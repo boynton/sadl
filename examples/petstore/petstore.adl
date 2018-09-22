@@ -1,0 +1,78 @@
+
+base "/v2"
+
+type ApiResponse Struct {
+   Int32 code;
+   String message;
+   String type;
+}
+
+type Category Struct {
+   Int64 id;
+   String name;
+}
+
+type Order Struct {
+   Bool complete (default=false);
+   Int64 id (optional);
+   Int64 petId (optional);
+   Int32 quantity (optional);
+   Timestamp shipDate (optional);
+   Enum {
+      placed,
+      approved,
+      delivered
+   } status (optional);
+}
+
+type Pet Struct {
+   Category category;
+   Int64 id (optional);
+   String name (example="doggie");
+   List<String> photoUrls;
+   Enum {
+       available,
+       pending,
+       sold
+   } status (optional); //pet status in the store
+   Array<Tag> tags
+}
+
+type Tag Struct {
+     Int64 id;
+     String name;
+}
+
+type User Struct {
+     String email (optional);
+     String firstName (optional);
+     int64 id (optional);
+     String lastName (optional);
+     String password (optional);
+     String phone (optional);
+     Int32 userStatus (optional); //User Status
+     String username (optional);
+}
+
+/* now the resources */
+
+//Find pet by ID
+resource Pet GET "/pet/{petId}" (x_tag="pet") {
+    Int64 petId; //ID of pet to return
+    expected 200;
+    exceptions {
+        ApiException 400; //Invalid ID supplied
+        ApiException 404; //Pet not found
+    }
+}
+
+//Delete a pet
+resource Pet DELETE "/pet/{petId}" (x_tag="pet") {
+    authorize(
+    Int64 petId; //Pet id to delete
+    String api_key (header="api_key", optional);
+    exceptions {
+        ApiException 400; //Invalid ID supplied
+        ApiException 404; //Pet not found
+    }
+}
