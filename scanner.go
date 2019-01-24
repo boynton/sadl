@@ -34,15 +34,7 @@ func main() {
 		}
 		if tok.Type != BLOCK_COMMENT { //ignore those
 			msg := tok.Type.String()
-			if tok.Type == STRING {
-				fmt.Println(scanner.formattedAnnotation("Token", msg, tok, RED))
-			} else if tok.Type == SYMBOL {
-				fmt.Println(scanner.formattedAnnotation("Token", msg, tok, BLUE))
-			} else if tok.Type == LINE_COMMENT {
-				fmt.Println(scanner.formattedAnnotation("Token", msg, tok, YELLOW))
-			} else {
-				fmt.Println(scanner.formattedAnnotation("Token", msg, tok, GREEN))
-			}
+			fmt.Println(scanner.formattedAnnotation("", msg, tok, RED, -1))
 		}
 	}
 }
@@ -61,7 +53,10 @@ const (
 	COLON
 	SEMICOLON
 	COMMA
-	ATSIGN
+	AT
+	DOT
+	EQUALS
+	DOLLAR
 	OPEN_BRACE
 	CLOSE_BRACE
 	OPEN_BRACKET
@@ -70,7 +65,6 @@ const (
 	CLOSE_PAREN
 	OPEN_ANGLE
 	CLOSE_ANGLE
-	EQUALS
 )
 
 type Token struct {
@@ -90,9 +84,12 @@ func (tokenType TokenType) String() string {
 	case NUMBER: return "NUMBER"
 	case STRING: return "STRING"
 	case COMMA: return "COMMA"
-	case COLON: return "COnLON"
+	case COLON: return "COLON"
 	case SEMICOLON: return "SEMICOLON"
-	case ATSIGN: return "ATSIGN"
+	case AT: return "AT"
+	case DOT: return "DOT"
+	case EQUALS: return "EQUALS"
+	case DOLLAR: return "DOLLAR"
 	case OPEN_BRACE: return "OPEN_BRACE"
 	case CLOSE_BRACE: return "CLOSE_BRACE"
 	case OPEN_BRACKET: return "OPEN_BRACKET"
@@ -101,7 +98,6 @@ func (tokenType TokenType) String() string {
 	case CLOSE_PAREN: return "CLOSE_PAREN"
 	case OPEN_ANGLE: return "OPEN_ANGLE"
 	case CLOSE_ANGLE: return "CLOSE_ANGLE"
-	case EQUALS: return "EQUALS"
 	}
 	return "?"
 }
@@ -217,7 +213,8 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 	tok := s.startToken(NUMBER)
 	gotDecimal := false
 	for {
-		if ch := s.read(); ch == eof {
+		ch := s.read()
+		if ch == eof {
 			break
 		} else if !isDigit(ch) {
 			if ch == '.' {
@@ -227,7 +224,9 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 				}
 				gotDecimal = true
 			} else {
-				s.unread()
+				if ch != '\n' {
+					s.unread()
+				}
 				break
 			}
 		} else {
@@ -334,8 +333,14 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = COLON
 	case ',':
 		tok.Type = COMMA
+	case '.':
+		tok.Type = DOT
 	case '@':
-		tok.Type = ATSIGN
+		tok.Type = AT
+	case '=':
+		tok.Type = EQUALS
+	case '$':
+		tok.Type = DOLLAR
 	case '{':
 		tok.Type = OPEN_BRACE
 	case '}':
@@ -352,8 +357,6 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = OPEN_ANGLE
 	case '>':
 		tok.Type = CLOSE_ANGLE
-	case '=':
-		tok.Type = EQUALS
 	}
 	return tok
 }
@@ -371,11 +374,10 @@ const YELLOW = "\033[0;33m"
 const BLUE = "\033[94m"
 const GREEN = "\033[92m"
 
-func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, color string) string {
-	contextSize := 4
+func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, color string, contextSize int) string {
 	if len(s.filename) > 0 {
 		data, err := ioutil.ReadFile(s.filename)
-		if err == nil {
+		if err == nil && contextSize >= 0 {
 			lines := strings.Split(string(data), "\n")
 			line := tok.Line - 1
 			begin := max(0, line-contextSize)
@@ -400,11 +402,11 @@ func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, colo
 					tmp += fmt.Sprintf("%3d\t%v\n", i+begin+1, l)
 				}
 			}
-			return fmt.Sprintf("%s%s (%s:%d:%d): %s%s\n%s", color, prefix, path.Base(s.filename), tok.Line, tok.Start, msg, BLACK, tmp)
+			return fmt.Sprintf("%s%s:%d:%d: %s%s%s\n%s", prefix, path.Base(s.filename), tok.Line, tok.Start, color, msg, BLACK, tmp)
 		}
-		return fmt.Sprintf("%s(%s:%d:%d): %s", prefix, filepath.Base(s.filename), tok.Line, tok.Start, msg)
+		return fmt.Sprintf("%s%s:%d:%d: %s", prefix, filepath.Base(s.filename), tok.Line, tok.Start, msg)
 	}
-	return fmt.Sprintf("%s(%d:%d): %s", prefix, tok.Line, tok.Start, msg)
+	return fmt.Sprintf("%s%d:%d: %s", prefix, tok.Line, tok.Start, msg)
 }
 
 func max(n1 int, n2 int) int {
