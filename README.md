@@ -11,12 +11,12 @@ and server code directly in a few languages for quick iterative API investigatio
 
 ## Usage
 
-   go get github.com/boynton/sadl
-   sadl foo.sadl # just parses and shows errors, if any.
+    go get github.com/boynton/sadl
+    sadl foo.sadl # just parses and shows errors, if any.
 
-   sadl jaxrs-server foo.sadl # generates a working java server based on jersey/jackson/jetty
-   sadl gen jaxrs-client foo.sadl # generates a working java client for the above server
-   sadl gen go-server foo.sadl # generates a go server
+    sadl jaxrs-server foo.sadl # generates a working java server based on jersey/jackson/jetty
+    sadl gen jaxrs-client foo.sadl # generates a working java client for the above server
+    sadl gen go-server foo.sadl # generates a go server
 
 ##
 
