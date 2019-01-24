@@ -279,8 +279,7 @@ func (s *Scanner) scanComment() Token {
 			}
 		}
 	}
-	return tok.illegal("bad comment")
-//	return tok.illegal("/" + string(ch) + "...")
+	return tok.illegal("/" + string(ch) + "...")
 }
 
 func (s *Scanner) scanString(matchingQuote rune) Token {
