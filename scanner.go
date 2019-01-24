@@ -32,9 +32,12 @@ func main() {
 		if tok.Type == EOF {
 			break
 		}
-		if tok.Type != BLOCK_COMMENT { //ignore those
+		if tok.Type == ILLEGAL {
+			fmt.Println(scanner.formattedAnnotation("", "Syntax error", tok, RED, 5))
+			os.Exit(1)
+		} else if tok.Type != BLOCK_COMMENT { //ignore those
 			msg := tok.Type.String()
-			fmt.Println(scanner.formattedAnnotation("", msg, tok, RED, -1))
+			fmt.Println(scanner.formattedAnnotation("", msg, tok, GREEN, -1))
 		}
 	}
 }
@@ -172,7 +175,7 @@ func (s *Scanner) Scan() Token {
 		if !isWhitespace(ch) {
 			if isLetter(ch) {
 				return s.scanSymbol(ch)
-			} else if isDigit(ch) {
+			} else if isDigit(ch) || ch == '-' {
 				return s.scanNumber(ch)
 			} else if ch == '/' {
 				return s.scanComment()
@@ -375,6 +378,8 @@ const BLUE = "\033[94m"
 const GREEN = "\033[92m"
 
 func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, color string, contextSize int) string {
+	highlight := color + "\033[1m"
+	restore := BLACK + "\033[0m"
 	if len(s.filename) > 0 {
 		data, err := ioutil.ReadFile(s.filename)
 		if err == nil && contextSize >= 0 {
@@ -396,13 +401,13 @@ func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, colo
 					mid := l[tok.Start-1:tok.Start-1+toklen]
 					right := l[tok.Start-1+toklen:]
 					tmp += fmt.Sprintf("%3d\t%v", i+begin+1, left)
-					tmp += fmt.Sprintf("%s%v%s", color, mid, BLACK)
+					tmp += fmt.Sprintf("%s%v%s", highlight, mid, restore)
 					tmp += fmt.Sprintf("%v\n", right)
 				} else {
 					tmp += fmt.Sprintf("%3d\t%v\n", i+begin+1, l)
 				}
 			}
-			return fmt.Sprintf("%s%s:%d:%d: %s%s%s\n%s", prefix, path.Base(s.filename), tok.Line, tok.Start, color, msg, BLACK, tmp)
+			return fmt.Sprintf("%s%s:%d:%d: %s%s%s\n%s", prefix, path.Base(s.filename), tok.Line, tok.Start, highlight, msg, restore, tmp)
 		}
 		return fmt.Sprintf("%s%s:%d:%d: %s", prefix, filepath.Base(s.filename), tok.Line, tok.Start, msg)
 	}
