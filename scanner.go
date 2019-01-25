@@ -5,42 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
-
-	"io/ioutil"
-	"strings"
-	"path"
-	"path/filepath"
 )
-
-//TODO remove this
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("usage: scanner file.sadl")
-		os.Exit(1)
-	}
-	path := os.Args[1]
-	fi, err := os.Open(path)
-	if err != nil {
-		panic("Can't open file")
-	}
-	defer fi.Close()	
-	reader := bufio.NewReader(fi)
-	scanner := NewScanner(path, reader)
-	for {
-		tok := scanner.Scan()
-		if tok.Type == EOF {
-			break
-		}
-		if tok.Type == ILLEGAL {
-			fmt.Println(scanner.formattedAnnotation("", "Syntax error", tok, RED, 5))
-			os.Exit(1)
-		} else if tok.Type != BLOCK_COMMENT { //ignore those
-			msg := tok.Type.String()
-			fmt.Println(scanner.formattedAnnotation("", msg, tok, GREEN, -1))
-		}
-	}
-}
 
 
 type TokenType int
@@ -60,6 +25,9 @@ const (
 	DOT
 	EQUALS
 	DOLLAR
+	QUOTE
+	SLASH
+	QUESTION
 	OPEN_BRACE
 	CLOSE_BRACE
 	OPEN_BRACKET
@@ -68,6 +36,13 @@ const (
 	CLOSE_PAREN
 	OPEN_ANGLE
 	CLOSE_ANGLE
+//not sure we need to model more than that
+	HASH
+	AMPERSAND
+	STAR
+	BACKQUOTE
+	TILDE
+	BANG
 )
 
 type Token struct {
@@ -90,9 +65,18 @@ func (tokenType TokenType) String() string {
 	case COLON: return "COLON"
 	case SEMICOLON: return "SEMICOLON"
 	case AT: return "AT"
+	case AMPERSAND: return "AMPERSAND"
 	case DOT: return "DOT"
 	case EQUALS: return "EQUALS"
+	case STAR: return "STAR"
 	case DOLLAR: return "DOLLAR"
+	case QUOTE: return "QUOTE"
+	case BACKQUOTE: return "BACKQUOTE"
+	case TILDE: return "TILDE"
+	case BANG: return "BANG"
+	case SLASH: return "SLASH"
+	case HASH: return "HASH"
+	case QUESTION: return "QUESTION"
 	case OPEN_BRACE: return "OPEN_BRACE"
 	case CLOSE_BRACE: return "CLOSE_BRACE"
 	case OPEN_BRACKET: return "OPEN_BRACKET"
@@ -179,8 +163,8 @@ func (s *Scanner) Scan() Token {
 				return s.scanNumber(ch)
 			} else if ch == '/' {
 				return s.scanComment()
-			} else if ch == '"' || ch == '\'' {
-				return s.scanString(ch)
+			} else if ch == '"' {
+				return s.scanString()
 			} else {
 				return s.scanPunct(ch)
 			}
@@ -281,10 +265,11 @@ func (s *Scanner) scanComment() Token {
 			}
 		}
 	}
-	return tok.illegal("/" + string(ch) + "...")
+	tok.Type = SLASH
+	return tok.finish("/")
 }
 
-func (s *Scanner) scanString(matchingQuote rune) Token {
+func (s *Scanner) scanString() Token {
 	escape := false
 	var buf bytes.Buffer
 	tok := s.startToken(STRING)
@@ -300,7 +285,7 @@ func (s *Scanner) scanString(matchingQuote rune) Token {
 				ch = '\n'
 			case 't':
 				buf.WriteRune('\t')
-			case matchingQuote:
+			case '"':
 				buf.WriteRune(ch)
 			case '\\':
 				buf.WriteRune(ch)
@@ -312,7 +297,7 @@ func (s *Scanner) scanString(matchingQuote rune) Token {
 			continue
 		}
 		switch ch {
-		case matchingQuote:
+		case '"':
 			return tok.finish(buf.String())
 		case '\\':
 			escape = true
@@ -340,10 +325,28 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = DOT
 	case '@':
 		tok.Type = AT
+	case '&':
+		tok.Type = AMPERSAND
 	case '=':
 		tok.Type = EQUALS
+	case '*':
+		tok.Type = STAR
 	case '$':
 		tok.Type = DOLLAR
+	case '\'':
+		tok.Type = QUOTE
+	case '`':
+		tok.Type = BACKQUOTE
+	case '~':
+		tok.Type = TILDE
+	case '!':
+		tok.Type = BANG
+	case '/':
+		tok.Type = SLASH
+	case '#':
+		tok.Type = HASH
+	case '?':
+		tok.Type = QUESTION
 	case '{':
 		tok.Type = OPEN_BRACE
 	case '}':
@@ -362,69 +365,5 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = CLOSE_ANGLE
 	}
 	return tok
-}
-
-/*
-func (s *Scanner) error(msg string) {
-	s := s.formattedAnnotation(msg)
-	p.err = fmt.Errorf(s)
-}
-*/
-
-const BLACK = "\033[0;0m"
-const RED = "\033[0;31m"
-const YELLOW = "\033[0;33m"
-const BLUE = "\033[94m"
-const GREEN = "\033[92m"
-
-func (s *Scanner) formattedAnnotation(prefix string, msg string, tok Token, color string, contextSize int) string {
-	highlight := color + "\033[1m"
-	restore := BLACK + "\033[0m"
-	if len(s.filename) > 0 {
-		data, err := ioutil.ReadFile(s.filename)
-		if err == nil && contextSize >= 0 {
-			lines := strings.Split(string(data), "\n")
-			line := tok.Line - 1
-			begin := max(0, line-contextSize)
-				end := min(len(lines), line+contextSize+1)
-			context := lines[begin:end]
-			tmp := ""
-			for i, l := range context {
-				if i+begin == line {
-					toklen := len(tok.Text)
-					if tok.Type == STRING {
-						toklen = len(fmt.Sprintf("%q", tok.Text))
-					} else if tok.Type == LINE_COMMENT {
-						toklen = toklen + 2
-					}
-					left := l[:tok.Start-1]
-					mid := l[tok.Start-1:tok.Start-1+toklen]
-					right := l[tok.Start-1+toklen:]
-					tmp += fmt.Sprintf("%3d\t%v", i+begin+1, left)
-					tmp += fmt.Sprintf("%s%v%s", highlight, mid, restore)
-					tmp += fmt.Sprintf("%v\n", right)
-				} else {
-					tmp += fmt.Sprintf("%3d\t%v\n", i+begin+1, l)
-				}
-			}
-			return fmt.Sprintf("%s%s:%d:%d: %s%s%s\n%s", prefix, path.Base(s.filename), tok.Line, tok.Start, highlight, msg, restore, tmp)
-		}
-		return fmt.Sprintf("%s%s:%d:%d: %s", prefix, filepath.Base(s.filename), tok.Line, tok.Start, msg)
-	}
-	return fmt.Sprintf("%s%d:%d: %s", prefix, tok.Line, tok.Start, msg)
-}
-
-func max(n1 int, n2 int) int {
-	if n1 > n2 {
-		return n1
-	}
-	return n2
-}
-
-func min(n1 int, n2 int) int {
-	if n1 < n2 {
-		return n1
-	}
-	return n2
 }
 
