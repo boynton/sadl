@@ -27,7 +27,7 @@ func main() {
 	if true {
 		pjson := sadl.Pretty(schema)
 		fmt.Println(pjson)
-		if true {
+		if false {
 			var myschema sadl.Schema
 			err = json.Unmarshal([]byte(pjson),&myschema)
 			if err == nil {
