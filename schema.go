@@ -1,25 +1,100 @@
-package main
+package sadl
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
+var _ = json.Marshal
+var _ = fmt.Printf
+
+type BaseType int
+
+const (
+	_ BaseType = iota
+	Bool
+	Int8
+	Int16
+	Int32
+	Int64
+	Float32
+	Float64
+	Decimal
+	Bytes
+	String
+	Timestamp
+	Quantity
+	UUID
+	Array
+	Map
+	Struct
+	Enum
+	Union
+	Any
+)
+
+var namesBaseType = []string{
+	Bool:      "Bool",
+	Int8:      "Int8",
+	Int16:     "Int16",
+	Int32:     "Int32",
+	Int64:     "Int64",
+	Float32:   "Float32",
+	Float64:   "Float64",
+	Decimal:   "Decimal",
+	Bytes:     "Bytes",
+	String:    "String",
+	Timestamp: "Timestamp",
+	Quantity:  "Quantity",
+	UUID:      "UUID",
+	Array:     "Array",
+	Map:       "Map",
+	Struct:    "Struct",
+	Enum:      "Enum",
+	Union:     "Union",
+	Any:       "Any",
+}
 
 type Schema struct {
-	Namespace string         `json:"namespace"`
-	Name string              `json:"name"`
-	Version string           `json:"version"`
-	Comment string           `json:"comment"`
-	Types map[string]TypeDef `json:"types"`
+	Name      string     `json:"name"`
+	Namespace string     `json:"namespace,omitempty"`
+	Version   string     `json:"version,omitempty"`
+	Comment   string     `json:"comment,omitempty"`
+	Types     []*TypeDef `json:"types,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type TypeDef struct {
-	Name string   `json:"name"`
-	Type string   `json:"type"`
-	Struct *StructTypeDef `json:"struct,omitempty"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+	Comment string `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	Pattern string `json:"pattern,omitempty"`
+	Values []string `json:"values,omitempty"`
+	MinSize *int32 `json:"minSize,omitempty"`
+	MaxSize *int32 `json:"maxSize,omitempty"`
+	Fields []*StructFieldDef `json:"fields,omitempty"`
+	Elements []*EnumElementDef `json:"elements,omitempty"`
+	Min *decimal `json:"min,string,omitempty"`
+	Max *decimal `json:"max,string,omitempty"`
+	Items string `json:"items,omitempty"`
+	Keys string `json:"keys,omitempty"`
+}
+
+type EnumElementDef struct {
+	Symbol string `json:"symbol"`
+	Comment string `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type StructFieldDef struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
-}
-
-type StructTypeDef struct {
-	Fields []*StructFieldDef `json:"fields,omitempty"`
+	Required bool `json:"required,omitempty"`
+	Default interface{} `json:"default,omitempty"`
+	Comment string `json:"comment,omitempty"`
+	Items string `json:"items,omitempty"`
+	Keys string `json:"keys,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }

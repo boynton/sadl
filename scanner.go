@@ -1,4 +1,4 @@
-package main
+package sadl
 
 import (
 	"bufio"
@@ -36,13 +36,16 @@ const (
 	CLOSE_PAREN
 	OPEN_ANGLE
 	CLOSE_ANGLE
-//not sure we need to model more than that
+	NEWLINE
+/* We don't really need the rest
 	HASH
 	AMPERSAND
 	STAR
 	BACKQUOTE
 	TILDE
 	BANG
+*/
+
 )
 
 type Token struct {
@@ -65,17 +68,13 @@ func (tokenType TokenType) String() string {
 	case COLON: return "COLON"
 	case SEMICOLON: return "SEMICOLON"
 	case AT: return "AT"
-	case AMPERSAND: return "AMPERSAND"
 	case DOT: return "DOT"
 	case EQUALS: return "EQUALS"
-	case STAR: return "STAR"
 	case DOLLAR: return "DOLLAR"
 	case QUOTE: return "QUOTE"
-	case BACKQUOTE: return "BACKQUOTE"
-	case TILDE: return "TILDE"
-	case BANG: return "BANG"
+	case NEWLINE: return "NEWLINE"
+
 	case SLASH: return "SLASH"
-	case HASH: return "HASH"
 	case QUESTION: return "QUESTION"
 	case OPEN_BRACE: return "OPEN_BRACE"
 	case CLOSE_BRACE: return "CLOSE_BRACE"
@@ -85,6 +84,14 @@ func (tokenType TokenType) String() string {
 	case CLOSE_PAREN: return "CLOSE_PAREN"
 	case OPEN_ANGLE: return "OPEN_ANGLE"
 	case CLOSE_ANGLE: return "CLOSE_ANGLE"
+/*
+	case BACKQUOTE: return "BACKQUOTE"
+	case TILDE: return "TILDE"
+	case AMPERSAND: return "AMPERSAND"
+	case STAR: return "STAR"
+	case BANG: return "BANG"
+	case HASH: return "HASH"
+*/
 	}
 	return "?"
 }
@@ -112,6 +119,7 @@ type Scanner struct {
 	r *bufio.Reader
 	line int
 	column int
+	prevColumn int
 	atEOL bool
 }
 
@@ -126,6 +134,7 @@ func (s *Scanner) read() rune {
 	}
 	if ch == '\n' {
 		s.line = s.line + 1
+		s.prevColumn = s.column + 1
 		s.column = 0
 	} else {
 		s.column = s.column + 1
@@ -133,8 +142,13 @@ func (s *Scanner) read() rune {
 	return ch
 }
 
-func (s *Scanner) unread() {
-	s.column = s.column - 1
+func (s *Scanner) unread(ch rune) {
+	if ch == '\n' {
+		s.column = s.prevColumn-1
+		s.line = s.line - 1
+	} else {
+		s.column = s.column - 1
+	}
 	s.r.UnreadRune()
 }
 
@@ -168,6 +182,8 @@ func (s *Scanner) Scan() Token {
 			} else {
 				return s.scanPunct(ch)
 			}
+		} else if ch == '\n' {
+			return Token{Type: NEWLINE, Text: "\n", Line: s.line-1, Start: s.prevColumn}
 		}
 	}
 }
@@ -182,9 +198,7 @@ func (s *Scanner) scanSymbol(firstChar rune) Token {
 		if ch == eof {
 			break
 		} else if !isLetter(ch) && !isDigit(ch) && ch != '_' {
-			if ch != '\n' {
-				s.unread()
-			}
+			s.unread(ch)
 			break
 		} else {
 			buf.WriteRune(ch)
@@ -211,9 +225,7 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 				}
 				gotDecimal = true
 			} else {
-				if ch != '\n' {
-					s.unread()
-				}
+				s.unread(ch)
 				break
 			}
 		} else {
@@ -232,7 +244,11 @@ func (s *Scanner) scanComment() Token {
 			var buf bytes.Buffer
 			for {
 				ch = s.read()
-				if ch == eof || ch == '\n' {
+				if ch == eof {
+					break
+				}
+				if ch == '\n' {
+					s.unread(ch)
 					break
 				}
 				buf.WriteRune(ch)
@@ -325,26 +341,14 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = DOT
 	case '@':
 		tok.Type = AT
-	case '&':
-		tok.Type = AMPERSAND
 	case '=':
 		tok.Type = EQUALS
-	case '*':
-		tok.Type = STAR
 	case '$':
 		tok.Type = DOLLAR
 	case '\'':
 		tok.Type = QUOTE
-	case '`':
-		tok.Type = BACKQUOTE
-	case '~':
-		tok.Type = TILDE
-	case '!':
-		tok.Type = BANG
 	case '/':
 		tok.Type = SLASH
-	case '#':
-		tok.Type = HASH
 	case '?':
 		tok.Type = QUESTION
 	case '{':
@@ -363,6 +367,22 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = OPEN_ANGLE
 	case '>':
 		tok.Type = CLOSE_ANGLE
+	case '\n':
+		tok.Type = NEWLINE
+/*
+	case '!':
+		tok.Type = BANG
+	case '*':
+		tok.Type = STAR
+	case '&':
+		tok.Type = AMPERSAND
+	case '`':
+		tok.Type = BACKQUOTE
+	case '~':
+		tok.Type = TILDE
+	case '#':
+		tok.Type = HASH
+*/
 	}
 	return tok
 }
