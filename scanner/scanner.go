@@ -1,4 +1,4 @@
-package sadl
+package scanner
 
 import (
 	"bufio"
@@ -100,6 +100,14 @@ func (tok Token) String() string {
 	return fmt.Sprintf("<%v %q %d:%d>", tok.Type, tok.Text, tok.Line, tok.Start)
 }
 
+func (tok Token) IsText() bool {
+	return tok.Type == SYMBOL || tok.Type == STRING
+}
+
+func (tok Token) IsNumeric() bool {
+	return tok.Type == NUMBER
+}
+
 func isWhitespace(ch rune) bool {
 	return ch == ' ' || ch == '\t' || ch == '\n'
 }
@@ -123,7 +131,7 @@ type Scanner struct {
 	atEOL bool
 }
 
-func NewScanner(filename string, r io.Reader) *Scanner {
+func New(filename string, r io.Reader) *Scanner {
 	return &Scanner{filename: filename, r: bufio.NewReader(r), line: 1, column: 0}
 }
 

@@ -80,6 +80,9 @@ type TypeDef struct {
 	Max *decimal `json:"max,string,omitempty"`
 	Items string `json:"items,omitempty"`
 	Keys string `json:"keys,omitempty"`
+	Variants []string `json:"variants,omitempty"` //FIXME: a variant element, so comments/annotations can be attached
+	Unit string `json:"unit,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type EnumElementDef struct {
@@ -96,5 +99,13 @@ type StructFieldDef struct {
 	Comment string `json:"comment,omitempty"`
 	Items string `json:"items,omitempty"`
 	Keys string `json:"keys,omitempty"`
+	Value string `json:"value,omitempty"`
+	Unit string `json:"unit,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
+	Values []string `json:"values,omitempty"`
+	Min *decimal `json:"min,omitempty"`
+	Max *decimal `json:"max,omitempty"`
+	MinSize *int32 `json:"minsize,omitempty"`
+	MaxSize *int32 `json:"maxsize,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }

@@ -19,7 +19,7 @@ func main() {
 	}
 	path := args[0]
 	sadl.Verbose = *pVerbose
-	schema, err := sadl.Parse(path)
+	schema, err := sadl.ParseFile(path)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
