@@ -1,71 +1,75 @@
 //schema comment line 1. Line comments get preserved with the closest element in the schema, these first few are schema comments
-namespace tests; //line 2: For java, this means com.boynton.tests.basictypes, for go github.com/boynton/tests/basictypes
-name basictypes; //line 3 for the schema
-version 1; //line 4 for the schema
+namespace tests //line 2: For java, this means com.boynton.tests.basictypes, for go github.com/boynton/tests/basictypes
+name basictypes //line 3 for the schema
+version 1 //line 4 for the schema
 
 /* Block comments get totally ignored.
 The following is not yet implemented:
-include "names.rdl";
+include "names.rdl"
 */
 
 //And this comment gets attach to the type SimpleName
-type SimpleName String (pattern="[a-zA-Z_][a-zA-Z_0-9]*");
-type CompoundName String (pattern="({SimpleName}\\.)*{SimpleName}");
+type SimpleName String (pattern="[a-zA-Z_][a-zA-Z_0-9]*")
+type CompoundName String (pattern="({SimpleName}\\.)*{SimpleName}")
 
 //options comment
 type Options Enum {ONE, TWO, THREE}
 
-type ComplicatedOptions String (values=["a:b","c:d","e:f"]);
+type NonSymbolicOptions String (values=["a:b","c:d","e:f"])
 
 //AlphaName def
-type AlphaName String (pattern="[a-zA-Z_]+"); //one or more alpha characters
+type AlphaName String (pattern="[a-zA-Z_]+") //one or more alpha characters
 
-type YEncoded String (pattern="[a-zA-Z0-9._%=-]*");
+type YEncoded String (pattern="[a-zA-Z0-9._%=-]*")
+
+/* note that semicolons are optional */
 type StringTest Struct {
-     SimpleName name (required);
-     CompoundName parent (required);
-     Array<SimpleName> names;
-     YEncoded enc;
+     SimpleName name (required); //name comment
+     CompoundName parent (required); //parent comment
+     Array<SimpleName> names ; //names comment
+     YEncoded enc //enc comment
 }
 
-/* The following only work without the -pedantic flag */
-type azAZ String (pattern="[a-zA-Z]+"); 
-type TinyInt Int8;
-type SmallInt Int16;
-type RegularInt Int32;
-type LargeInt Int64;
+type azAZ String (pattern="[a-zA-Z]+")
+type TinyInt Int8
+type SmallInt Int16
+type RegularInt Int32
+type LargeInt Int64
+type RegularFloat Float32
+type LargeFloat Float64
+type HugeNumber Decimal
 
-type Year Int32 (min=1000, max=3000);
-type Latitude Float64 (min=-90,max=90);
-type Pi Float64 (min=3.0 , max=3.5);
-type LongNumber Int64 (min=500000 ,max=10000000);
-type NumberBigFraction Decimal (max=3.141592653589793238462643383279502884197169399375105819);
-type BigNumber Decimal (max=3141592653589793238462643383279502884197169399375105819);
+type Year Int32 (min=1000, max=3000)
+type Latitude Float64 (min=-90,max=90)
+type Pi Float64 (min=3.0 , max=3.5)
+type LongNumber Int64 (min=500000 ,max=10000000)
+type NumberBigFraction Decimal (max=3.141592653589793238462643383279502884197169399375105819)
+type BigNumber Decimal (max=3141592653589793238462643383279502884197169399375105819)
 
 
 type MapTest Struct {
-    Map<String,Int32> locations;
+    Map<String,Int32> locations
 }
 
-type ArrayOfInt Array<Int32> (maxsize=3);
+type ArrayOfInt Array<Int32> (maxsize=3)
 type MapArrayTest Struct {
-    Map<String,ArrayOfInt> locations;
+    Map<String,ArrayOfInt> locations
 }
 
 type IntOOBTest Struct {
-    Year    theyear;
+    Year    theyear
 }
 
 type NegativeNumberTest Struct {
-    Latitude mylatitude;
+    Latitude mylatitude
 }
 
 type UUIDTest Struct {
-    UUID myid;
+    UUID myid
 }
 
 type TimestampTest Struct {
-    Timestamp mytime ;
+    Timestamp mytime
 }
 
 type Test Struct {

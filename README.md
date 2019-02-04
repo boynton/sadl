@@ -33,7 +33,8 @@ and server code directly in a few languages for quick iterative API investigatio
 
 ## Example Schemas
 
-For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples)directory.
+For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples) directory.
+
 ## Usage
 
     go get github.com/boynton/sadl/...
