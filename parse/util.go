@@ -1,18 +1,16 @@
-package sadl
+package parse
 
-import(
+import (
 	"encoding/json"
 	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/boynton/sadl/scanner"
 )
 
 var Verbose bool
 
-func debug(args ...interface{}) {
+func Debug(args ...interface{}) {
 	if Verbose {
 		max := len(args) - 1
 		for i := 0; i < max; i++ {
@@ -26,23 +24,6 @@ func str(arg interface{}) string {
 	return fmt.Sprintf("%v", arg)
 }
 
-func BaseFileName(path string) string {
-	fname := FileName(path)
-	n := strings.LastIndex(fname, ".")
-	if n < 1 {
-		return fname
-	}
-	return fname[:n]
-}
-
-func FileName(path string) string {
-	return filepath.Base(path)
-}
-
-func FileDir(path string) string {
-	return filepath.Dir(path)
-}
-
 func Pretty(obj interface{}) string {
 	j, err := json.MarshalIndent(obj, "", "    ")
 	if err != nil {
@@ -51,6 +32,15 @@ func Pretty(obj interface{}) string {
 	return string(j)
 }
 
+func BaseFileName(path string) string {
+	fname := filepath.Base(path)
+	//	fname := FileName(path)
+	n := strings.LastIndex(fname, ".")
+	if n < 1 {
+		return fname
+	}
+	return fname[:n]
+}
 
 const BLACK = "\033[0;0m"
 const RED = "\033[0;31m"
@@ -58,7 +48,7 @@ const YELLOW = "\033[0;33m"
 const BLUE = "\033[94m"
 const GREEN = "\033[92m"
 
-func formattedAnnotation(filename string, source string, prefix string, msg string, tok *scanner.Token, color string, contextSize int) string {
+func formattedAnnotation(filename string, source string, prefix string, msg string, tok *Token, color string, contextSize int) string {
 	highlight := color + "\033[1m"
 	restore := BLACK + "\033[0m"
 	if source != "" && contextSize >= 0 {
@@ -72,9 +62,9 @@ func formattedAnnotation(filename string, source string, prefix string, msg stri
 			if i+begin == line {
 				toklen := len(tok.Text)
 				if toklen > 0 {
-					if tok.Type == scanner.STRING {
+					if tok.Type == STRING {
 						toklen = len(fmt.Sprintf("%q", tok.Text))
-					} else if tok.Type == scanner.LINE_COMMENT {
+					} else if tok.Type == LINE_COMMENT {
 						toklen = toklen + 2
 					}
 					left := ""
@@ -82,7 +72,7 @@ func formattedAnnotation(filename string, source string, prefix string, msg stri
 					right := ""
 					if tok.Start > 0 && toklen > 1 {
 						left = l[:tok.Start-1]
-						mid = l[tok.Start-1:tok.Start-1+toklen]
+						mid = l[tok.Start-1 : tok.Start-1+toklen]
 						right = l[tok.Start-1+toklen:]
 					}
 					tmp += fmt.Sprintf("%3d\t%v", i+begin+1, left)
@@ -120,4 +110,3 @@ func min(n1 int, n2 int) int {
 	}
 	return n2
 }
-

@@ -1,7 +1,8 @@
-package sadl
+package parse
 
-import(
+import (
 	"fmt"
+	//	"github.com/boynton/sadl"
 )
 
 type ExtensionHandler interface {
@@ -38,4 +39,3 @@ func (p *Parser) parseExtensionDirective(comment string, extension string) error
 	}
 	return p.expectedDirectiveError()
 }
-

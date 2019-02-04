@@ -1,51 +1,77 @@
 package sadl
 
-import(
+import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 )
 
 const DecimalPrecision = uint(250)
 
-type decimal struct {
+type Decimal struct {
 	bf *big.Float
 }
 
 // Encode as a string. Encoding as a JSON number works fine, but the Unbmarshal doesn't. If we use string as the representation in JSON, it works fine.
 // What a shame.
-func (bd *decimal) MarshalJSON() ([]byte, error) {
-	repr := bd.bf.Text('f',-1)
+func (d *Decimal) MarshalJSON() ([]byte, error) {
+	repr := d.bf.Text('f', -1)
 	stringRepr := "\"" + repr + "\""
 	return []byte(stringRepr), nil
 }
 
-func (bd *decimal) UnmarshalJSON(b []byte) error {
+func (d *Decimal) UnmarshalJSON(b []byte) error {
 	var stringRepr string
 	err := json.Unmarshal(b, &stringRepr)
-   if err == nil {
-		num, err := parseDecimal(stringRepr)
+	if err == nil {
+		var num *Decimal
+		num, err = ParseDecimal(stringRepr)
 		if err == nil {
-			bd.bf = num.bf
+			d.bf = num.bf
+			return nil
+		}
+	} else {
+		var floatRepr float64
+		err = json.Unmarshal(b, &floatRepr)
+		if err == nil {
+			num := NewDecimal(floatRepr)
+			d.bf = num.bf
+			return nil
 		}
 	}
-	return err
+	return fmt.Errorf("Bad Decimal number: %s", string(b))
 }
 
-func parseDecimal(text string) (*decimal, error) {
+func ParseDecimal(text string) (*Decimal, error) {
 	num, _, err := big.ParseFloat(text, 10, DecimalPrecision, big.ToNearestEven)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Bad Decimal number: %s", text)
 	}
-	return &decimal{bf: num}, nil
+	return &Decimal{bf: num}, nil
 }
 
-func decimalToInt64(d *decimal) int64 {
+func NewDecimal(val float64) *Decimal {
+	return &Decimal{bf: big.NewFloat(val)}
+}
+
+func (d *Decimal) String() string {
+	if d == nil {
+		return ""
+	}
+	return fmt.Sprint(d.bf)
+}
+
+func (d *Decimal) Int32() int32 {
+	n := d.Int64()
+	return int32(n)
+}
+
+func (d *Decimal) Int64() int64 {
 	i, _ := d.bf.Int64()
 	return i
 }
 
-func decimalToFloat64(d *decimal) float64 {
+func (d *Decimal) Float64() float64 {
 	f, _ := d.bf.Float64()
 	return f
 }
-

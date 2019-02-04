@@ -1,4 +1,4 @@
-package scanner
+package parse
 
 import (
 	"bufio"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 )
-
 
 type TokenType int
 
@@ -37,61 +36,91 @@ const (
 	OPEN_ANGLE
 	CLOSE_ANGLE
 	NEWLINE
-/* We don't really need the rest
 	HASH
 	AMPERSAND
 	STAR
 	BACKQUOTE
 	TILDE
 	BANG
-*/
-
 )
 
 type Token struct {
-	Type TokenType
-	Text string
-	Line int
+	Type  TokenType
+	Text  string
+	Line  int
 	Start int
 }
 
 func (tokenType TokenType) String() string {
 	switch tokenType {
-	case ILLEGAL: return "ILLEGAL"
-	case EOF: return "EOF"
-	case LINE_COMMENT: return "LINE_COMMENT"
-	case BLOCK_COMMENT: return "BLOCK_COMMENT"
-	case SYMBOL: return "SYMBOL"
-	case NUMBER: return "NUMBER"
-	case STRING: return "STRING"
-	case COMMA: return "COMMA"
-	case COLON: return "COLON"
-	case SEMICOLON: return "SEMICOLON"
-	case AT: return "AT"
-	case DOT: return "DOT"
-	case EQUALS: return "EQUALS"
-	case DOLLAR: return "DOLLAR"
-	case QUOTE: return "QUOTE"
-	case NEWLINE: return "NEWLINE"
+	case ILLEGAL:
+		return "ILLEGAL"
+	case EOF:
+		return "EOF"
 
-	case SLASH: return "SLASH"
-	case QUESTION: return "QUESTION"
-	case OPEN_BRACE: return "OPEN_BRACE"
-	case CLOSE_BRACE: return "CLOSE_BRACE"
-	case OPEN_BRACKET: return "OPEN_BRACKET"
-	case CLOSE_BRACKET: return "CLOSE_BRACKET"
-	case OPEN_PAREN: return "OPEN_PAREN"
-	case CLOSE_PAREN: return "CLOSE_PAREN"
-	case OPEN_ANGLE: return "OPEN_ANGLE"
-	case CLOSE_ANGLE: return "CLOSE_ANGLE"
-/*
-	case BACKQUOTE: return "BACKQUOTE"
-	case TILDE: return "TILDE"
-	case AMPERSAND: return "AMPERSAND"
-	case STAR: return "STAR"
-	case BANG: return "BANG"
-	case HASH: return "HASH"
-*/
+	case LINE_COMMENT:
+		return "LINE_COMMENT"
+	case BLOCK_COMMENT:
+		return "BLOCK_COMMENT"
+
+	case SYMBOL:
+		return "SYMBOL"
+	case NUMBER:
+		return "NUMBER"
+	case STRING:
+		return "STRING"
+
+	case COMMA:
+		return "COMMA"
+	case COLON:
+		return "COLON"
+	case SEMICOLON:
+		return "SEMICOLON"
+	case AT:
+		return "AT"
+	case DOT:
+		return "DOT"
+	case EQUALS:
+		return "EQUALS"
+	case DOLLAR:
+		return "DOLLAR"
+	case QUOTE:
+		return "QUOTE"
+	case NEWLINE:
+		return "NEWLINE"
+
+	case SLASH:
+		return "SLASH"
+	case QUESTION:
+		return "QUESTION"
+	case OPEN_BRACE:
+		return "OPEN_BRACE"
+	case CLOSE_BRACE:
+		return "CLOSE_BRACE"
+	case OPEN_BRACKET:
+		return "OPEN_BRACKET"
+	case CLOSE_BRACKET:
+		return "CLOSE_BRACKET"
+	case OPEN_PAREN:
+		return "OPEN_PAREN"
+	case CLOSE_PAREN:
+		return "CLOSE_PAREN"
+	case OPEN_ANGLE:
+		return "OPEN_ANGLE"
+	case CLOSE_ANGLE:
+		return "CLOSE_ANGLE"
+	case BACKQUOTE:
+		return "BACKQUOTE"
+	case TILDE:
+		return "TILDE"
+	case AMPERSAND:
+		return "AMPERSAND"
+	case STAR:
+		return "STAR"
+	case BANG:
+		return "BANG"
+	case HASH:
+		return "HASH"
 	}
 	return "?"
 }
@@ -123,12 +152,12 @@ func isLetter(ch rune) bool {
 var eof = rune(0)
 
 type Scanner struct {
-	filename string
-	r *bufio.Reader
-	line int
-	column int
+	filename   string
+	r          *bufio.Reader
+	line       int
+	column     int
 	prevColumn int
-	atEOL bool
+	atEOL      bool
 }
 
 func New(filename string, r io.Reader) *Scanner {
@@ -152,7 +181,7 @@ func (s *Scanner) read() rune {
 
 func (s *Scanner) unread(ch rune) {
 	if ch == '\n' {
-		s.column = s.prevColumn-1
+		s.column = s.prevColumn - 1
 		s.line = s.line - 1
 	} else {
 		s.column = s.column - 1
@@ -191,7 +220,7 @@ func (s *Scanner) Scan() Token {
 				return s.scanPunct(ch)
 			}
 		} else if ch == '\n' {
-			return Token{Type: NEWLINE, Text: "\n", Line: s.line-1, Start: s.prevColumn}
+			return Token{Type: NEWLINE, Text: "\n", Line: s.line - 1, Start: s.prevColumn}
 		}
 	}
 }
@@ -200,7 +229,7 @@ func (s *Scanner) scanSymbol(firstChar rune) Token {
 	var buf bytes.Buffer
 	buf.WriteRune(firstChar)
 	tok := s.startToken(SYMBOL)
-	
+
 	for {
 		ch := s.read()
 		if ch == eof {
@@ -240,13 +269,13 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 			buf.WriteRune(ch)
 		}
 	}
-	tok.Text = buf.String()	
-	return tok	
+	tok.Text = buf.String()
+	return tok
 }
 
 func (s *Scanner) scanComment() Token {
 	tok := s.startToken(LINE_COMMENT)
-	ch := s.read();
+	ch := s.read()
 	if ch != eof {
 		if ch == '/' {
 			var buf bytes.Buffer
@@ -298,7 +327,7 @@ func (s *Scanner) scanString() Token {
 	var buf bytes.Buffer
 	tok := s.startToken(STRING)
 	for {
-		ch := s.read();
+		ch := s.read()
 		if ch == eof {
 			return tok.illegal("unterminated string")
 		}
@@ -377,21 +406,20 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = CLOSE_ANGLE
 	case '\n':
 		tok.Type = NEWLINE
-/*
-	case '!':
-		tok.Type = BANG
-	case '*':
-		tok.Type = STAR
-	case '&':
-		tok.Type = AMPERSAND
-	case '`':
-		tok.Type = BACKQUOTE
-	case '~':
-		tok.Type = TILDE
-	case '#':
-		tok.Type = HASH
-*/
+		/*
+			case '!':
+				tok.Type = BANG
+			case '*':
+				tok.Type = STAR
+			case '&':
+				tok.Type = AMPERSAND
+			case '`':
+				tok.Type = BACKQUOTE
+			case '~':
+				tok.Type = TILDE
+			case '#':
+				tok.Type = HASH
+		*/
 	}
 	return tok
 }
-

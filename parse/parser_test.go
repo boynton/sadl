@@ -1,16 +1,14 @@
-package sadl
+package parse
 
 import (
-//	"encoding/json"
 	"fmt"
-//	"io/ioutil"
-//	"strings"
 	"testing"
+	//	"github.com/boynton/sadl"
 )
 
-func xTestQuantity(test *testing.T) {
+func TestQuantity(test *testing.T) {
 	Verbose = true
-	v, err := ParseString(`type Money Quantity<Decimal,String>`)
+	v, err := parseString(`type Money Quantity<Decimal,Stringx>`)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -18,9 +16,9 @@ func xTestQuantity(test *testing.T) {
 	}
 }
 
-func xTestArray(test *testing.T) {
+func TestArray(test *testing.T) {
 	Verbose = true
-	v, err := ParseString(`type Foo Array<String> (maxsize=2)`)
+	v, err := parseString(`type Foo Array<String> (maxsize=2)`)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -30,7 +28,7 @@ func xTestArray(test *testing.T) {
 
 func xTestUnion(test *testing.T) {
 	Verbose = true
-	v, err := ParseString(`type Foo Union<Int32,String>`)
+	v, err := parseString(`type Foo Union<Int32,String>`)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -40,7 +38,7 @@ func xTestUnion(test *testing.T) {
 
 func TestStruct(test *testing.T) {
 	Verbose = true
-	v, err := ParseString(`
+	v, err := parseString(`
 type Foo Struct {
    String s (pattern="y*")
    Decimal d (min=0, max=100)
@@ -55,8 +53,8 @@ type Foo Struct {
 }
 
 func xTestBaseTypes(test *testing.T) {
-	v, err := ParseString(
-	`
+	v, err := parseString(
+		`
 type Int Int32
 type Long Int64 (min=0, max=20)
 type Float Float32
