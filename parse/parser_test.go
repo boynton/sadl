@@ -7,7 +7,7 @@ import (
 )
 
 func TestComments(test *testing.T) {
-//	Verbose = true
+	//	Verbose = true
 	v, err := parseString(`//one
 //two
 name foo
