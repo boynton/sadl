@@ -83,18 +83,17 @@ func (p *Parser) Parse() error {
 		case SYMBOL:
 			switch tok.Text {
 			case "name":
-				err = p.parseNameDirective()
+				err = p.parseNameDirective(comment)
 			case "namespace":
-				err = p.parseNamespaceDirective()
+				err = p.parseNamespaceDirective(comment)
 			case "version":
-				err = p.parseVersionDirective()
+				err = p.parseVersionDirective(comment)
 			case "type":
 				err = p.parseTypeDirective(comment)
-				comment = ""
 			default:
 				err = p.parseExtensionDirective(comment, tok.Text)
-				comment = ""
 			}
+			comment = ""
 		case LINE_COMMENT:
 			comment = p.mergeComment(comment, tok.Text)
 		case SEMICOLON:
@@ -111,7 +110,8 @@ func (p *Parser) Parse() error {
 	return nil
 }
 
-func (p *Parser) parseNameDirective() error {
+func (p *Parser) parseNameDirective(comment string) error {
+	p.schema.Comment = comment
 	txt, err := p.expectText()
 	if err == nil {
 		p.schema.Name = txt
@@ -119,7 +119,8 @@ func (p *Parser) parseNameDirective() error {
 	return err
 }
 
-func (p *Parser) parseNamespaceDirective() error {
+func (p *Parser) parseNamespaceDirective(comment string) error {
+	p.schema.Comment = comment
 	txt, err := p.expectText()
 	if err == nil {
 		p.schema.Namespace = txt
@@ -127,7 +128,8 @@ func (p *Parser) parseNamespaceDirective() error {
 	return err
 }
 
-func (p *Parser) parseVersionDirective() error {
+func (p *Parser) parseVersionDirective(comment string) error {
+	p.schema.Comment = comment
 	tok := p.getToken()
 	if tok == nil {
 		return p.endOfFileError()

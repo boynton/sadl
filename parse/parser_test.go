@@ -6,8 +6,37 @@ import (
 	//	"github.com/boynton/sadl"
 )
 
+func TestComments(test *testing.T) {
+//	Verbose = true
+	v, err := parseString(`//one
+//two
+name foo
+
+//three
+type Foo String
+
+//four
+type Bar Int32
+`)
+	if err != nil {
+		test.Errorf("%v", err)
+	} else {
+		if len(v.Types) != 2 {
+			test.Errorf("Did not parse correctly, expected 2 types in the schema")
+			return
+		}
+		if v.Comment == "one two" {
+			if v.Types[0].Comment == "three" && v.Types[1].Comment == "four" {
+				// Looks ok
+				fmt.Println(Pretty(v))
+				return
+			}
+		}
+		test.Errorf("Comments did not get attached to correct elements in schema")
+	}
+}
+
 func TestQuantity(test *testing.T) {
-	Verbose = true
 	v, err := parseString(`type Money Quantity<Decimal,Stringx>`)
 	if err != nil {
 		test.Errorf("%v", err)
@@ -17,7 +46,6 @@ func TestQuantity(test *testing.T) {
 }
 
 func TestArray(test *testing.T) {
-	Verbose = true
 	v, err := parseString(`type Foo Array<String> (maxsize=2)`)
 	if err != nil {
 		test.Errorf("%v", err)
@@ -27,7 +55,6 @@ func TestArray(test *testing.T) {
 }
 
 func xTestUnion(test *testing.T) {
-	Verbose = true
 	v, err := parseString(`type Foo Union<Int32,String>`)
 	if err != nil {
 		test.Errorf("%v", err)
@@ -37,7 +64,6 @@ func xTestUnion(test *testing.T) {
 }
 
 func TestStruct(test *testing.T) {
-	Verbose = true
 	v, err := parseString(`
 type Foo Struct {
    String s (pattern="y*")
