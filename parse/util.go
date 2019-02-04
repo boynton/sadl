@@ -51,7 +51,7 @@ const GREEN = "\033[92m"
 func formattedAnnotation(filename string, source string, prefix string, msg string, tok *Token, color string, contextSize int) string {
 	highlight := color + "\033[1m"
 	restore := BLACK + "\033[0m"
-	if source != "" && contextSize >= 0 {
+	if source != "" && contextSize >= 0 && tok != nil {
 		lines := strings.Split(source, "\n")
 		line := tok.Line - 1
 		begin := max(0, line-contextSize)

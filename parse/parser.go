@@ -18,6 +18,7 @@ type Parser struct {
 	tokens         []*Token
 	schema         *sadl.Schema
 	lastToken      *Token
+	prevLastToken  *Token
 	ungottenToken  *Token
 	currentComment string
 	extensions     map[string]ExtensionHandler
@@ -185,6 +186,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	case "Union":
 		err = p.parseUnionDef(td, params)
 	default:
+		fmt.Println("supername:", superName)
 		err = p.Error(fmt.Sprintf("Super type must be a base type: %v", superName))
 	}
 	if err != nil {
@@ -452,7 +454,7 @@ func (p *Parser) syntaxError() error {
 func (p *Parser) ungetToken() {
 	Debug("ungetToken() -> ", p.lastToken)
 	p.ungottenToken = p.lastToken
-	p.lastToken = nil
+	p.lastToken = p.prevLastToken
 }
 
 func (p *Parser) getToken() *Token {
@@ -464,6 +466,7 @@ func (p *Parser) getToken() *Token {
 	if len(p.tokens) == 0 {
 		return nil
 	}
+	p.prevLastToken = p.lastToken
 	p.lastToken = p.tokens[0]
 	p.tokens = p.tokens[1:]
 	Debug("getToken() -> ", p.lastToken)
