@@ -3,10 +3,10 @@
 SADL is a general high level API description language that defines its own schema language as well as operation and resource
 descriptions. It's goal is to provide a means to express a straightforward, consistent view of APIs.
 
-It is an independent derivitive of [RDL](https://github.com/ardielle), and shares the syntax for type definitions, although
-the operation and resource descriptions are different. It is not intended to be compatible.
+It is inspired by [RDL](https://github.com/ardielle), but changes some syntax to be more consistent and cleaner for things like
+nested structs. How it handles services definitions will be different than RDL, also. It is not intended to be compatible.
 
-SADL can be used to generate other API definitions, for example OpenAPI, RAML, gRPC, and RDL, as well as generate client
+SADL will be used to generate other API definitions, for example OpenAPI, RAML, gRPC, and RDL, as well as generate client
 and server code directly in a few languages for quick iterative API investigations.
 
 ## Base Types
@@ -26,7 +26,7 @@ and server code directly in a few languages for quick iterative API investigatio
 - UUID - a Universally Unique Identifier [RFC 4122](http://tools.ietf.org/html/rfc4122), represented as a string in JSON (i.e. "1ce437b0-1dd2-11b2-81ef-003ee1be85f9")
 - Array - an ordered collections of values
 - Map - an unordered mapping of keys to values type.
-- Struct - an ordered collection of named fields, each with its own type
+- Struct - an ordered collection of named fields, each with its own type.
 - Enum - a set of symbols
 - Union - a tagged union of types. Expressed as a JSON object with optional keys for each variant.
 - Any - any of the above types
@@ -40,13 +40,9 @@ For now, see some examples in the [examples](https://github.com/boynton/sadl/tre
     go get github.com/boynton/sadl/...
     $(GOPATH)/bin/sadl foo.sadl # just parses and shows errors, if any.
 
-    sadl java-model foo.sadl # generates Java model objects for the types in the schema
-    sadl java-jaxrs-server foo.sadl # generates a working java server based on jersey/jackson/jetty
-    sadl gen java-client foo.sadl # generates a working java client for the above server
-    sadl gen go-server foo.sadl # generates a go server
-    sadl gen go-client foo.sadl # generates a go server
+    sadl foo.sadl # just parses and outputs the result, for now. More coming...
 
-##
+
 
 
 
