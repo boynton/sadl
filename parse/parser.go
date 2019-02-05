@@ -1,21 +1,39 @@
 package parse
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/boynton/sadl"
 )
 
+//
+// import "github.com/boynton/sadl/parse"
+// ...
+// model, err :- parse.File("/some/path")
+//
+func File(path string) (*sadl.Model, error) {
+	return parseFile(path)
+}
+
+//
+// import "github.com/boynton/sadl/parse"
+// ...
+// model, err :- parse.String("...")
+//
+func String(src string) (*sadl.Model, error) {
+	return parseString(src)
+}
+
+//----------------
+
 type Parser struct {
 	path           string
 	source         string
-	tokens         []*Token
+	scanner        *Scanner
+	model          *sadl.Model
 	schema         *sadl.Schema
 	lastToken      *Token
 	prevLastToken  *Token
@@ -24,52 +42,71 @@ type Parser struct {
 	extensions     map[string]ExtensionHandler
 }
 
-func File(path string) (*sadl.Schema, error) {
-	return parseFile(path)
-}
-
-func parseFile(path string) (*sadl.Schema, error) {
+func parseFile(path string) (*sadl.Model, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	src := string(b)
 	parser := &Parser{
-		path: path,
-		schema: &sadl.Schema{
-			Types: make([]*sadl.TypeDef, 0),
-		},
+		scanner: NewScanner(strings.NewReader(src)),
+		path:    path,
+		source:  src,
 	}
-	err := parser.ScanFile(path)
-	if err != nil {
-		return nil, err
-	}
-	err = parser.Parse()
-	if err != nil {
-		return nil, err
-	}
-	return parser.schema, nil
+	return parser.Parse()
 }
 
-func String(src string) (*sadl.Schema, error) {
-	return parseString(src)
-}
-
-func parseString(src string) (*sadl.Schema, error) {
+func parseString(src string) (*sadl.Model, error) {
 	parser := &Parser{
-		path:   "",
-		source: src,
-		schema: &sadl.Schema{
-			Types: make([]*sadl.TypeDef, 0),
-		},
+		scanner: NewScanner(strings.NewReader(src)),
+		source:  src,
 	}
-	err := parser.ScanString(src)
-	if err != nil {
-		return nil, err
-	}
-	err = parser.Parse()
-	if err != nil {
-		return nil, err
-	}
-	return parser.schema, nil
+	return parser.Parse()
 }
 
-func (p *Parser) Parse() error {
+func (p *Parser) ungetToken() {
+	Debug("ungetToken() -> ", p.lastToken)
+	p.ungottenToken = p.lastToken
+	p.lastToken = p.prevLastToken
+}
+
+func (p *Parser) getToken() *Token {
+	if p.ungottenToken != nil {
+		p.lastToken = p.ungottenToken
+		p.ungottenToken = nil
+		Debug("getToken() -> ", p.lastToken)
+		return p.lastToken
+	}
+	p.prevLastToken = p.lastToken
+	tok := p.scanner.Scan()
+	for {
+		if tok.Type == EOF {
+			return nil //fixme
+		} else if tok.Type != BLOCK_COMMENT {
+			break
+		}
+		tok = p.scanner.Scan()
+	}
+	p.lastToken = &tok
+	Debug("getToken() -> ", p.lastToken)
+	return p.lastToken
+}
+
+func (p *Parser) Source() string {
+	source := p.source
+	if p.path != "" && source == "" {
+		data, err := ioutil.ReadFile(p.path)
+		if err == nil {
+			source = string(data)
+		}
+	}
+	return source
+}
+
+func (p *Parser) Parse() (*sadl.Model, error) {
+	p.schema = &sadl.Schema{
+		Types: make([]*sadl.TypeDef, 0),
+	}
 	if p.schema.Name == "" {
 		p.schema.Name = BaseFileName(p.path)
 	}
@@ -102,13 +139,19 @@ func (p *Parser) Parse() error {
 		case NEWLINE:
 			/* ignore */
 		default:
-			return p.expectedDirectiveError()
+			return nil, p.expectedDirectiveError()
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	var err error
+	p.model, err = sadl.NewModel(p.schema)
+	p.schema = nil //can't use it any more
+	if err != nil {
+		return nil, err
+	}
+	return p.Validate()
 }
 
 func (p *Parser) parseNameDirective(comment string) error {
@@ -149,13 +192,16 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	superName, params, err := p.parseTypeSpec()
+	superName, params, fields, comment2, err := p.parseTypeSpec() //note that this can return user-defined types
 	if err != nil {
 		return err
 	}
+	comment = p.mergeComment(comment, comment2)
 	td := &sadl.TypeDef{
+		TypeSpec: sadl.TypeSpec{
+			Type: superName,
+		},
 		Name:    typeName,
-		Type:    superName,
 		Comment: comment,
 	}
 	switch superName {
@@ -179,14 +225,13 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		err = p.parseArrayDef(td, params)
 	case "Map":
 		err = p.parseMapDef(td, params)
-	case "Struct": //no inheritance, period. Use composition instead, just a lot clearer
-		err = p.parseStructDef(td)
+	case "Struct":
+		err = p.parseStructDef(td, fields)
 	case "Enum":
 		err = p.parseEnumDef(td)
 	case "Union":
 		err = p.parseUnionDef(td, params)
 	default:
-		fmt.Println("supername:", superName)
 		err = p.Error(fmt.Sprintf("Super type must be a base type: %v", superName))
 	}
 	if err != nil {
@@ -196,14 +241,14 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) parseTypeSpec() (string, []string, error) {
+func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, string, error) {
 	typeName, err := p.expectIdentifier()
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, "", err
 	}
 	tok := p.getToken()
 	if tok == nil {
-		return typeName, nil, nil
+		return typeName, nil, nil, "", nil
 	}
 	if tok.Type == OPEN_ANGLE {
 		var params []string
@@ -216,29 +261,52 @@ func (p *Parser) parseTypeSpec() (string, []string, error) {
 		case "Union":
 			expectedParams = -1
 		default:
-			return "", nil, p.syntaxError()
+			return typeName, nil, nil, "", p.syntaxError()
 		}
 		for {
 			tok = p.getToken()
 			if tok == nil {
-				return typeName, nil, p.endOfFileError()
+				return typeName, nil, nil, "", p.endOfFileError()
 			}
 			if tok.Type != COMMA {
 				if tok.Type == CLOSE_ANGLE {
 					if expectedParams >= 0 && expectedParams != len(params) {
-						return "", nil, p.syntaxError()
+						return typeName, nil, nil, "", p.syntaxError()
 					}
-					return typeName, params, nil
+					return typeName, params, nil, "", nil
 				}
 				if tok.Type != SYMBOL {
-					return typeName, params, p.syntaxError()
+					return typeName, params, nil, "", p.syntaxError()
 				}
 				params = append(params, tok.Text)
 			}
 		}
+	} else if tok.Type == OPEN_BRACE {
+		var fields []*sadl.StructFieldDef
+		comment := p.parseTrailingComment("")
+		tok := p.getToken()
+		if tok == nil {
+			return typeName, nil, fields, comment, p.syntaxError()
+		}
+		if tok.Type != NEWLINE {
+			p.ungetToken()
+		}
+		for {
+			field, err := p.parseStructFieldDef()
+			if err != nil {
+				return typeName, nil, fields, comment, err
+			}
+			if field == nil {
+				break
+			}
+			fields = append(fields, field)
+		}
+		comment, err = p.endOfStatement(comment)
+		p.ungetToken() //the closing brace
+		return typeName, nil, fields, comment, nil
 	}
 	p.ungetToken()
-	return typeName, nil, nil
+	return typeName, nil, nil, "", nil
 }
 
 func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
@@ -332,33 +400,37 @@ func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseStructDef(td *sadl.TypeDef) error {
+func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
-		tok := p.getToken()
-		if tok.Type == OPEN_BRACE {
-			td.Comment = p.parseTrailingComment(td.Comment)
+		if fields == nil {
 			tok := p.getToken()
-			if tok == nil {
-				return p.syntaxError()
-			}
-			if tok.Type != NEWLINE {
+			if tok.Type == OPEN_BRACE {
+				td.Comment = p.parseTrailingComment(td.Comment)
+				tok := p.getToken()
+				if tok == nil {
+					return p.syntaxError()
+				}
+				if tok.Type != NEWLINE {
+					p.ungetToken()
+				}
+				for {
+					field, err := p.parseStructFieldDef()
+					if err != nil {
+						return err
+					}
+					if field == nil {
+						break
+					}
+					td.Fields = append(td.Fields, field)
+				}
+				td.Comment, err = p.endOfStatement(td.Comment)
+			} else {
 				p.ungetToken()
+				td.Comment, err = p.endOfStatement(td.Comment)
 			}
-			for {
-				field, err := p.parseStructFieldDef()
-				if err != nil {
-					return err
-				}
-				if field == nil {
-					break
-				}
-				td.Fields = append(td.Fields, field)
-			}
-			td.Comment, err = p.endOfStatement(td.Comment)
 		} else {
-			p.ungetToken()
-			td.Comment, err = p.endOfStatement(td.Comment)
+			td.Fields = fields
 		}
 	}
 	return err
@@ -396,52 +468,6 @@ func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) ScanFile(path string) error {
-	p.path = path
-	fi, err := os.Open(p.path)
-	if err != nil {
-		return fmt.Errorf("Can't open file %q\n", p.path)
-	}
-	defer fi.Close()
-	reader := bufio.NewReader(fi)
-	return p.Scan(reader)
-}
-
-func (p *Parser) ScanString(src string) error {
-	p.path = ""
-	reader := strings.NewReader(src)
-	return p.Scan(reader)
-}
-
-func (p *Parser) Source() string {
-	source := p.source
-	if p.path != "" {
-		data, err := ioutil.ReadFile(p.path)
-		if err == nil {
-			source = string(data)
-		}
-	}
-	return source
-}
-
-func (p *Parser) Scan(reader io.Reader) error {
-	scanr := New(p.path, reader)
-	var tokens []*Token
-	for {
-		tok := scanr.Scan()
-		if tok.Type == EOF {
-			break
-		}
-		if tok.Type == ILLEGAL {
-			return fmt.Errorf("*** %s\n", formattedAnnotation(p.path, p.Source(), "", "Syntax error", &tok, RED, 5))
-		} else if tok.Type != BLOCK_COMMENT {
-			tokens = append(tokens, &tok)
-		}
-	}
-	p.tokens = tokens
-	return nil
-}
-
 func (p *Parser) Error(msg string) error {
 	Debug("*** error, last token:", p.lastToken)
 	return fmt.Errorf("*** %s\n", formattedAnnotation(p.path, p.Source(), "", msg, p.lastToken, RED, 5))
@@ -449,28 +475,6 @@ func (p *Parser) Error(msg string) error {
 
 func (p *Parser) syntaxError() error {
 	return p.Error("Syntax error")
-}
-
-func (p *Parser) ungetToken() {
-	Debug("ungetToken() -> ", p.lastToken)
-	p.ungottenToken = p.lastToken
-	p.lastToken = p.prevLastToken
-}
-
-func (p *Parser) getToken() *Token {
-	if p.ungottenToken != nil {
-		p.lastToken = p.ungottenToken
-		p.ungottenToken = nil
-		return p.lastToken
-	}
-	if len(p.tokens) == 0 {
-		return nil
-	}
-	p.prevLastToken = p.lastToken
-	p.lastToken = p.tokens[0]
-	p.tokens = p.tokens[1:]
-	Debug("getToken() -> ", p.lastToken)
-	return p.lastToken
 }
 
 func (p *Parser) endOfFileError() error {
@@ -602,6 +606,8 @@ func (p *Parser) parseTypeOptions(td *sadl.TypeDef, acceptable ...string) error 
 		td.Min = options.Min
 		td.Max = options.Max
 		td.Annotations = options.Annotations
+	} else {
+		fmt.Println("parseTypeOptions returned", err)
 	}
 	return err
 }
@@ -618,7 +624,7 @@ type Options struct {
 	Annotations map[string]string
 }
 
-func (p *Parser) parseOptions(datatype string, acceptable []string) (*Options, error) {
+func (p *Parser) parseOptions(typeName string, acceptable []string) (*Options, error) {
 	options := &Options{}
 	var err error
 	tok := p.getToken()
@@ -635,10 +641,11 @@ func (p *Parser) parseOptions(datatype string, acceptable []string) (*Options, e
 				return options, nil
 			}
 			if tok.Type == SYMBOL {
-				if strings.HasPrefix(tok.Text, "x_") {
+				match := strings.ToLower(tok.Text)
+				if strings.HasPrefix(match, "x_") {
 					options.Annotations, err = p.parseExtendedOption(options.Annotations, tok.Text)
-				} else if containsOption(acceptable, tok.Text) {
-					switch tok.Text {
+				} else if containsOption(acceptable, match) {
+					switch match {
 					case "min":
 						options.Min, err = p.expectEqualsNumber()
 					case "max":
@@ -654,12 +661,12 @@ func (p *Parser) parseOptions(datatype string, acceptable []string) (*Options, e
 					case "required":
 						options.Required = true
 					case "default":
-						options.Default, err = p.parseEqualsLiteral(datatype)
+						options.Default, err = p.parseEqualsLiteral()
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
 				} else {
-					err = p.Error(fmt.Sprintf("Unrecognized type option for %s: %s", datatype, tok.Text))
+					err = p.Error(fmt.Sprintf("Unrecognized type option for %s: %s", typeName, tok.Text))
 				}
 				if err != nil {
 					return nil, err
@@ -830,24 +837,40 @@ func (p *Parser) expectNewline() error {
 }
 
 func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
+	var comment string
 	tok := p.getToken()
 	if tok == nil {
 		return nil, p.endOfFileError()
 	}
-
-	if tok.Type == CLOSE_BRACE {
-		return nil, nil
-	} else {
-		p.ungetToken()
-	}
-	ftype, fparams, err := p.parseTypeSpec()
-	if err != nil {
-		return nil, err
+	for {
+		if tok.Type == CLOSE_BRACE {
+			return nil, nil
+		} else if tok.Type == LINE_COMMENT {
+			comment = p.mergeComment("", tok.Text)
+			tok = p.getToken()
+			if tok == nil {
+				return nil, p.endOfFileError()
+			}
+		} else if tok.Type == NEWLINE {
+			tok = p.getToken()
+			if tok == nil {
+				return nil, p.endOfFileError()
+			}
+		} else {
+			p.ungetToken()
+			break
+		}
 	}
 	fname, err := p.expectIdentifier()
 	if err != nil {
 		return nil, err
 	}
+	ftype, fparams, ffields, fcomment, err := p.parseTypeSpec()
+	if err != nil {
+		return nil, err
+	}
+	comment = p.mergeComment(comment, fcomment)
+
 	var fkeys, fitems string
 	var funit, fvalue string
 	switch ftype {
@@ -866,12 +889,16 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 		return nil, err
 	}
 	field := &sadl.StructFieldDef{
-		Name:  fname,
-		Type:  ftype,
-		Items: fitems,
-		Keys:  fkeys,
-		Value: fvalue,
-		Unit:  funit,
+		Name:    fname,
+		Comment: comment,
+		TypeSpec: sadl.TypeSpec{
+			Type:   ftype,
+			Items:  fitems,
+			Keys:   fkeys,
+			Value:  fvalue,
+			Unit:   funit,
+			Fields: ffields,
+		},
 	}
 	err = p.parseStructFieldOptions(field)
 	if err == nil {
@@ -907,30 +934,30 @@ func (p *Parser) parseStructFieldOptions(field *sadl.StructFieldDef) error {
 	return err
 }
 
-func (p *Parser) parseEqualsLiteral(expectedType string) (interface{}, error) {
+func (p *Parser) parseEqualsLiteral() (interface{}, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
 		return 0, err
 	}
-	return p.parseLiteralValue(expectedType)
+	return p.parseLiteralValue()
 }
 
-func (p *Parser) parseLiteralValue(expectedType string) (interface{}, error) {
+func (p *Parser) parseLiteralValue() (interface{}, error) {
 	tok := p.getToken()
 	if tok == nil {
 		return nil, p.syntaxError()
 	}
-	return p.parseLiteral(expectedType, tok)
+	return p.parseLiteral(tok)
 }
 
-func (p *Parser) parseLiteral(expectedType string, tok *Token) (interface{}, error) {
+func (p *Parser) parseLiteral(tok *Token) (interface{}, error) {
 	switch tok.Type {
 	case SYMBOL:
 		return p.parseLiteralSymbol(tok)
 	case STRING:
 		return p.parseLiteralString(tok)
 	case NUMBER:
-		return p.parseLiteralNumber(expectedType, tok)
+		return p.parseLiteralNumber(tok)
 	case OPEN_BRACKET:
 		return p.parseLiteralArray()
 	case OPEN_BRACE:
@@ -961,19 +988,12 @@ func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(expectedType string, tok *Token) (interface{}, error) {
+func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
 	num, err := sadl.ParseDecimal(tok.Text)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
 	}
-	switch expectedType {
-	case "Int8", "Int16", "Int32", "Int64":
-		return num.Int64(), nil
-	case "Float32", "Float64":
-		return num.Float64(), nil
-	default:
-		return num, nil
-	}
+	return num, nil
 }
 
 func (p *Parser) parseLiteralArray() (interface{}, error) {
@@ -987,7 +1007,7 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 			return ary, nil
 		}
 		if tok.Type != COMMA {
-			obj, err := p.parseLiteral("", tok)
+			obj, err := p.parseLiteral(tok)
 			if err != nil {
 				return nil, err
 			}
@@ -1016,13 +1036,13 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			val, err := p.parseLiteralValue("")
+			val, err := p.parseLiteralValue()
 			if err != nil {
 				return nil, err
 			}
 			obj[*pkey] = val
 		} else {
-			fmt.Println("ignoring this token:", tok)
+			//fmt.Println("ignoring this token:", tok)
 		}
 	}
 }
@@ -1163,4 +1183,48 @@ func (p *Parser) mergeComment(comment1 string, comment2 string) string {
 		return comment1
 	}
 	return comment2
+}
+
+func (p *Parser) Validate() (*sadl.Model, error) {
+	for _, td := range p.model.Types {
+		switch td.Type {
+		case "Struct":
+			err := p.validateStruct(td)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			//			fmt.Println("VALIDATE ME:", td)
+		}
+	}
+	return p.model, nil
+}
+
+func (p *Parser) validateStruct(td *sadl.TypeDef) error {
+	model := p.model
+	if false {
+		return nil
+	} else {
+		//fmt.Println(Pretty(p.model))
+	}
+
+	for _, field := range td.Fields {
+		ftd := model.FindType(field.Type)
+		if ftd == nil {
+			return fmt.Errorf("Undefined type '%s' in struct field '%s.%s'", field.Type, td.Name, field.Name)
+		}
+		if field.Default != nil {
+			if field.Required {
+				return fmt.Errorf("Cannot have a default value for required field: '%s.%s'", td.Name, field.Name)
+			}
+			err := model.ValidateAgainstTypeSpec(&field.TypeSpec, field.Default)
+			if err != nil {
+				return err
+			}
+		}
+		if field.Values != nil && field.Pattern != "" {
+			return fmt.Errorf("Cannot have both 'values' and 'pattern' constraints in one string field: '%s.%s'", td.Name, field.Name)
+		}
+	}
+	return nil
 }

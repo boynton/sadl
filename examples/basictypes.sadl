@@ -24,10 +24,10 @@ type YEncoded String (pattern="[a-zA-Z0-9._%=-]*")
 
 /* note that semicolons are optional */
 type StringTest Struct {
-     SimpleName name (required); //name comment
-     CompoundName parent (required); //parent comment
-     Array<SimpleName> names ; //names comment
-     YEncoded enc //enc comment
+     name SimpleName (required);
+     parent CompoundName (required);
+     names Array<SimpleName> ; //names comment
+     enc YEncoded //enc comment
 }
 
 type azAZ String (pattern="[a-zA-Z]+")
@@ -48,50 +48,54 @@ type BigNumber Decimal (max=3141592653589793238462643383279502884197169399375105
 
 
 type MapTest Struct {
-    Map<String,Int32> locations
+    locations Map<String,Int32>
 }
 
 type ArrayOfInt Array<Int32> (maxsize=3)
 type MapArrayTest Struct {
-    Map<String,ArrayOfInt> locations
+    locations Map<String,ArrayOfInt>
 }
 
 type IntOOBTest Struct {
-    Year    theyear
+    theyear   Year
 }
 
 type NegativeNumberTest Struct {
-    Latitude mylatitude
+    mylatitude Latitude
 }
 
 type UUIDTest Struct {
-    UUID myid
+    myid UUID
 }
 
 type TimestampTest Struct {
-    Timestamp mytime
+    mytime Timestamp
 }
 
 type Test Struct {
-    String  name (required)
-    String  utfname (required)
-    Bool bool (required)
-    Bool bool2 (required)
-    Int32 int (required)
-    Int64 mylong (required)
-    Float64  mydbl (required)
-    ArrayOfInt intarray
-    Array<Int32> my_int_array (required)
-    Array<String> my_str_array (required)
-    UUID    myuuid (required)
-    azAZ    myaz (required)
-    Year    myyear (required)
-    Pi      mypi (required)
-    LongNumber myotherlong (required)
-    Timestamp mytime (required)
-    Options myoptions (required)
-    ComplicatedOptions co1 (required)
-    ComplicatedOptions co2 (required)
-    ComplicatedOptions co3 (required)
+    name String (required)
+    utfname String (required)
+    mybool Bool (required)
+    mybool2 Bool (required)
+    myint Int32 (required)
+    mylong Int64 (required)
+    mydbl Float64 (required)
+    intarray ArrayOfInt
+    mynestedstruct Struct {
+      something String
+      oranother Int32
+    } (default={"something": "foo", "oranother": 23})
+    my_int_array Array<Int32> (required)
+    my_str_array Array<String> (required)
+    myuuid UUID (required)
+    myaz azAZ (required)
+    myyear Year (required)
+    mypi Pi (required)
+    myotherlong LongNumber (required)
+    mytime Timestamp (required)
+    myoptions Options (required)
+    co1 NonSymbolicOptions (required)
+    co2 String (values=["a:b","c:d","e:f"], required)
+    co3 NonSymbolicOptions
 }
 

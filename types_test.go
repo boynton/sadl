@@ -18,14 +18,6 @@ func decode(jsonData string, expected interface{}) error {
 	return json.Unmarshal([]byte(jsonData), &expected)
 }
 
-func pretty(obj interface{}) string {
-	j, err := json.MarshalIndent(obj, "", "    ")
-	if err != nil {
-		return fmt.Sprintf("<JSON ERROR: %v>", err)
-	}
-	return string(j)
-}
-
 func TestTimestamp(test *testing.T) {
 	jsonData := `"2019-02-03T22:48:19.043Z"`
 	var ts Timestamp

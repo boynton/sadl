@@ -10,7 +10,7 @@ import (
 type TokenType int
 
 const (
-	ILLEGAL TokenType = iota
+	UNDEFINED TokenType = iota
 	EOF
 	LINE_COMMENT
 	BLOCK_COMMENT
@@ -53,8 +53,8 @@ type Token struct {
 
 func (tokenType TokenType) String() string {
 	switch tokenType {
-	case ILLEGAL:
-		return "ILLEGAL"
+	case UNDEFINED:
+		return "UNDEFINED"
 	case EOF:
 		return "EOF"
 
@@ -152,7 +152,6 @@ func isLetter(ch rune) bool {
 var eof = rune(0)
 
 type Scanner struct {
-	filename   string
 	r          *bufio.Reader
 	line       int
 	column     int
@@ -160,8 +159,8 @@ type Scanner struct {
 	atEOL      bool
 }
 
-func New(filename string, r io.Reader) *Scanner {
-	return &Scanner{filename: filename, r: bufio.NewReader(r), line: 1, column: 0}
+func NewScanner(r io.Reader) *Scanner {
+	return &Scanner{r: bufio.NewReader(r), line: 1, column: 0}
 }
 
 func (s *Scanner) read() rune {
@@ -198,8 +197,8 @@ func (tok Token) finish(text string) Token {
 	return tok
 }
 
-func (tok Token) illegal(text string) Token {
-	tok.Type = ILLEGAL
+func (tok Token) undefined(text string) Token {
+	tok.Type = UNDEFINED
 	tok.Text = text
 	return tok
 }
@@ -258,7 +257,7 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 			if ch == '.' {
 				buf.WriteRune(ch)
 				if gotDecimal {
-					return tok.illegal(buf.String())
+					return tok.undefined(buf.String())
 				}
 				gotDecimal = true
 			} else {
@@ -298,7 +297,7 @@ func (s *Scanner) scanComment() Token {
 			var buf bytes.Buffer
 			for {
 				if ch = s.read(); ch == eof {
-					return tok.illegal("Unterminated block comment")
+					return tok.undefined("Unterminated block comment")
 				}
 				if nextToLast {
 					if ch == '/' {
@@ -329,7 +328,7 @@ func (s *Scanner) scanString() Token {
 	for {
 		ch := s.read()
 		if ch == eof {
-			return tok.illegal("unterminated string")
+			return tok.undefined("unterminated string")
 		}
 		if escape {
 			switch ch {
@@ -344,7 +343,7 @@ func (s *Scanner) scanString() Token {
 				buf.WriteRune(ch)
 			default:
 				buf.WriteRune(ch)
-				return tok.illegal("Bad escape char in string: \\" + string(ch))
+				return tok.undefined("Bad escape char in string: \\" + string(ch))
 			}
 			escape = false
 			continue
@@ -362,7 +361,7 @@ func (s *Scanner) scanString() Token {
 }
 
 func (s *Scanner) scanPunct(ch rune) Token {
-	tok := s.startToken(ILLEGAL)
+	tok := s.startToken(UNDEFINED)
 	tok.Text = string(ch)
 	switch ch {
 	case eof:

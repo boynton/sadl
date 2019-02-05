@@ -1,7 +1,8 @@
 all:: bin/sadl
 
-test1::
-	go test -v github.com/boynton/sadl
+test1:
+#	go test -v github.com/boynton/sadl
+	go test -v github.com/boynton/sadl/parse
 
 test::
 	go test github.com/boynton/sadl
@@ -13,7 +14,7 @@ bin/sadl::
 	go build github.com/boynton/sadl/parse
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
-check::
+proper::
 	go fmt github.com/boynton/sadl
 	go vet github.com/boynton/sadl
 	go fmt github.com/boynton/sadl/parse
