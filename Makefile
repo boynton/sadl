@@ -1,18 +1,20 @@
-all:: bin/sadl
+all:: bin/sadl bin/sadl2pojo
 
-test1:
-#	go test -v github.com/boynton/sadl
-	go test -v github.com/boynton/sadl/parse
+lib::
+	go build github.com/boynton/sadl
+	go build github.com/boynton/sadl/parse
 
 test::
 	go test github.com/boynton/sadl
 	go test github.com/boynton/sadl/parse
 
-bin/sadl::
+bin/sadl:: lib
 	mkdir -p bin
-	go build github.com/boynton/sadl
-	go build github.com/boynton/sadl/parse
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
+
+bin/sadl2pojo:: lib
+	mkdir -p bin
+	go build -o bin/sadl2pojo github.com/boynton/sadl/cmd/sadl2pojo
 
 proper::
 	go fmt github.com/boynton/sadl

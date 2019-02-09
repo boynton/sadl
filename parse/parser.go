@@ -147,7 +147,7 @@ func (p *Parser) Parse() (*sadl.Model, error) {
 	}
 	var err error
 	p.model, err = sadl.NewModel(p.schema)
-	p.schema = nil //can't use it any more
+	p.schema = nil
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	superName, params, fields, comment2, err := p.parseTypeSpec() //note that this can return user-defined types
+	superName, params, fields, elements, options, comment2, err := p.parseTypeSpec() //note that this can return user-defined types
 	if err != nil {
 		return err
 	}
@@ -227,8 +227,14 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		err = p.parseMapDef(td, params)
 	case "Struct":
 		err = p.parseStructDef(td, fields)
+		if options != nil {
+			td.Annotations = options.Annotations
+		}
 	case "Enum":
-		err = p.parseEnumDef(td)
+		td.Elements = elements
+		if options != nil {
+			td.Annotations = options.Annotations
+		}
 	case "Union":
 		err = p.parseUnionDef(td, params)
 	default:
@@ -241,14 +247,15 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, string, error) {
+func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
+	var options *Options
 	typeName, err := p.expectIdentifier()
 	if err != nil {
-		return "", nil, nil, "", err
+		return "", nil, nil, nil, options, "", err
 	}
 	tok := p.getToken()
 	if tok == nil {
-		return typeName, nil, nil, "", nil
+		return typeName, nil, nil, nil, options, "", nil
 	}
 	if tok.Type == OPEN_ANGLE {
 		var params []string
@@ -261,52 +268,91 @@ func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, stri
 		case "Union":
 			expectedParams = -1
 		default:
-			return typeName, nil, nil, "", p.syntaxError()
+			return typeName, nil, nil, nil, options, "", p.syntaxError()
 		}
 		for {
 			tok = p.getToken()
 			if tok == nil {
-				return typeName, nil, nil, "", p.endOfFileError()
+				return typeName, nil, nil, nil, options, "", p.endOfFileError()
 			}
 			if tok.Type != COMMA {
 				if tok.Type == CLOSE_ANGLE {
 					if expectedParams >= 0 && expectedParams != len(params) {
-						return typeName, nil, nil, "", p.syntaxError()
+						return typeName, nil, nil, nil, options, "", p.syntaxError()
 					}
-					return typeName, params, nil, "", nil
+					return typeName, params, nil, nil, options, "", nil
 				}
 				if tok.Type != SYMBOL {
-					return typeName, params, nil, "", p.syntaxError()
+					return typeName, params, nil, nil, options, "", p.syntaxError()
 				}
 				params = append(params, tok.Text)
 			}
 		}
-	} else if tok.Type == OPEN_BRACE {
-		var fields []*sadl.StructFieldDef
-		comment := p.parseTrailingComment("")
-		tok := p.getToken()
-		if tok == nil {
-			return typeName, nil, fields, comment, p.syntaxError()
-		}
-		if tok.Type != NEWLINE {
+	} else if typeName == "Struct" || typeName == "Enum" {
+		if tok.Type != OPEN_BRACE {
 			p.ungetToken()
-		}
-		for {
-			field, err := p.parseStructFieldDef()
+			options, err = p.parseOptions(typeName, []string{})
 			if err != nil {
-				return typeName, nil, fields, comment, err
+				return typeName, nil, nil, nil, options, "", err
 			}
-			if field == nil {
-				break
+			tok = p.getToken()
+			if tok == nil {
+				return typeName, nil, nil, nil, options, "", p.endOfFileError()
 			}
-			fields = append(fields, field)
 		}
-		comment, err = p.endOfStatement(comment)
-		p.ungetToken() //the closing brace
-		return typeName, nil, fields, comment, nil
+		if tok.Type == OPEN_BRACE {
+			comment := p.parseTrailingComment("")
+			switch typeName {
+			case "Struct":
+				var fields []*sadl.StructFieldDef
+				tok := p.getToken()
+				if tok == nil {
+					return typeName, nil, fields, nil, options, comment, p.syntaxError()
+				}
+				if tok.Type != NEWLINE {
+					p.ungetToken()
+				}
+				for {
+					field, err := p.parseStructFieldDef()
+					if err != nil {
+						return typeName, nil, fields, nil, options, comment, err
+					}
+					if field == nil {
+						break
+					}
+					fields = append(fields, field)
+				}
+				comment, err = p.endOfStatement(comment)
+				p.ungetToken() //the closing brace
+				return typeName, nil, fields, nil, options, comment, nil
+			case "Enum":
+				var elements []*sadl.EnumElementDef
+				tok := p.getToken()
+				if tok == nil {
+					return typeName, nil, nil, nil, options, comment, p.syntaxError()
+				}
+				if tok.Type != NEWLINE {
+					p.ungetToken()
+				}
+				for {
+					element, err := p.parseEnumElementDef()
+					if err != nil {
+						return typeName, nil, nil, nil, options, comment, err
+					}
+					if element == nil {
+						break
+					}
+					elements = append(elements, element)
+				}
+				comment, err = p.endOfStatement(comment)
+				p.ungetToken() //the closing brace
+				return typeName, nil, nil, elements, options, comment, nil
+			}
+			return typeName, nil, nil, nil, options, comment, p.syntaxError()
+		}
 	}
 	p.ungetToken()
-	return typeName, nil, nil, "", nil
+	return typeName, nil, nil, nil, options, "", nil
 }
 
 func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
@@ -403,60 +449,14 @@ func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
 func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
-		if fields == nil {
-			tok := p.getToken()
-			if tok.Type == OPEN_BRACE {
-				td.Comment = p.parseTrailingComment(td.Comment)
-				tok := p.getToken()
-				if tok == nil {
-					return p.syntaxError()
-				}
-				if tok.Type != NEWLINE {
-					p.ungetToken()
-				}
-				for {
-					field, err := p.parseStructFieldDef()
-					if err != nil {
-						return err
-					}
-					if field == nil {
-						break
-					}
-					td.Fields = append(td.Fields, field)
-				}
-				td.Comment, err = p.endOfStatement(td.Comment)
-			} else {
-				p.ungetToken()
-				td.Comment, err = p.endOfStatement(td.Comment)
-			}
-		} else {
-			td.Fields = fields
-		}
+		td.Fields = fields
 	}
 	return err
 }
 
-func (p *Parser) parseEnumDef(td *sadl.TypeDef) error {
-	err := p.parseTypeOptions(td)
-	if err == nil {
-		tok := p.getToken()
-		if tok.Type != OPEN_BRACE {
-			return p.syntaxError()
-		}
-		td.Comment = p.parseTrailingComment(td.Comment)
-		for {
-			elem, err := p.parseEnumElementDef()
-			if err != nil {
-				return err
-			}
-			if elem == nil {
-				break
-			}
-			td.Elements = append(td.Elements, elem)
-		}
-		td.Comment, err = p.endOfStatement(td.Comment)
-	}
-	return err
+func (p *Parser) parseEnumDef(td *sadl.TypeDef, elements []*sadl.EnumElementDef) error {
+	td.Elements = elements
+	return nil
 }
 
 func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string) error {
@@ -606,8 +606,6 @@ func (p *Parser) parseTypeOptions(td *sadl.TypeDef, acceptable ...string) error 
 		td.Min = options.Min
 		td.Max = options.Max
 		td.Annotations = options.Annotations
-	} else {
-		fmt.Println("parseTypeOptions returned", err)
 	}
 	return err
 }
@@ -666,7 +664,7 @@ func (p *Parser) parseOptions(typeName string, acceptable []string) (*Options, e
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
 				} else {
-					err = p.Error(fmt.Sprintf("Unrecognized type option for %s: %s", typeName, tok.Text))
+					err = p.Error(fmt.Sprintf("Unrecognized option for %s: %s", typeName, tok.Text))
 				}
 				if err != nil {
 					return nil, err
@@ -817,10 +815,12 @@ func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
 			break
 		}
 	}
+	options, err := p.parseOptions("Enum", []string{})
 	comment = p.parseTrailingComment(comment)
 	return &sadl.EnumElementDef{
-		Symbol:  sym,
-		Comment: comment,
+		Symbol:      sym,
+		Comment:     comment,
+		Annotations: options.Annotations,
 	}, nil
 }
 
@@ -865,7 +865,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 	if err != nil {
 		return nil, err
 	}
-	ftype, fparams, ffields, fcomment, err := p.parseTypeSpec()
+	ftype, fparams, ffields, felements, foptions, fcomment, err := p.parseTypeSpec()
 	if err != nil {
 		return nil, err
 	}
@@ -882,6 +882,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 		fvalue, funit, err = p.quantityParams(fparams)
 	default:
 		if len(fparams) != 0 {
+			//unions!
 			return nil, p.syntaxError()
 		}
 	}
@@ -892,16 +893,27 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 		Name:    fname,
 		Comment: comment,
 		TypeSpec: sadl.TypeSpec{
-			Type:   ftype,
-			Items:  fitems,
-			Keys:   fkeys,
-			Value:  fvalue,
-			Unit:   funit,
-			Fields: ffields,
+			Type:     ftype,
+			Items:    fitems,
+			Keys:     fkeys,
+			Value:    fvalue,
+			Unit:     funit,
+			Fields:   ffields,
+			Elements: felements,
 		},
 	}
 	err = p.parseStructFieldOptions(field)
 	if err == nil {
+		if foptions != nil {
+			if foptions.Annotations != nil && len(foptions.Annotations) > 0 {
+				if field.Annotations == nil {
+					field.Annotations = make(map[string]string, 0)
+				}
+				for k, v := range foptions.Annotations {
+					field.Annotations[k] = v
+				}
+			}
+		}
 		field.Comment, err = p.endOfStatement(field.Comment)
 	}
 	return field, nil
@@ -1186,28 +1198,43 @@ func (p *Parser) mergeComment(comment1 string, comment2 string) string {
 }
 
 func (p *Parser) Validate() (*sadl.Model, error) {
+	var err error
 	for _, td := range p.model.Types {
 		switch td.Type {
 		case "Struct":
-			err := p.validateStruct(td)
-			if err != nil {
-				return nil, err
-			}
+			err = p.validateStruct(td)
+		case "Quantity":
+			err = p.validateQuantity(td)
 		default:
 			//			fmt.Println("VALIDATE ME:", td)
 		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	return p.model, nil
+	return p.model, err
+}
+
+func (p *Parser) validateQuantity(td *sadl.TypeDef) error {
+	vt := p.model.FindType(td.Value)
+	if vt == nil {
+		return fmt.Errorf("Undefined type '%s' for %s quantity type", td.Value, td.Name)
+	}
+	if !p.model.IsNumericType(&vt.TypeSpec) {
+		return fmt.Errorf("Quantity value type of %s is not numeric: %s", td.Name, vt.Name)
+	}
+	ut := p.model.FindType(td.Unit)
+	if ut == nil {
+		return fmt.Errorf("Undefined type '%s' for %s quantity unit", td.Unit, td.Name)
+	}
+	if ut.Type != "String" && ut.Type != "Enum" {
+		return fmt.Errorf("Quantity value type of %s is not String or Enum: %s", td.Name, vt.Name)
+	}
+	return nil
 }
 
 func (p *Parser) validateStruct(td *sadl.TypeDef) error {
 	model := p.model
-	if false {
-		return nil
-	} else {
-		//fmt.Println(Pretty(p.model))
-	}
-
 	for _, field := range td.Fields {
 		ftd := model.FindType(field.Type)
 		if ftd == nil {

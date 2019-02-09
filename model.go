@@ -105,6 +105,14 @@ func (model *Model) ValidateTimestamp(td *TypeSpec, val interface{}) error {
 	return model.fail(td, val, "format invalid")
 }
 
+func (model *Model) IsNumericType(td *TypeSpec) bool {
+	switch td.Type {
+	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
+		return true
+	}
+	return false
+}
+
 //and so on
 
 func (model *Model) fail(td *TypeSpec, val interface{}, msg string) error {
