@@ -1,7 +1,3 @@
-debug:: bin/sadl2go
-	./bin/sadl2go -r -o example _examples/test1.sadl
-	cat example/test1_model.go
-
 all:: bin/sadl bin/sadl2java bin/sadl2go
 
 lib::

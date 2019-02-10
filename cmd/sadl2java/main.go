@@ -31,7 +31,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
 		os.Exit(1)
 	}
-//	fmt.Println(parse.Pretty(model))
 	err = generatePojos(model, *pOutdir, *pPackage, *pLombok, *pGetters, *pJsonutil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
@@ -102,7 +101,7 @@ func (gen *PojoGenerator) createJavaFile(name string) {
 		gen.emit("package " + gen.pkgname + ";\n\n")
 	}
 }
-n
+
 func (gen *PojoGenerator) createPojo(td *sadl.TypeDef) {
 	if gen.err != nil {
 		return
