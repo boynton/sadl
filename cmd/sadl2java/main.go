@@ -165,15 +165,15 @@ func (gen *PojoGenerator) createQuantityPojo(td *sadl.TypeDef, className string)
 	gen.addImport("com.fasterxml.jackson.annotation.JsonValue")
 	gen.emit("public class " + className + " {\n\n")
 
-	valueType, _ := gen.typeName(&td.TypeSpec, td.Value, true)
-	unitType := td.Unit
-	gen.emit("    public " + valueType + " value;\n")
-	gen.emit("    public " + unitType + " unit;\n\n")
+	valueType, _ := gen.typeName(&td.TypeSpec, td.Value, true) //this type must be  primitive numeric type
+	unitType, _ := gen.typeName(&td.TypeSpec, td.Unit, true)
+	gen.emit("    public final " + valueType + " value;\n")
+	gen.emit("    public final " + unitType + " unit;\n\n")
 
-	gen.emit("    public " + className + "(" + valueType + " value, " + unitType + " unit) {\n")
+	gen.emit("    public " + className + "(" + valueType + " value, @NotNull " + unitType + " unit) {\n")
 	gen.emit("        this.value = value;\n")
 	gen.emit("        this.unit = unit;\n")
-	gen.emit("    }\n")
+	gen.emit("    }\n\n")
 	
 	v := "<bad value type, must be numeric>"
 	switch valueType {
@@ -207,16 +207,6 @@ func (gen *PojoGenerator) createQuantityPojo(td *sadl.TypeDef, className string)
 	gen.emit("        String[] tmp = repr.split(\" \");\n")
 	gen.emit("        this.value = " + v + ";\n")
 	gen.emit("        this.unit = " + u + ";\n")
-	gen.emit("    }\n\n")
-
-	gen.emit("    public " + className + " value(" + valueType + " value) {\n")
-	gen.emit("        this.value = value;\n")
-	gen.emit("        return this;\n")
-	gen.emit("    }\n\n")
-
-	gen.emit("    public " + className + " unit(" + unitType + " unit) {\n")
-	gen.emit("        this.unit = unit;\n")
-	gen.emit("        return this;\n")
 	gen.emit("    }\n\n")
 
 	gen.emit(`    @JsonValue
