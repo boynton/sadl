@@ -26,7 +26,7 @@ func main() {
 	argv := flag.Args()
 	argc := len(argv)
 	if argc == 0 {
-		fmt.Fprintf(os.Stderr, "usage: sadl2pojo -dir projdir -src relative_source_dir -package java.package.name -pom -getters -lombok some_model.sadl\n")
+		fmt.Fprintf(os.Stderr, "usage: sadl2pojo -dir projdir -src relative_source_dir -package java.package.name -pom -server -jsonutil -getters -lombok some_model.sadl\n")
 		os.Exit(1)
 	}
 	model, err := parse.File(argv[0])

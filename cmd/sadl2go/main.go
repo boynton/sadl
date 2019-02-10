@@ -14,14 +14,14 @@ import (
 )
 
 func main() {
-	pOutdir := flag.String("o", "", "output directory for generated source")
-	pPackage := flag.String("p", "", "Go package for generated source")
-	pRuntime := flag.Bool("r", false, "Use SADL runtime library for base types. If false, they are generated in the target package")
+	pOutdir := flag.String("dir", "", "output directory for generated source")
+	pPackage := flag.String("package", "", "Go package for generated source")
+	pRuntime := flag.Bool("runtime", false, "Use SADL runtime library for base types. If false, they are generated in the target package")
 	flag.Parse()
 	argv := flag.Args()
 	argc := len(argv)
 	if argc == 0 {
-		fmt.Fprintf(os.Stderr, "usage: sadl2go -o=outdir -p=go_package_name some_model.sadl\n")
+		fmt.Fprintf(os.Stderr, "usage: sadl2go -dir outdir -package go_package_name -runtime some_model.sadl\n")
 		os.Exit(1)
 	}
 	model, err := parse.File(argv[0])
