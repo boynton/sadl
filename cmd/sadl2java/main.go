@@ -7,6 +7,7 @@ import(
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/boynton/sadl"
@@ -128,6 +129,9 @@ func (gen *PojoGenerator) createPojo(td *sadl.TypeDef) {
 	}
    var b bytes.Buffer
 	gen.writer = bufio.NewWriter(&b) //first write to a string
+	if td.Comment != "" {
+		gen.emit(gen.formatComment("", td.Comment, 100))
+	}
 	className := capitalize(td.Name)
 	switch td.Type {
 	case "Struct":
@@ -138,12 +142,17 @@ func (gen *PojoGenerator) createPojo(td *sadl.TypeDef) {
 		gen.createEnumPojo(td, className)
 	default:
 		//do nothing, i.e. a String subclass
+		return
 	}
 	if gen.err == nil {
 		gen.writer.Flush()
 		gen.createJavaFile(td.Name) //then create file and write the header with imports
-		for _, pack := range gen.imports {
-			gen.emit("import " + pack + ";\n")
+		if len(gen.imports) > 0 {
+			sort.Strings(gen.imports)
+			for _, pack := range gen.imports {
+				gen.emit("import " + pack + ";\n")
+			}
+			gen.emit("\n")
 		}
 		b.WriteTo(gen.writer) //and append the originally written output after that
 		gen.writer.Flush()
@@ -154,7 +163,7 @@ func (gen *PojoGenerator) createPojo(td *sadl.TypeDef) {
 func (gen *PojoGenerator) createQuantityPojo(td *sadl.TypeDef, className string) {
 	gen.addImport("javax.validation.constraints.NotNull")
 	gen.addImport("com.fasterxml.jackson.annotation.JsonValue")
-	gen.emit("public class " + className + "{\n\n")
+	gen.emit("public class " + className + " {\n\n")
 
 	valueType, _ := gen.typeName(&td.TypeSpec, td.Value, true)
 	unitType := td.Unit
@@ -224,14 +233,19 @@ func (gen *PojoGenerator) createEnumPojo(td *sadl.TypeDef, className string) {
 
 	gen.emit("public enum " + className + "{\n")
 	max := len(td.Elements)
-	delim := ",\n"
+	delim := ","
 	for i:=0; i<max; i++ {
 		el := td.Elements[i]
 		if i == max-1 {
-			delim = ";\n\n"
+			delim = ";"
 		}
-		gen.emit("    " + strings.ToUpper(el.Symbol) + "(\"" + el.Symbol + "\")" + delim)
+		comment := "\n"
+		if el.Comment != "" {
+			comment = gen.formatComment(" ", el.Comment, 0)
+		}
+		gen.emit("    " + strings.ToUpper(el.Symbol) + "(\"" + el.Symbol + "\")" + delim + comment)
 	}
+	gen.emit("\n")
 	gen.emit("    private String repr;\n\n")
 	gen.emit("    private " + className + "(String repr) {\n        this.repr = repr;\n    }\n\n")
 
@@ -266,14 +280,19 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string) {
 	}
 	gen.emit("public class " + className + "{\n")
 	for _, fd := range td.Fields {
+		if fd.Comment != "" {
+			gen.emit(gen.formatComment("    ", fd.Comment, 100))
+		}
 		if !fd.Required {
 			gen.emit("    @JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
 		}
-		tn, tp := gen.typeName(&fd.TypeSpec, fd.Type, fd.Required)
-		if tp != "" {
-			tp = tp + " "
+		tn, tanno := gen.typeName(&fd.TypeSpec, fd.Type, fd.Required)
+		if tanno != nil {
+			for _, anno := range tanno {
+				gen.emit("    " + anno + "\n")
+			}
 		}
-		gen.emit("    public " + tp + tn + " " + fd.Name + ";\n\n")
+		gen.emit("    public " + tn + " " + fd.Name + ";\n\n")
 	}
 	for _, fd := range td.Fields {
 		gen.emitFluidSetter(td, fd)
@@ -292,11 +311,9 @@ func (gen *PojoGenerator) emitFluidSetter(td *sadl.TypeDef, fd *sadl.StructField
 	if gen.err != nil {
 		return
 	}
-	tn, tp := gen.typeName(&fd.TypeSpec, fd.Type, fd.Required)
-	if tp != "" {
-		tp = tp + " "
-	}
-	gen.emit("    public " + td.Name + " " + fd.Name + "(" + tp + tn + " val) {\n")
+	tn, _ := gen.typeName(&fd.TypeSpec, fd.Type, fd.Required)
+	//fixme: the annotations are getting ignored. Figure out if this is preferred or not
+	gen.emit("    public " + td.Name + " " + fd.Name + "(" + tn + " val) {\n")
 	gen.emit("        this." + fd.Name + " = val;\n")
 	gen.emit("        return this;\n")
 	gen.emit("    }\n\n")
@@ -315,57 +332,104 @@ func (gen *PojoGenerator) addImport(fullReference string) {
 	gen.imports = adjoin(gen.imports, fullReference)
 }
 
-func (gen *PojoGenerator) requiredPrimitiveTypeName(nameOptional, nameRequired string, required bool) string {
-	if !required {
-		return nameOptional
+func primitiveType(name string) (string, bool) {
+	switch name {
+	case "Bool":
+		return "boolean", true
+	case "Int8":
+		return "byte", true
+	case "Int16":
+		return "short", true
+	case "Int32":
+		return "int", true
+	case "Int64":
+		return "long", true
+	case "Float32":
+		return "float", true
+	case "Float64":
+		return "double", true
+	default:
+		return "", false
 	}
-	return nameRequired
 }
 
-func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool) (string, string) {
+func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool) (string, []string) {
+	primitiveName, isPrimitive := primitiveType(name)
+	var annotations []string
+	if required {
+		if isPrimitive {
+			return primitiveName, nil
+		}
+		gen.addImport("javax.validation.constraints.NotNull")
+		annotations = append(annotations, "@NotNull")
+	} else {
+		if isPrimitive {
+			name = capitalize(primitiveName)
+		}
+	}
 	switch name {
-	case "Int8":
-		return gen.requiredPrimitiveTypeName("Byte", "byte", required), ""
-	case "Int16":
-		return gen.requiredPrimitiveTypeName("Short", "short", required), ""
-	case "Int32":
-		return gen.requiredPrimitiveTypeName("Integer", "int", required), ""
-	case "Int64":
-		return gen.requiredPrimitiveTypeName("Long", "long", required), ""
-	case "Float32":
-		return gen.requiredPrimitiveTypeName("Float", "float", required), ""
-	case "Float64":
-		return gen.requiredPrimitiveTypeName("Double", "double", required), ""
+	case "String":
+		if ts.Pattern != "" {
+			gen.addImport("javax.validation.constraints.Pattern")
+			annotations = append(annotations, fmt.Sprintf("@Pattern(regexp=%q)", ts.Pattern))
+		} else if ts.Values != nil {
+			//?
+		}
+		if ts.MinSize != nil || ts.MaxSize != nil {
+			gen.addImport("javax.validation.constraints.Size")
+			smin := ""
+			if ts.MinSize != nil {
+				smin = fmt.Sprintf("min=%d", *ts.MinSize)
+			}
+			smax := ""
+			if ts.MaxSize != nil {
+				smax = fmt.Sprintf("max=%d", *ts.MaxSize)
+			}
+			if smin != "" {
+				smax = ", " + smax
+			}
+			annotations = append(annotations, fmt.Sprintf("@Size(%s%s)", smin, smax))
+		}
+		return "String", annotations
 	case "Decimal":
 		gen.addImport("java.math.BigDecimal")
-		if required {
-			gen.addImport("javax.validation.constraints.NotNull")
-			return "BigDecimal", "@NotNull"
-		}
-		return "BigDecimal", ""
-	case "Bool":
-		return gen.requiredPrimitiveTypeName("Boolean", "boolean", required), ""
-	case "String":
-		if required {
-			gen.addImport("javax.validation.constraints.NotNull")
-			return name, "@NotNull"
-		}
-		return name, ""
+		return "BigDecimal", annotations
 	case "Array":
-		items := ts.Items
 		gen.addImport("java.util.List")
-		if required {
-			gen.addImport("javax.validation.constraints.NotNull")
-			return "List<" + items + ">", "@NotNull"
-		}
-		return "List<" + items + ">", ""
+		td := gen.model.FindType(ts.Items)
+		items, _ := gen.typeName(&td.TypeSpec, ts.Items, false)
+		return "List<" + items + ">", annotations
+	case "Map":
+		gen.addImport("java.util.Map")
+		itd := gen.model.FindType(ts.Items)
+		items, _ := gen.typeName(&itd.TypeSpec, ts.Items, true)
+		ktd := gen.model.FindType(ts.Keys)
+		keys, _ := gen.typeName(&ktd.TypeSpec, ts.Keys, true)
+		return "Map<" + keys + "," + items + ">", annotations
+	case "UUID":
+		gen.addImport("java.util.UUID")
+		return name, annotations
 	default:
-		//must be a app-defined class. Parser should have already verified its existence
+		//app-defined type. Parser will have already verified its existence
 		td := gen.model.FindType(name)
 		if td == nil {
 			panic("Unresolved type, parser should have caught this: " + name)
 		}
-		return name, ""
+		switch td.Type {
+		case "String":
+			return gen.typeName(&td.TypeSpec, "String", required)
+		case "Array":
+			return gen.typeName(&td.TypeSpec, "Array", false) //FIXME: the "required/optional" state of the field is lost
+		case "Map":
+			return gen.typeName(&td.TypeSpec, "Map", false) //FIXME: the "required/optional" state of the field is lost
+		case "Struct":
+			if name == "Struct" {
+				//if nested, need to generate a class and refer to that.
+				fmt.Println(name, "->", parse.Pretty(ts))
+				panic("Nested Structs NYI")
+			}
+		}
+		return name, annotations
 	}
 }
 
@@ -450,4 +514,44 @@ public class Json {
     }
 }
 `
+
+func (gen *PojoGenerator) formatComment(indent, comment string, maxcol int) string {
+	prefix := "// "
+	left := len(indent)
+	if maxcol <= left {
+		return indent + prefix + comment + "\n"
+	}
+	tabbytes := make([]byte, 0, left)
+	for i := 0; i < left; i++ {
+		tabbytes = append(tabbytes, ' ')
+	}
+	tab := string(tabbytes)
+	prefixlen := len(prefix)
+	var buf bytes.Buffer
+	col := 0
+	lines := 1
+	tokens := strings.Split(comment, " ")
+	for _, tok := range tokens {
+		toklen := len(tok)
+		if col+toklen >= maxcol {
+			buf.WriteString("\n")
+			lines++
+			col = 0
+		}
+		if col == 0 {
+			buf.WriteString(tab)
+			buf.WriteString(prefix)
+			buf.WriteString(tok)
+			col = left + prefixlen + toklen
+		} else {
+			buf.WriteString(" ")
+			buf.WriteString(tok)
+			col += toklen + 1
+		}
+	}
+	buf.WriteString("\n")
+	emptyPrefix := strings.Trim(prefix, " ")
+	pad := tab + emptyPrefix + "\n"
+	return pad + buf.String() + pad
+}
 

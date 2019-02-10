@@ -116,7 +116,6 @@ func (gen *GoGenerator) finish() {
 			gen.pkgname = "main"
 		}
 		gen.emit("package " + gen.pkgname + ";\n\n")
-		fmt.Println("imports", gen.imports)
 		if len(gen.imports) > 0 {
 			gen.emit("import(\n")
 			for _, pack := range gen.imports {
