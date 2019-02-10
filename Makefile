@@ -1,4 +1,8 @@
-all:: bin/sadl bin/sadl2pojo
+debug:: bin/sadl2go
+	./bin/sadl2go -r -o example _examples/test1.sadl
+	cat example/test1_model.go
+
+all:: bin/sadl bin/sadl2java bin/sadl2go
 
 lib::
 	go build github.com/boynton/sadl
@@ -12,9 +16,13 @@ bin/sadl:: lib
 	mkdir -p bin
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
-bin/sadl2pojo:: lib
+bin/sadl2java:: lib
 	mkdir -p bin
-	go build -o bin/sadl2pojo github.com/boynton/sadl/cmd/sadl2pojo
+	go build -o bin/sadl2java github.com/boynton/sadl/cmd/sadl2java
+
+bin/sadl2go:: lib
+	mkdir -p bin
+	go build -o bin/sadl2go github.com/boynton/sadl/cmd/sadl2go
 
 proper::
 	go fmt github.com/boynton/sadl

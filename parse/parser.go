@@ -739,10 +739,10 @@ func (p *Parser) parseBytesOptions(typedef *sadl.TypeDef) error {
 					return err
 				}
 				if expected == "minsize" {
-					i := val.Int32()
+					i := val.AsInt32()
 					typedef.MinSize = &i
 				} else if expected == "maxsize" {
-					i := val.Int32()
+					i := val.AsInt32()
 					typedef.MinSize = &i
 				} else {
 					return p.Error("bytes option must have numeric value")

@@ -1,11 +1,16 @@
-// Decimal is a big.Float equivalent, but marshals to JSON as strings to preserve precision.
-package sadl
+package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"math/big"
-)
+func (gen *GoGenerator) emitDecimalType() {
+	if gen.err != nil {
+		return
+	}
+	gen.addImport("encoding/json")
+	gen.addImport("fmt")
+	gen.addImport("math/big")
+	gen.emit(decimalType)
+}
+
+const decimalType = `// Decimal is a big.Float equivalent, but marshals to JSON as strings to preserve precision.
 
 const DecimalPrecision = uint(250)
 
@@ -35,7 +40,7 @@ func (d *Decimal) UnmarshalJSON(b []byte) error {
 		var floatRepr float64
 		err = json.Unmarshal(b, &floatRepr)
 		if err == nil {
-			*d = *NewDecimal(floatRepr)
+         *d = *NewDecimal(floatRepr)
 			return nil
 		}
 	}
@@ -47,11 +52,11 @@ func ParseDecimal(text string) (*Decimal, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Bad Decimal number: %s", text)
 	}
-	return &Decimal{Float: *num}, nil
+   return &Decimal{Float:*num}, nil
 }
 
 func NewDecimal(val float64) *Decimal {
-	return &Decimal{Float: *big.NewFloat(val)}
+   return &Decimal{Float:*big.NewFloat(val)}
 }
 
 func (d *Decimal) String() string {
@@ -74,5 +79,7 @@ func (d *Decimal) AsFloat64() float64 {
 }
 
 func (d *Decimal) AsBigFloat() *big.Float {
-	return &d.Float
+   return &d.Float
 }
+
+`

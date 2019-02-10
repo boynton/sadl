@@ -101,7 +101,7 @@ func TestQuantity(test *testing.T) {
 	} else {
 		if q == nil {
 			test.Errorf("Quantity JSON round trip resulting in no object")
-		} else if q.Value == nil || q.Value.Float64() != val {
+		} else if q.Value == nil || q.Value.AsFloat64() != val {
 			test.Errorf("Quantity JSON round trip resulting in quantity value: %v", q.Value)
 		} else if q.Unit != unit {
 			test.Errorf("Quantity JSON round trip resulting in quantity unit: %v", q.Unit)
