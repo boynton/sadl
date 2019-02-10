@@ -238,11 +238,10 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string) {
 	}
 	
 	if optional {
-		gen.addImport("java.util.List")
-		gen.addImport("javax.validation.constraints.NotNull")
 		gen.addImport("com.fasterxml.jackson.annotation.JsonInclude")
 //		gen.emit("@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
 	} else {
+		gen.addImport("javax.validation.constraints.NotNull")
 		gen.emit("\n")
 	}
 	gen.emit("public class " + className + "{\n")
@@ -334,6 +333,7 @@ func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool
 		return name, ""
 	case "Array":
 		items := ts.Items
+		gen.addImport("java.util.List")
 		if required {
 			gen.addImport("javax.validation.constraints.NotNull")
 			return "List<" + items + ">", "@NotNull"
