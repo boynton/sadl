@@ -8,9 +8,9 @@ The following is not yet implemented:
 include "names.sadl"
 */
 
-//And this comment gets attach to the type SimpleName
+//And this comment gets attached to the type SimpleName
 type SimpleName String (pattern="[a-zA-Z_][a-zA-Z_0-9]*")
-type CompoundName String (pattern="({SimpleName}\\.)*{SimpleName}")
+type CompoundName String (pattern="([a-zA-Z_][a-zA-Z_0-9]*\\.)*[a-zA-Z_][a-zA-Z_0-9]*")
 
 //options comment
 type Options Enum {
@@ -24,19 +24,16 @@ type NonSymbolicOptions String (values=["a:b","c:d","e:f"])
 //AlphaName def
 type AlphaName String (pattern="[a-zA-Z_]+") //one or more alpha characters
 
-type YEncoded String (pattern="[a-zA-Z0-9._%=-]*")
-
 /* note that semicolons are optional */
 type StringTest Struct {
      name SimpleName (required);
      parent CompoundName (required);
      names Array<SimpleName> ; //names comment
-     enc YEncoded //enc comment
 }
 
 type NakedStruct Struct
 
-type azAZ String (pattern="[a-zA-Z]+")
+type AZaz String (pattern="[a-zA-Z]+")
 type TinyInt Int8
 type SmallInt Int16
 type RegularInt Int32
@@ -89,12 +86,12 @@ type Test Struct {
     intarray ArrayOfInt
     mynestedstruct Struct {
       something String
-      oranother Int32
-    } (default={"something": "foo", "oranother": 23})
+      orAnother Int32
+    } (default={"something": "foo", "orAnother": 23})
     my_int_array Array<Int32> (required)
     my_str_array Array<String> (required)
     myuuid UUID (required)
-    myaz azAZ (required)
+    myaz AZaz (required)
     myyear Year (required)
     mypi Pi (required)
     myotherlong LongNumber (required)
