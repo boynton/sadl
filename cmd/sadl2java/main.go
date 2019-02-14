@@ -42,10 +42,20 @@ func main() {
 		os.Exit(1)
 	}
 	if *pServer {
-		createServer(model.Name, *pPackage, *pDir, *pSrc)
+		err = createServer(model, *pPackage, *pDir, *pSrc)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "*** %v\n", err)
+		}
 	}
 	if *pPom {
-		createPom(model.Name, *pDir)
+		domain := os.Getenv("DOMAIN")
+		if domain == "" {
+			domain = "my.domain"
+		}
+		err = createPom(domain, model.Name, *pDir, *pLombok)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "*** %v\n", err)
+		}
 	}
 }
 
@@ -275,6 +285,16 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 		gen.addImport("javax.validation.constraints.NotNull")
 	}
 	if indent == "" {
+		if gen.lombok {
+			gen.emit(indent + "@Data\n")
+			gen.addImport("lombok.Data")
+			gen.emit(indent + "@AllArgsConstructor\n")
+			gen.addImport("lombok.AllArgsConstructor")
+			gen.emit(indent + "@Builder\n")
+			gen.addImport("lombok.Builder")
+			gen.emit(indent + "@NoArgsConstructor\n")
+			gen.addImport("lombok.NoArgsConstructor")
+		}
 		gen.emit(indent + "public class " + className + " {\n")
 	} else {
 		gen.emit(indent + "public static class " + className + " {\n")
@@ -304,20 +324,22 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 		}
 		gen.emit(indent + "    public " + tn + " " + fd.Name + ";\n\n")
 	}
-	for _, fd := range td.Fields {
-		gen.emitFluidSetter(td, fd, indent)
+	if !gen.lombok {
+		for _, fd := range td.Fields {
+			gen.emitFluidSetter(td, fd, indent)
+		}
+		if gen.jsonutil {
+			gen.emit(`    @Override
+    public String toString() {
+        return Json.pretty(this);
+    }
+`)
 	}
 	if len(nested) > 0 {
 		for iname, ispec := range nested {
 			gen.createStructPojo(ispec, iname, indent + "    ")
 		}
 	}
-	if gen.jsonutil {
-		gen.emit(`    @Override
-    public String toString() {
-        return Json.pretty(this);
-    }
-`)
 	}
 	gen.emit("}\n")
 }
@@ -492,6 +514,10 @@ func javaPackageToPath(pkg string) string {
 
 func capitalize(s string) string {
 	return strings.ToUpper(s[0:1]) + s[1:]
+}
+
+func lowercase(s string) string {
+	return strings.ToLower(s)
 }
 
 func uncapitalize(s string) string {

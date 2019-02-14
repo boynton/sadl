@@ -28,6 +28,7 @@ type Schema struct {
 	Version     string            `json:"version,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Types       []*TypeDef        `json:"types,omitempty"`
+	Operations  []*HttpDef        `json:"operations,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
@@ -68,4 +69,34 @@ type StructFieldDef struct {
 	Required    bool              `json:"required,omitempty"`
 	Default     interface{}       `json:"default,omitempty"`
 	TypeSpec
+}
+
+type HttpDef struct {
+	Method      string              `json:"method"`
+	Path        string              `json:"path"`
+	Name        string              `json:"name,omitempty"`
+	Comment     string              `json:"comment,omitempty"`
+	Annotations map[string]string   `json:"annotations,omitempty"`
+	Inputs      []*HttpParamSpec    `json:"inputs,omitempty"`
+	Output      *HttpResponseSpec   `json:"output,omitempty"`
+	Errors      []*HttpResponseSpec `json:"errors,omitempty"`
+}
+
+type HttpParamSpec struct {
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Header      string            `json:"header,omitempty"`
+	Query       string            `json:"query,omitempty"`
+	Path        bool              `json:"path,omitempty"`
+	Comment     string            `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type HttpResponseSpec struct {
+	Type        string            `json:"type"`
+	Status      int32             `json:"status"`
+	Name        string            `json:"name,omitempty"`
+	Headers     []*HttpParamSpec  `json:"headers,omitempty"`
+	Comment     string            `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }

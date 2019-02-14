@@ -1,6 +1,7 @@
 package sadl
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -116,13 +117,16 @@ func (model *Model) IsNumericType(td *TypeSpec) bool {
 //and so on
 
 func (model *Model) fail(td *TypeSpec, val interface{}, msg string) error {
-	return fmt.Errorf("Validation error: not a valid %s (%s): %s", td.Type, msg, pretty(val))
+	return fmt.Errorf("Validation error: not a valid %s (%s): %s", td.Type, msg, Pretty(val))
 }
 
-func pretty(obj interface{}) string {
-	j, err := json.MarshalIndent(obj, "", "    ")
-	if err != nil {
+func Pretty(obj interface{}) string {
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(&obj); err != nil {
 		return fmt.Sprint(obj)
 	}
-	return string(j)
+	return string(buf.String())
 }

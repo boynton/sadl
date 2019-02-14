@@ -128,6 +128,8 @@ func (p *Parser) Parse() (*sadl.Model, error) {
 				err = p.parseVersionDirective(comment)
 			case "type":
 				err = p.parseTypeDirective(comment)
+			case "http":
+				err = p.parseHttpDirective(comment)
 			default:
 				err = p.parseExtensionDirective(comment, tok.Text)
 			}
@@ -187,6 +189,206 @@ func (p *Parser) parseVersionDirective(comment string) error {
 	}
 }
 
+func (p *Parser) parseHttpDirective(comment string) error {
+	sym, err := p.expectIdentifier()
+	if err != nil {
+		return err
+	}
+	var method string
+	up := strings.ToUpper(sym)
+	switch up {
+	case "POST", "GET", "PUT", "DELETE": //HEAD, OPTIONS
+		method = up
+	default:
+		return p.Error(fmt.Sprintf("HTTP 'method' invalid: %s", sym))
+	}
+	pathTemplate, err := p.expectString()
+	if err != nil {
+		return err
+	}
+	options, err := p.parseOptions("http", []string{"operation"})
+	if err != nil {
+		return err
+	}
+	op := &sadl.HttpDef{
+		Method:      method,
+		Path:        pathTemplate,
+		Name:        options.Operation,
+		Annotations: options.Annotations,
+	}
+	tok := p.getToken()
+	if tok == nil {
+		return p.endOfFileError()
+	}
+	if tok.Type == OPEN_BRACE {
+		comment = p.parseTrailingComment(comment)
+		for {
+			done, comment2, err := p.isBlockDone(comment)
+			if done {
+				comment = comment2
+				break
+			}
+			in, out, err := p.parseHttpSpec(pathTemplate, true)
+			if err != nil {
+				return err
+			}
+			if in != nil {
+				op.Inputs = append(op.Inputs, in)
+			} else if out != nil {
+				fmt.Println("out:", out)
+				if out.Name == "body" {
+					op.Output = out
+				} else {
+					op.Errors = append(op.Errors, out)
+				}
+			} else {
+				break
+			}
+		}
+		comment, err = p.endOfStatement(comment)
+		op.Comment = comment
+		p.schema.Operations = append(p.schema.Operations, op)
+	} else {
+		return p.syntaxError()
+	}
+	return nil
+}
+
+func (p *Parser) parseHttpSpec(pathTemplate string, top bool) (*sadl.HttpParamSpec, *sadl.HttpResponseSpec, error) {
+	ename, err := p.expectIdentifier()
+	if err != nil {
+		return nil, nil, err
+	}
+	if ename == "expect" || ename == "except" {
+		if !top {
+			return nil, nil, p.syntaxError()
+		}
+		output, err := p.parseHttpResponseSpec(ename)
+		return nil, output, err
+	}
+	etype, err := p.expectIdentifier()
+	if err != nil {
+		return nil, nil, err
+	}
+	options, err := p.parseOptions("HttpParam", []string{"header", "default"})
+	if err != nil {
+		return nil, nil, err
+	}
+	spec := &sadl.HttpParamSpec{
+		Name:        ename,
+		Type:        etype,
+		Annotations: options.Annotations,
+	}
+	if options.Header != "" {
+		spec.Header = options.Header
+	} else if top {
+		paramType, paramName := p.parameterSource(pathTemplate, ename)
+		switch paramType {
+		case "path":
+			spec.Path = true
+		case "query":
+			spec.Query = paramName
+		default:
+			//must be the body. Should I require the name "body"?
+		}
+	}
+	return spec, nil, err
+}
+
+func (p *Parser) parseHttpResponseSpec(ename string) (*sadl.HttpResponseSpec, error) {
+	estatus, err := p.expectInt32()
+	if err != nil {
+		return nil, err
+	}
+	var etype string
+	if estatus != 204 && estatus != 304 { //these two response have no body, hence no type
+		etype, err = p.expectIdentifier()
+		if err != nil {
+			return nil, err
+		}
+	}
+	options, err := p.parseOptions("HttpResponse", []string{})
+	if err != nil {
+		return nil, err
+	}
+	output := &sadl.HttpResponseSpec{
+		Status:      estatus,
+		Type:        etype,
+		Annotations: options.Annotations,
+	}
+	if ename == "expect" {
+		output.Name = "body" //Hmm.
+	}
+	tok := p.getToken()
+	if tok == nil {
+		return nil, p.endOfFileError()
+	}
+	comment := ""
+	if tok.Type == OPEN_BRACE {
+		comment = p.parseTrailingComment(comment)
+		for {
+			done, comment2, err := p.isBlockDone(comment)
+			if done {
+				comment = comment2
+				break
+			}
+			header, _, err := p.parseHttpSpec("", false)
+			if err != nil {
+				return nil, err
+			}
+			output.Headers = append(output.Headers, header)
+		}
+	} else {
+		p.ungetToken()
+		output.Comment, err = p.endOfStatement(comment)
+	}
+	return output, nil
+}
+
+func (p *Parser) parameterSource(pathTemplate, name string) (string, string) {
+	path := pathTemplate
+	query := ""
+	n := strings.Index(path, "?")
+	if n >= 0 {
+		query = path[n+1:]
+		path = path[:n]
+	}
+	match := "{" + name + "}" //fixme: wildcard for the end of the path
+	for _, qparam := range strings.Split(query, "&") {
+		kv := strings.Split(qparam, "=")
+		if len(kv) > 1 && kv[1] == match {
+			return "query", kv[0]
+		}
+	}
+	return "", ""
+}
+
+func (p *Parser) isBlockDone(comment string) (bool, string, error) {
+	tok := p.getToken()
+	if tok == nil {
+		return false, comment, p.endOfFileError()
+	}
+	for {
+		if tok.Type == CLOSE_BRACE {
+			return true, comment, nil
+		} else if tok.Type == LINE_COMMENT {
+			comment = p.mergeComment("", tok.Text)
+			tok = p.getToken()
+			if tok == nil {
+				return false, comment, p.endOfFileError()
+			}
+		} else if tok.Type == NEWLINE {
+			tok = p.getToken()
+			if tok == nil {
+				return false, comment, p.endOfFileError()
+			}
+		} else {
+			p.ungetToken()
+			return false, comment, nil
+		}
+	}
+}
+
 func (p *Parser) parseTypeDirective(comment string) error {
 	typeName, err := p.expectIdentifier()
 	if err != nil {
@@ -227,14 +429,10 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		err = p.parseMapDef(td, params)
 	case "Struct":
 		err = p.parseStructDef(td, fields)
-		if options != nil {
-			td.Annotations = options.Annotations
-		}
+		td.Annotations = options.Annotations
 	case "Enum":
 		td.Elements = elements
-		if options != nil {
-			td.Annotations = options.Annotations
-		}
+		td.Annotations = options.Annotations
 	case "Union":
 		err = p.parseUnionDef(td, params)
 	default:
@@ -248,7 +446,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 }
 
 func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
-	var options *Options
+	options := &Options{}
 	typeName, err := p.expectIdentifier()
 	if err != nil {
 		return "", nil, nil, nil, options, "", err
@@ -496,6 +694,14 @@ func (p *Parser) expectIdentifier() (string, error) {
 	return p.assertIdentifier(tok)
 }
 
+func (p *Parser) expectEqualsIdentifier() (string, error) {
+	err := p.expect(EQUALS)
+	if err != nil {
+		return "", err
+	}
+	return p.expectIdentifier()
+}
+
 func (p *Parser) assertString(tok *Token) (string, error) {
 	if tok == nil {
 		return "", p.endOfFileError()
@@ -619,6 +825,8 @@ type Options struct {
 	MaxSize     *int32
 	Min         *sadl.Decimal
 	Max         *sadl.Decimal
+	Operation   string
+	Header      string
 	Annotations map[string]string
 }
 
@@ -660,6 +868,10 @@ func (p *Parser) parseOptions(typeName string, acceptable []string) (*Options, e
 						options.Required = true
 					case "default":
 						options.Default, err = p.parseEqualsLiteral()
+					case "operation":
+						options.Operation, err = p.expectEqualsIdentifier()
+					case "header":
+						options.Header, err = p.expectEqualsString()
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
@@ -816,6 +1028,9 @@ func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
 		}
 	}
 	options, err := p.parseOptions("Enum", []string{})
+	if err != nil {
+		return nil, err
+	}
 	comment = p.parseTrailingComment(comment)
 	return &sadl.EnumElementDef{
 		Symbol:      sym,

@@ -8,7 +8,7 @@ import(
 	"strings"
 )
 
-func createPom(name, dir string) error {
+func createPom(domain, name, dir string, lombok bool) error {
 	path := filepath.Join(dir, "pom.xml")
 	if fileExists(path) {
 		fmt.Println("[pom.xml already exists, not overwriting]")
@@ -19,27 +19,27 @@ func createPom(name, dir string) error {
 		return err
    }
    writer := bufio.NewWriter(f)
-	_, err = writer.WriteString(strings.Replace(serverPom, "{{name}}", name, -1)) //ok, this could be generalized to invoking the template engine if I need to...
+	dependsMgt := jerseyDependsMgt
+	depends := jerseyDepends
+	versions := jerseyVersion
+	if lombok {
+		depends = depends + lombokDepends
+	}
+	s := pomTemplate
+	s = strings.Replace(s, "{{domain}}", domain, -1)
+	s = strings.Replace(s, "{{name}}", name, -1)
+	s = strings.Replace(s, "{{dependsMgt}}", dependsMgt, -1)
+	s = strings.Replace(s, "{{depends}}", depends, -1)
+	s = strings.Replace(s, "{{versions}}", versions, -1)
+	_, err = writer.WriteString(s)
 	writer.Flush()
 	f.Close()
 	return err
 }
 
-const serverPom = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+const jerseyVersion = `    <jersey.version>2.27</jersey.version>                                                                          `
 
-  <modelVersion>4.0.0</modelVersion>
-  
-  <groupId>boynton.com</groupId>
-  <artifactId>{{name}}</artifactId>
-  <packaging>jar</packaging>
-  <version>1.0-SNAPSHOT</version>
-  <name>{{name}}</name>
-
-  <repositories>
-  </repositories>
-  
-  <dependencyManagement>
+const jerseyDependsMgt = `  <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>org.glassfish.jersey</groupId>
@@ -50,8 +50,9 @@ const serverPom = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi=
       </dependency>
     </dependencies>
   </dependencyManagement>
+`
 
-  <dependencies>    <dependency>
+const jerseyDepends = `    <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-jetty-http</artifactId>
     </dependency>
@@ -63,7 +64,30 @@ const serverPom = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi=
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-jackson</artifactId>
     </dependency>
+`
 
+const lombokDepends = `      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>1.18.6</version>
+        <scope>provided</scope>
+      </dependency>
+`
+
+const pomTemplate = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+  
+  <groupId>{{domain}}</groupId>
+  <artifactId>{{name}}</artifactId>
+  <packaging>jar</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>{{name}}</name>
+
+{{dependsMgt}}
+  <dependencies>
+{{depends}}
   </dependencies>
   
   <build>
@@ -98,9 +122,7 @@ const serverPom = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi=
   
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jersey.version>2.27</jersey.version>
+{{versions}}
   </properties>
 </project>
-
 `
-

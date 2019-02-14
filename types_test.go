@@ -25,7 +25,7 @@ func TestTimestamp(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(pretty(ts))
+		fmt.Println(Pretty(ts))
 	}
 }
 
@@ -45,7 +45,7 @@ func TestUUID(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(pretty(u1))
+		fmt.Println(Pretty(u1))
 	}
 }
 
@@ -65,7 +65,7 @@ func TestDecimal(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(pretty(d))
+		fmt.Println(Pretty(d))
 	}
 }
 
@@ -76,7 +76,7 @@ func TestGood2Decimal(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(pretty(d))
+		fmt.Println(Pretty(d))
 	}
 }
 
@@ -93,7 +93,7 @@ func TestQuantity(test *testing.T) {
 	val := 100.0
 	unit := "USD"
 	q1 := NewQuantity(val, unit)
-	jsonData := pretty(q1)
+	jsonData := Pretty(q1)
 	var q *Quantity
 	err := decode(jsonData, &q)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestQuantity(test *testing.T) {
 		} else if q.Unit != unit {
 			test.Errorf("Quantity JSON round trip resulting in quantity unit: %v", q.Unit)
 		} else {
-			fmt.Println("Valid Quantity:", pretty(q))
+			fmt.Println("Valid Quantity:", Pretty(q))
 		}
 	}
 }
