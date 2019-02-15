@@ -85,6 +85,7 @@ type HttpDef struct {
 type HttpParamSpec struct {
 	Name        string            `json:"name"`
 	Type        string            `json:"type"`
+	Default     interface{}       `json:"default,omitempty"`
 	Header      string            `json:"header,omitempty"`
 	Query       string            `json:"query,omitempty"`
 	Path        bool              `json:"path,omitempty"`
@@ -93,10 +94,10 @@ type HttpParamSpec struct {
 }
 
 type HttpResponseSpec struct {
-	Type        string            `json:"type"`
 	Status      int32             `json:"status"`
-	Name        string            `json:"name,omitempty"`
-	Headers     []*HttpParamSpec  `json:"headers,omitempty"`
+	Outputs      []*HttpParamSpec    `json:"outputs,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+	Error bool `json:"error,omitempty"`
+//	Name        string            `json:"name,omitempty"`
 }

@@ -2,4 +2,10 @@ _*
 *~
 .#*
 \#*
+.classpath
 bin
+gen
+gen2
+gen3
+gen4
+genlombok

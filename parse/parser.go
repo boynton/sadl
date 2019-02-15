@@ -122,8 +122,6 @@ func (p *Parser) Parse() (*sadl.Model, error) {
 			switch tok.Text {
 			case "name":
 				err = p.parseNameDirective(comment)
-			case "namespace":
-				err = p.parseNamespaceDirective(comment)
 			case "version":
 				err = p.parseVersionDirective(comment)
 			case "type":
@@ -157,7 +155,7 @@ func (p *Parser) Parse() (*sadl.Model, error) {
 }
 
 func (p *Parser) parseNameDirective(comment string) error {
-	p.schema.Comment = comment
+	p.schema.Comment = p.mergeComment(p.schema.Comment, comment)
 	txt, err := p.expectText()
 	if err == nil {
 		p.schema.Name = txt
@@ -165,17 +163,8 @@ func (p *Parser) parseNameDirective(comment string) error {
 	return err
 }
 
-func (p *Parser) parseNamespaceDirective(comment string) error {
-	p.schema.Comment = comment
-	txt, err := p.expectText()
-	if err == nil {
-		p.schema.Namespace = txt
-	}
-	return err
-}
-
 func (p *Parser) parseVersionDirective(comment string) error {
-	p.schema.Comment = comment
+	p.schema.Comment = p.mergeComment(p.schema.Comment, comment)
 	tok := p.getToken()
 	if tok == nil {
 		return p.endOfFileError()
@@ -235,11 +224,10 @@ func (p *Parser) parseHttpDirective(comment string) error {
 			if in != nil {
 				op.Inputs = append(op.Inputs, in)
 			} else if out != nil {
-				fmt.Println("out:", out)
-				if out.Name == "body" {
-					op.Output = out
-				} else {
+				if out.Error {
 					op.Errors = append(op.Errors, out)
+				} else {
+					op.Output = out
 				}
 			} else {
 				break
@@ -279,6 +267,9 @@ func (p *Parser) parseHttpSpec(pathTemplate string, top bool) (*sadl.HttpParamSp
 		Type:        etype,
 		Annotations: options.Annotations,
 	}
+	if options.Default != "" {
+		spec.Default = options.Default
+	}
 	if options.Header != "" {
 		spec.Header = options.Header
 	} else if top {
@@ -300,30 +291,20 @@ func (p *Parser) parseHttpResponseSpec(ename string) (*sadl.HttpResponseSpec, er
 	if err != nil {
 		return nil, err
 	}
-	var etype string
-	if estatus != 204 && estatus != 304 { //these two response have no body, hence no type
-		etype, err = p.expectIdentifier()
-		if err != nil {
-			return nil, err
-		}
-	}
 	options, err := p.parseOptions("HttpResponse", []string{})
 	if err != nil {
 		return nil, err
 	}
 	output := &sadl.HttpResponseSpec{
 		Status:      estatus,
-		Type:        etype,
 		Annotations: options.Annotations,
-	}
-	if ename == "expect" {
-		output.Name = "body" //Hmm.
-	}
-	tok := p.getToken()
-	if tok == nil {
-		return nil, p.endOfFileError()
+		Error: ename != "expect",
 	}
 	comment := ""
+   tok := p.getToken()
+   if tok == nil {
+      return nil, p.endOfFileError()
+   }
 	if tok.Type == OPEN_BRACE {
 		comment = p.parseTrailingComment(comment)
 		for {
@@ -332,11 +313,11 @@ func (p *Parser) parseHttpResponseSpec(ename string) (*sadl.HttpResponseSpec, er
 				comment = comment2
 				break
 			}
-			header, _, err := p.parseHttpSpec("", false)
+			out, _, err := p.parseHttpSpec("", false)
 			if err != nil {
 				return nil, err
 			}
-			output.Headers = append(output.Headers, header)
+			output.Outputs = append(output.Outputs, out)
 		}
 	} else {
 		p.ungetToken()
@@ -1403,13 +1384,7 @@ func (p *Parser) parseTrailingComment(comment string) string {
 }
 
 func (p *Parser) mergeComment(comment1 string, comment2 string) string {
-	if comment1 != "" {
-		if comment2 != "" {
-			return comment1 + " " + comment2
-		}
-		return comment1
-	}
-	return comment2
+	return strings.TrimSpace(comment1 + " " + comment2)
 }
 
 func (p *Parser) Validate() (*sadl.Model, error) {

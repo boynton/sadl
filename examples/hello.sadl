@@ -1,11 +1,8 @@
-name foo
-version 1
+http GET "/hello?caller={caller}" (operation=Hello) {
+   caller String (default="Mystery Person")
 
-type Greeting Struct {
-     message String
-}
+   expect 200 {
+      greeting String
+   }
 
-http GET "/greeting?sender={name}" {
-    name String (default="human")
-    response 400 Greeting
 }

@@ -1,5 +1,8 @@
 all:: bin/sadl bin/sadl2java bin/sadl2go
 
+install:: all
+	cp -p bin/* $(HOME)/bin/
+
 lib::
 	go build github.com/boynton/sadl
 	go build github.com/boynton/sadl/parse

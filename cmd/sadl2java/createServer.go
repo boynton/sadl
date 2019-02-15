@@ -2,6 +2,7 @@ package main
 
 import(
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ type serverData struct {
 	InterfaceClass string
 	ResourcesClass string
 	RootPath string
+	Op *sadl.HttpDef
 	Inputs []*sadl.HttpParamSpec
 	Output *sadl.HttpResponseSpec
 	Errors []*sadl.HttpResponseSpec
@@ -29,8 +31,25 @@ type serverData struct {
 	Imports []string
 }
 
+func opInfo(op *sadl.HttpDef) (string, string) {
+	switch op.Method {
+	case "POST", "PUT":
+		for _, in := range op.Inputs {
+			if in.Query == "" && in.Header == "" && !in.Path {
+				return in.Name, in.Type
+			}
+		}
+	default:
+		for _, out := range op.Output.Outputs {
+			if out.Header == "" {
+				return out.Name, out.Type
+			}
+		}
+	}
+	return "anonymous", "Object"
+}
+
 func createServer(model *sadl.Model, pkg, dir, src string) error {
-	fmt.Println("OK:", sadl.Pretty(model))
 	serviceName := capitalize(model.Name)
 	data := &serverData{
 		RootPath: "/" + lowercase(model.Name),
@@ -45,10 +64,19 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 	opName := func(op *sadl.HttpDef) string {
 		name := op.Name
 		if name == "" {
-			entityType := op.Output.Type
-			name = lowercase(op.Method) + entityType
+			method := lowercase(op.Method)
+			_, etype := opInfo(op)
+			name = method + etype
 		}
 		return name
+	}
+	entityNameType := func(op *sadl.HttpDef) (string, string) {
+		for _, out := range op.Output.Outputs {
+			if out.Header == "" { //must be the body
+				return out.Name, out.Type
+			}
+		}
+		return "", ""
 	}
 	reqType := func(name string) string {
 		return capitalize(name) + "Request"
@@ -66,45 +94,83 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			}
 			return path
 		},
+		"outtype": func (op *sadl.HttpDef) string {
+			_, t := opInfo(op)
+			return t
+		},
+		"outname": func (op *sadl.HttpDef) string {
+			n, _ := opInfo(op)
+			return n
+		},
 		"reqClass":  func(op *sadl.HttpDef) string { return reqType(opName(op))},
 		"resClass":  func(op *sadl.HttpDef) string { return resType(opName(op))},
-		"reqInnerClass": func(op *sadl.HttpDef) string {
-			return `public static class GetFooRequest {
-        public UUID id;
-        public GetFooRequest id(UUID id) { this.id = id; return this; }
-    }
-`},
-		"resInnerClass": func(op *sadl.HttpDef) string {
-			return "public static class GetFooResponse { public Foo body; public GetFooResponse body(Foo body) { this.body = body; return this; } }\n"
-		},
 		"handlerSig": func(op *sadl.HttpDef) string {
 			name := opName(op)
 			return "public " + resType(name) + " " + name + "(" + reqType(name) + " req)"
 		},
 		"resourceSig": func(op *sadl.HttpDef) string {
 			name := opName(op) //i.e. "getFoo"
-			rtype := op.Output.Type
 			var params []string
-			params = append(params, `@PathParam("id") UUID id`) //FIXME
+			for _, in := range op.Inputs {
+				param := in.Type + " " + in.Name
+				if in.Query != "" {
+					param = `@QueryParam("` + in.Query + `") ` + param
+				} else if in.Header != "" {
+					param = `@HeaderParam("` + in.Header + `") ` + param
+				} else if in.Path {
+					param = `@PathParam("` + in.Name + `") ` + param
+				}
+				if in.Default != nil {
+					switch b := in.Default.(type) {
+					case *string:
+						param = fmt.Sprintf("@DefaultValue(%q)", *b) + " " + param //strings only
+					default:
+						fmt.Println("Whoops:", sadl.Pretty(in.Default))
+					}
+				}
+				params = append(params, param)
+			}
+			_, etype := entityNameType(op)
 			paramlist := strings.Join(params, ", ")
-			return "public " + rtype + " " + name + "(" + paramlist + ")"
+			return "public " + etype + " " + name + "(" + paramlist + ")"
 		},
-		"resourceBody": func(r *sadl.HttpDef) string {
-			//FIXME
-			return `//fixme: set up headers, params, etc.
-        GetFooRequest req = new GetFooRequest().id(id);
-        try {
-            GetFooResponse res = impl.getFoo(req);
-            //set output headers, return body
-            return res.body;
-        } catch (ServiceException se) {
-            if (se.entity instanceof NotFoundError) {
-                throw new WebApplicationException(Response.status(404).entity(se.entity).build());
-            }
-            se.printStackTrace();
-            throw new WebApplicationException(Response.status(500).build());
-        }
-`		},
+		"resourceBody": func(op *sadl.HttpDef) string {
+			name := opName(op) //i.e. "Hello"
+			reqname := reqType(name)
+			resname := resType(name)
+			var params []string
+			for _, in := range op.Inputs {
+				params = append(params, in.Name)
+			}
+			ename, etype := entityNameType(op)
+			var b bytes.Buffer
+			writer := bufio.NewWriter(&b)
+			writer.WriteString("        " + reqname + " req = new " + reqname + "()")
+			for _, p := range params {
+				writer.WriteString("." + p + "(" + p + ")")
+			}
+			writer.WriteString(";\n")
+			writer.WriteString("        try {\n")
+			writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
+			if ename != "" {
+				wrappedResult := jsonWrapper(etype, "res." + ename)
+				writer.WriteString("            return " + wrappedResult + ";\n")
+			} else {
+				writer.WriteString("            return null;\n")
+			}
+			writer.WriteString("        } catch (ServiceException se) {\n")
+			for _, errRes := range op.Errors {
+				writer.WriteString(fmt.Sprintf("            // %d %s\n", errRes.Status))
+			   /* if (se.entity instanceof NotFoundError) {
+				throw new WebApplicationException(Response.status(404).entity(se.entity).build());
+			}*/
+			}
+			writer.WriteString("			     se.printStackTrace();\n")
+			writer.WriteString("			     throw new WebApplicationException(Response.status(500).build());\n")
+			writer.WriteString("        }\n")
+			writer.Flush()
+			return b.String()
+		},
 	}
 	base := filepath.Join(dir, src)
 	packageDir := base
@@ -142,9 +208,11 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			return err
 		}
 		//fixme: headers
-		data.Imports = addImportIfNeeded(nil, op.Output.Type)
+		_, otype := opInfo(op)
+		data.Imports = addImportIfNeeded(nil, otype)
 		data.Output = op.Output
 		data.Errors = op.Errors
+		data.Op = op
 		cname = resType(opName(op))
 		funcMap["reqClass"] = func() string { return cname }
 		err = createFileFromTemplate(packageDir, cname + ".java", resTemplate, data, funcMap)
@@ -153,6 +221,15 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		}
 	}
 	return err
+}
+
+func  jsonWrapper(etype string, val string) string {
+	switch etype {
+	case "Struct", "Array":
+		return val //these are already valid JSON objects
+	default:
+		return "Json.string(" + val + ")"
+	}
 }
 
 func addImportIfNeeded(pkgs []string, pkg string) []string {
@@ -184,9 +261,8 @@ const resTemplate = `//
 //
 {{.PackageLine}}
 public class {{reqClass}} {{openBrace}}
-    public int status;
-    public {{.Output.Type}} {{.Output.Name}};
-    public {{reqClass}} {{.Output.Name}}({{.Output.Type}} {{.Output.Name}}) { this.{{.Output.Name}} = {{.Output.Name}}; return this; }
+{{if .Output.Outputs}}    public {{outtype .Op}} {{outname .Op}};
+    public {{reqClass}} {{outname .Op}}({{outtype .Op}} {{outname .Op}}) { this.{{outname .Op}} = {{outname .Op}}; return this; }{{end}}
 }
 `
 
@@ -225,7 +301,7 @@ import org.glassfish.jersey.jackson.JacksonFeature;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.net.URI;
-import {{.Package}}.*;
+{{if .Package}}import {{.Package}}.*;{{end}}
 
 public class {{.MainClass}} {
 
@@ -233,17 +309,22 @@ public class {{.MainClass}} {
 
     public static void main(String[] args) {
         try {
-            Server server = startServer();
+            Server server = startServer(new {{.ImplClass}}());
             server.join();
         } catch (Exception e) {
             System.err.println("*** " + e);
         }
     }
 
-    public static Server startServer() throws Exception {
+    public static Server startServer({{.ImplClass}} impl) throws Exception {
         URI baseUri = UriBuilder.fromUri(BASE_URI).build();
         ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
-        //inject the implementation of {{.InterfaceClass}} into {{.ResourcesClass}} here.
+        config.registerInstances(new AbstractBinder() {
+                @Override
+                protected void configure() {
+                    bind(impl).to({{.InterfaceClass}}.class);
+                }
+            });
         Server server = JettyHttpContainerFactory.createServer(baseUri, config);
         server.start();
         System.out.println(String.format("Service started at %s", BASE_URI));
@@ -277,7 +358,8 @@ import static javax.ws.rs.core.Response.Status;
 
 @Path("{{.RootPath}}")
 public class {{.ResourcesClass}} {
-    {{.InterfaceClass}} impl = null;
+    @Inject
+    private {{.InterfaceClass}} impl;
 {{range .Model.Operations}}
     
     @{{.Method}}
@@ -286,23 +368,6 @@ public class {{.ResourcesClass}} {
     {{resourceSig .}} {{openBrace}}
 {{resourceBody .}}    }
 {{end}}
-
-    
-    //-----------------------------
-
-    static public class Hello {
-        public String message;
-    }
-
-    @GET
-    @Path("/hello")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Hello hello() {
-        Hello h = new Hello();
-        h.message = "Hello there";
-        return h;
-    }
-
 }
 `
 
@@ -321,7 +386,7 @@ public interface {{.InterfaceClass}} {
 const exceptionTemplate = `//
 // Generated by sadl2java
 //
-package model;
+{{.PackageLine}}
 
 public class ServiceException extends RuntimeException {
     public Object entity;
