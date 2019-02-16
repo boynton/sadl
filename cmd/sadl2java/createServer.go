@@ -6,6 +6,7 @@ import(
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -25,8 +26,8 @@ type serverData struct {
 	RootPath string
 	Op *sadl.HttpDef
 	Inputs []*sadl.HttpParamSpec
-	Output *sadl.HttpResponseSpec
-	Errors []*sadl.HttpResponseSpec
+	Expected *sadl.HttpExpectedSpec
+	Errors []*sadl.HttpExceptionSpec
 	Class string
 	Imports []string
 }
@@ -40,7 +41,7 @@ func opInfo(op *sadl.HttpDef) (string, string) {
 			}
 		}
 	default:
-		for _, out := range op.Output.Outputs {
+		for _, out := range op.Expected.Outputs {
 			if out.Header == "" {
 				return out.Name, out.Type
 			}
@@ -51,8 +52,12 @@ func opInfo(op *sadl.HttpDef) (string, string) {
 
 func createServer(model *sadl.Model, pkg, dir, src string) error {
 	serviceName := capitalize(model.Name)
+	rootPath := model.Base
+	if rootPath == "" {
+		rootPath = "/"
+	}
 	data := &serverData{
-		RootPath: "/" + lowercase(model.Name),
+		RootPath: rootPath,
 		Model: model,
 		Name: model.Name,
 		Port: 8080,
@@ -61,28 +66,42 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		InterfaceClass: serviceName + "Service",
 		ResourcesClass: serviceName + "Resources",
 	}
+	lombok := false //FIXME
+	jsonutil := false //FIXME
+	instant := false //FIXME
+	getters := false //FIXME
+	gen := newPojoGenerator(model, dir, src, pkg, lombok, getters, jsonutil, instant)
+
 	opName := func(op *sadl.HttpDef) string {
-		name := op.Name
-		if name == "" {
-			method := lowercase(op.Method)
-			_, etype := opInfo(op)
-			name = method + etype
-		}
-		return name
+		return operationName(op)
 	}
 	entityNameType := func(op *sadl.HttpDef) (string, string) {
-		for _, out := range op.Output.Outputs {
-			if out.Header == "" { //must be the body
-				return out.Name, out.Type
+//		out := op.Expected
+		for _, out := range op.Expected.Outputs {
+			if out.Header == "" {
+				tn, _, _ := gen.typeName(nil, out.Type, true)
+				return out.Name, tn
 			}
 		}
-		return "", ""
+/*		if out.Type != "" {
+			td := gen.model.FindType(out.Type)
+			if td == nil {
+				//we must generate it.
+				td = &sadl.TypeDef{
+					Name: out.Type,
+					TypeSpec: sadl.TypeSpec{
+						Type: "Struct",
+					},
+				}
+			}
+			tn, _, _ := gen.typeName(&td.TypeSpec, out.Type, true)
+			return "FIXME", tn
+		}
+*/
+		return "", "void"
 	}
 	reqType := func(name string) string {
-		return capitalize(name) + "Request"
-	}
-	resType := func(name string) string {
-		return capitalize(name) + "Response"
+		return requestType(name)
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
@@ -103,16 +122,22 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			return n
 		},
 		"reqClass":  func(op *sadl.HttpDef) string { return reqType(opName(op))},
-		"resClass":  func(op *sadl.HttpDef) string { return resType(opName(op))},
+		"resClass":  func(op *sadl.HttpDef) string {
+			resType, _ := gen.responsePojoName(op)
+			return resType
+		},
 		"handlerSig": func(op *sadl.HttpDef) string {
 			name := opName(op)
-			return "public " + resType(name) + " " + name + "(" + reqType(name) + " req)"
+			resType := responseType(operationName(op))
+//			resType, _ := gen.responsePojoName(op)
+			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
 		"resourceSig": func(op *sadl.HttpDef) string {
 			name := opName(op) //i.e. "getFoo"
 			var params []string
 			for _, in := range op.Inputs {
-				param := in.Type + " " + in.Name
+				tn, _, _ := gen.typeName(nil, in.Type, false)
+				param := tn + " " + in.Name
 				if in.Query != "" {
 					param = `@QueryParam("` + in.Query + `") ` + param
 				} else if in.Header != "" {
@@ -123,9 +148,12 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 				if in.Default != nil {
 					switch b := in.Default.(type) {
 					case *string:
-						param = fmt.Sprintf("@DefaultValue(%q)", *b) + " " + param //strings only
+						param = fmt.Sprintf("@DefaultValue(%q)", *b) + " " + param
+					case *sadl.Decimal:
+						param = fmt.Sprintf("@DefaultValue(%q)", (*b).String()) + " " + param
 					default:
 						fmt.Println("Whoops:", sadl.Pretty(in.Default))
+						panic("HERE")
 					}
 				}
 				params = append(params, param)
@@ -137,12 +165,13 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		"resourceBody": func(op *sadl.HttpDef) string {
 			name := opName(op) //i.e. "Hello"
 			reqname := reqType(name)
-			resname := resType(name)
+			resname := responseType(operationName(op))
 			var params []string
 			for _, in := range op.Inputs {
 				params = append(params, in.Name)
 			}
 			ename, etype := entityNameType(op)
+//			ename := "";
 			var b bytes.Buffer
 			writer := bufio.NewWriter(&b)
 			writer.WriteString("        " + reqname + " req = new " + reqname + "()")
@@ -151,22 +180,42 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			}
 			writer.WriteString(";\n")
 			writer.WriteString("        try {\n")
-			writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
-			if ename != "" {
-				wrappedResult := jsonWrapper(etype, "res." + ename)
+			if op.Expected.Status != 204 && op.Expected.Status != 304 {
+				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
+				wrappedResult := "res"
+				if ename != "" {
+					wrappedResult = jsonWrapper(etype, "res." + ename)
+				}
 				writer.WriteString("            return " + wrappedResult + ";\n")
 			} else {
-				writer.WriteString("            return null;\n")
+				writer.WriteString("            impl." + name + "(req);\n")
+				if etype != "void" {
+					writer.WriteString("            return null;\n")
+				}
 			}
 			writer.WriteString("        } catch (ServiceException se) {\n")
-			for _, errRes := range op.Errors {
-				writer.WriteString(fmt.Sprintf("            // %d %s\n", errRes.Status))
-			   /* if (se.entity instanceof NotFoundError) {
-				throw new WebApplicationException(Response.status(404).entity(se.entity).build());
-			}*/
+			writer.WriteString("            Object entity = se.entity == null? se : se.entity;\n")
+			writer.WriteString("            int status = 500;\n")
+			first := true
+			any := false
+			for _, resp := range op.Exceptions {
+				tn, _, _ := gen.typeName(nil, resp.Type, true)
+				if tn != "ServiceException" {
+					any = true
+					if first {
+						writer.WriteString("            if (entity instanceof " + tn + ") {\n")
+						first = false
+					} else {
+						writer.WriteString("            } else if (entity instanceof " + tn + ") {\n")
+					}
+					writer.WriteString(fmt.Sprintf("                status = %d;\n", resp.Status))
+//					writer.WriteString("            }\n");
+				}
 			}
-			writer.WriteString("			     se.printStackTrace();\n")
-			writer.WriteString("			     throw new WebApplicationException(Response.status(500).build());\n")
+			if any {
+				writer.WriteString("            }\n");
+			}
+			writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n");
 			writer.WriteString("        }\n")
 			writer.Flush()
 			return b.String()
@@ -197,38 +246,21 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		return err
 	}
 	for _, op := range model.Operations {
-		cname := reqType(opName(op))
-		funcMap["reqClass"] = func() string { return cname }
-		data.Inputs = op.Inputs
-		for _, in := range op.Inputs {
-			data.Imports = addImportIfNeeded(data.Imports, in.Type)
-		}
-		err := createFileFromTemplate(packageDir, cname + ".java", reqTemplate, data, funcMap)
-		if err != nil {
-			return err
-		}
-		//fixme: headers
-		_, otype := opInfo(op)
-		data.Imports = addImportIfNeeded(nil, otype)
-		data.Output = op.Output
-		data.Errors = op.Errors
-		data.Op = op
-		cname = resType(opName(op))
-		funcMap["reqClass"] = func() string { return cname }
-		err = createFileFromTemplate(packageDir, cname + ".java", resTemplate, data, funcMap)
-		if err != nil {
-			return err
-		}
+		gen.createRequestPojo(op)
+		gen.createResponsePojo(op)
+//		for _, exc := range op.Exceptions {
+//			gen.createExceptionPojo(op, exc)
+//		}
 	}
-	return err
+	return gen.err
 }
 
 func  jsonWrapper(etype string, val string) string {
 	switch etype {
-	case "Struct", "Array":
-		return val //these are already valid JSON objects
-	default:
+	case "String":
 		return "Json.string(" + val + ")"
+	default:
+		return val //these are already valid JSON objects
 	}
 }
 
@@ -237,7 +269,7 @@ func addImportIfNeeded(pkgs []string, pkg string) []string {
 	case "UUID":
 		return adjoin(pkgs, "java.util.UUID")
 	case "Timestamp":
-		return adjoin(pkgs, "java.time.Instance")
+		return adjoin(pkgs, "java.time.Instant")
 	}
 	return pkgs
 }
@@ -250,8 +282,8 @@ import {{.}};{{end}}
 
 public class {{reqClass}} {{openBrace}}
 {{range .Inputs}}{{if .Name}}
-    public {{.Type}} {{.Name}};
-    public {{reqClass}} {{.Name}}({{.Type}} {{.Name}}) { this.{{.Name}} = {{.Name}}; return this; }{{end}}
+    public {{javaType .}} {{.Name}};
+    public {{reqClass}} {{.Name}}({{javaType .}} {{.Name}}) { this.{{.Name}} = {{.Name}}; return this; }{{end}}
 {{end}}
 }
 `
@@ -388,10 +420,132 @@ const exceptionTemplate = `//
 //
 {{.PackageLine}}
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
+
+@JsonSerialize(using = ServiceException.JSONSerializer.class)
+@JsonDeserialize(using = ServiceException.JSONDeserializer.class)
 public class ServiceException extends RuntimeException {
     public Object entity;
-    public ServiceException(Object entity) {
-        this.entity = entity;
+
+    public ServiceException() { super(); }
+    public ServiceException(String message) { super(message); }
+    public ServiceException(String message, Throwable cause) { super(message, cause); }
+    public ServiceException(Throwable cause) { super(cause); }
+
+    public ServiceException entity(Object entity) { this.entity = entity; return this; }
+
+    public static class ErrorObject {
+        public String error;
+        public ErrorObject(String error) { this.error = error; }
     }
+
+    public static class JSONSerializer extends JsonSerializer<ServiceException> {
+        @Override
+        public void serialize(ServiceException value, JsonGenerator jgen, SerializerProvider provider) throws IOException, JsonProcessingException {
+            Object tmp = value.entity;
+            if (tmp == null) {
+                tmp = new ErrorObject(value.getMessage());
+            }
+            jgen.writeObject(tmp);
+        }
+    }
+
+    public static class JSONDeserializer extends JsonDeserializer<ServiceException> {
+        @Override
+        public ServiceException deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            ErrorObject tmp = jp.readValueAs(ErrorObject.class);
+            return new ServiceException(tmp.error);
+        }
+    }
+
 }
 `
+
+func (gen *PojoGenerator) finishPojo(b bytes.Buffer, className string) {
+	if gen.err == nil {
+		gen.createJavaFile(className) //then create file and write the header with imports
+		if len(gen.imports) > 0 {
+			sort.Strings(gen.imports)
+			for _, pack := range gen.imports {
+				gen.emit("import " + pack + ";\n")
+			}
+			gen.emit("\n")
+		}
+		b.WriteTo(gen.writer) //and append the originally written output after that
+		gen.writer.Flush()
+		gen.file.Close()
+	}
+}
+
+func requestType(name string) string {
+	return capitalize(name) + "Request"
+}
+
+func responseType(name string) string {
+	return capitalize(name) + "Response"
+}
+
+func operationName(op *sadl.HttpDef) string {
+	name := op.Name
+	if name == "" {
+		method := lowercase(op.Method)
+		_, etype := opInfo(op)
+		name = method + etype
+	}
+	return name
+}
+
+func (gen *PojoGenerator) createRequestPojo(op *sadl.HttpDef) {
+	if gen.err != nil {
+		return
+	}
+	ts := &sadl.TypeSpec{
+		Type: "Struct",
+	}
+	for _, in := range op.Inputs {
+		ts.Fields = append(ts.Fields, &in.StructFieldDef)
+	}
+	className := requestType(operationName(op))
+   var b bytes.Buffer
+	gen.writer = bufio.NewWriter(&b) //first write to a string
+	gen.createStructPojo(ts, className, "")
+	gen.writer.Flush()
+	gen.finishPojo(b, className)
+}
+
+func (gen *PojoGenerator) responsePojoName(op *sadl.HttpDef) (string, bool) {
+	for _, out := range op.Expected.Outputs {
+		if out.Header == "" {
+			tn, _, _ := gen.typeName(nil, out.Type, true)
+			return tn, false
+		}
+	}
+	return "void", false
+}
+
+func (gen *PojoGenerator) createResponsePojo(op *sadl.HttpDef) {
+	if gen.err != nil {
+		return
+	}
+	className := responseType(operationName(op))
+	ts := &sadl.TypeSpec{
+		Type: "Struct",
+	}
+	for _, spec := range op.Expected.Outputs {
+		ts.Fields = append(ts.Fields, &spec.StructFieldDef)
+	}
+   var b bytes.Buffer
+	gen.writer = bufio.NewWriter(&b) //first write to a string
+	gen.createStructPojo(ts, className, "")
+	gen.writer.Flush()
+	gen.finishPojo(b, className)
+}

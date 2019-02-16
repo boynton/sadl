@@ -29,6 +29,7 @@ type Schema struct {
 	Comment     string            `json:"comment,omitempty"`
 	Types       []*TypeDef        `json:"types,omitempty"`
 	Operations  []*HttpDef        `json:"operations,omitempty"`
+	Base        string            `json:"base,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
@@ -72,32 +73,33 @@ type StructFieldDef struct {
 }
 
 type HttpDef struct {
-	Method      string              `json:"method"`
-	Path        string              `json:"path"`
-	Name        string              `json:"name,omitempty"`
-	Comment     string              `json:"comment,omitempty"`
-	Annotations map[string]string   `json:"annotations,omitempty"`
-	Inputs      []*HttpParamSpec    `json:"inputs,omitempty"`
-	Output      *HttpResponseSpec   `json:"output,omitempty"`
-	Errors      []*HttpResponseSpec `json:"errors,omitempty"`
+	Method      string               `json:"method"`
+	Path        string               `json:"path"`
+	Name        string               `json:"name,omitempty"`
+	Comment     string               `json:"comment,omitempty"`
+	Annotations map[string]string    `json:"annotations,omitempty"`
+	Inputs      []*HttpParamSpec     `json:"inputs,omitempty"`
+	Expected    *HttpExpectedSpec    `json:"expected,omitempty"`
+	Exceptions  []*HttpExceptionSpec `json:"exceptions,omitempty"`
 }
 
 type HttpParamSpec struct {
-	Name        string            `json:"name"`
-	Type        string            `json:"type"`
-	Default     interface{}       `json:"default,omitempty"`
-	Header      string            `json:"header,omitempty"`
-	Query       string            `json:"query,omitempty"`
-	Path        bool              `json:"path,omitempty"`
+	Header string `json:"header,omitempty"`
+	Query  string `json:"query,omitempty"`
+	Path   bool   `json:"path,omitempty"`
+	StructFieldDef
+}
+
+type HttpExpectedSpec struct {
+	Outputs     []*HttpParamSpec  `json:"outputs,omitempty"`
+	Status      int32             `json:"status"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-type HttpResponseSpec struct {
+type HttpExceptionSpec struct {
+	Type        string            `json:"type"`
 	Status      int32             `json:"status"`
-	Outputs      []*HttpParamSpec    `json:"outputs,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	Error bool `json:"error,omitempty"`
-//	Name        string            `json:"name,omitempty"`
 }

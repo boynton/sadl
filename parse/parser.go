@@ -128,8 +128,14 @@ func (p *Parser) Parse() (*sadl.Model, error) {
 				err = p.parseTypeDirective(comment)
 			case "http":
 				err = p.parseHttpDirective(comment)
+			case "base":
+				err = p.parseBaseDirective(comment)
 			default:
-				err = p.parseExtensionDirective(comment, tok.Text)
+				if strings.HasPrefix(tok.Text, "x_") {
+					p.schema.Annotations, err = p.parseExtendedOption(p.schema.Annotations, tok.Text)
+				} else {
+					err = p.parseExtensionDirective(comment, tok.Text)
+				}
 			}
 			comment = ""
 		case LINE_COMMENT:
@@ -178,6 +184,18 @@ func (p *Parser) parseVersionDirective(comment string) error {
 	}
 }
 
+func (p *Parser) parseBaseDirective(comment string) error {
+	p.schema.Comment = p.mergeComment(p.schema.Comment, comment)
+	base, err := p.expectString()
+	if err == nil {
+		p.schema.Base = base
+		if base != "" && !strings.HasPrefix(base, "/") {
+			err = p.Error("Bad base path value: " + base)
+		}
+	}
+	return err
+}
+
 func (p *Parser) parseHttpDirective(comment string) error {
 	sym, err := p.expectIdentifier()
 	if err != nil {
@@ -210,31 +228,20 @@ func (p *Parser) parseHttpDirective(comment string) error {
 		return p.endOfFileError()
 	}
 	if tok.Type == OPEN_BRACE {
-		comment = p.parseTrailingComment(comment)
+		var done bool
+		op.Comment = p.parseTrailingComment(comment)
+		comment = ""
 		for {
-			done, comment2, err := p.isBlockDone(comment)
+			done, comment, err = p.isBlockDone(comment)
 			if done {
-				comment = comment2
 				break
 			}
-			in, out, err := p.parseHttpSpec(pathTemplate, true)
+			err := p.parseHttpSpec(op, comment, true)
 			if err != nil {
 				return err
 			}
-			if in != nil {
-				op.Inputs = append(op.Inputs, in)
-			} else if out != nil {
-				if out.Error {
-					op.Errors = append(op.Errors, out)
-				} else {
-					op.Output = out
-				}
-			} else {
-				break
-			}
 		}
-		comment, err = p.endOfStatement(comment)
-		op.Comment = comment
+		op.Comment, err = p.endOfStatement(op.Comment)
 		p.schema.Operations = append(p.schema.Operations, op)
 	} else {
 		return p.syntaxError()
@@ -242,88 +249,137 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) parseHttpSpec(pathTemplate string, top bool) (*sadl.HttpParamSpec, *sadl.HttpResponseSpec, error) {
+func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error {
+	pathTemplate := op.Path
 	ename, err := p.expectIdentifier()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	if ename == "expect" || ename == "except" {
+	if ename == "expect" {
 		if !top {
-			return nil, nil, p.syntaxError()
+			err = p.syntaxError()
+		} else {
+			return p.parseHttpExpectedSpec(op, comment)
 		}
-		output, err := p.parseHttpResponseSpec(ename)
-		return nil, output, err
+	} else if ename == "except" {
+		if !top {
+			err = p.syntaxError()
+		} else {
+			return p.parseHttpExceptionSpec(op, comment)
+		}
 	}
-	etype, err := p.expectIdentifier()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
-	options, err := p.parseOptions("HttpParam", []string{"header", "default"})
+	ts, _, comment, err := p.parseTypeSpec(comment)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
+	options, err := p.parseOptions("HttpParam", []string{"header", "default", "required"})
+	if err != nil {
+		return err
+	}
+	comment, err = p.endOfStatement(comment)
 	spec := &sadl.HttpParamSpec{
-		Name:        ename,
-		Type:        etype,
-		Annotations: options.Annotations,
+		StructFieldDef: sadl.StructFieldDef{
+			Name:        ename,
+			Annotations: options.Annotations,
+			Comment:     comment,
+			TypeSpec:    *ts,
+		},
 	}
 	if options.Default != "" {
 		spec.Default = options.Default
 	}
 	if options.Header != "" {
 		spec.Header = options.Header
-	} else if top {
-		paramType, paramName := p.parameterSource(pathTemplate, ename)
-		switch paramType {
-		case "path":
-			spec.Path = true
-		case "query":
-			spec.Query = paramName
-		default:
-			//must be the body. Should I require the name "body"?
+	} else {
+		if top {
+			paramType, paramName := p.parameterSource(pathTemplate, ename)
+			switch paramType {
+			case "path":
+				spec.Path = true
+			case "query":
+				spec.Query = paramName
+			case "body":
+			default:
+			}
 		}
 	}
-	return spec, nil, err
+	if top {
+		op.Inputs = append(op.Inputs, spec)
+	} else {
+		op.Expected.Outputs = append(op.Expected.Outputs, spec)
+	}
+	return nil
 }
 
-func (p *Parser) parseHttpResponseSpec(ename string) (*sadl.HttpResponseSpec, error) {
+func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
+	if op.Expected != nil {
+		return p.Error("Only a single 'expect' directive is allowed per HTTP operation")
+	}
 	estatus, err := p.expectInt32()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	options, err := p.parseOptions("HttpResponse", []string{})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	output := &sadl.HttpResponseSpec{
+	op.Expected = &sadl.HttpExpectedSpec{
 		Status:      estatus,
 		Annotations: options.Annotations,
-		Error: ename != "expect",
 	}
-	comment := ""
-   tok := p.getToken()
-   if tok == nil {
-      return nil, p.endOfFileError()
-   }
+	tok := p.getToken()
+	if tok == nil {
+		return p.endOfFileError()
+	}
 	if tok.Type == OPEN_BRACE {
-		comment = p.parseTrailingComment(comment)
+		op.Expected.Comment = p.parseTrailingComment(comment)
+		comment = ""
 		for {
-			done, comment2, err := p.isBlockDone(comment)
+			done, comment, err := p.isBlockDone(comment)
 			if done {
-				comment = comment2
+				op.Expected.Comment = p.mergeComment(op.Expected.Comment, comment)
 				break
 			}
-			out, _, err := p.parseHttpSpec("", false)
+			err = p.parseHttpSpec(op, comment, false)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			output.Outputs = append(output.Outputs, out)
 		}
 	} else {
 		p.ungetToken()
-		output.Comment, err = p.endOfStatement(comment)
 	}
-	return output, nil
+	op.Expected.Comment, err = p.endOfStatement(op.Expected.Comment)
+	return err
+}
+
+func (p *Parser) parseHttpExceptionSpec(op *sadl.HttpDef, comment string) error {
+	estatus, err := p.expectInt32()
+	if err != nil {
+		return err
+	}
+	etype, err := p.expectIdentifier()
+	if err != nil {
+		return err
+	}
+	options, err := p.parseOptions("HttpResponse", []string{})
+	if err != nil {
+		return err
+	}
+	exc := &sadl.HttpExceptionSpec{
+		Type:        etype,
+		Status:      estatus,
+		Annotations: options.Annotations,
+	}
+	exc.Comment, err = p.endOfStatement(comment)
+	if err != nil {
+		return err
+	}
+	op.Exceptions = append(op.Exceptions, exc)
+	return nil
+
 }
 
 func (p *Parser) parameterSource(pathTemplate, name string) (string, string) {
@@ -335,6 +391,9 @@ func (p *Parser) parameterSource(pathTemplate, name string) (string, string) {
 		path = path[:n]
 	}
 	match := "{" + name + "}" //fixme: wildcard for the end of the path
+	if strings.Index(path, match) >= 0 {
+		return "path", ""
+	}
 	for _, qparam := range strings.Split(query, "&") {
 		kv := strings.Split(qparam, "=")
 		if len(kv) > 1 && kv[1] == match {
@@ -375,7 +434,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	superName, params, fields, elements, options, comment2, err := p.parseTypeSpec() //note that this can return user-defined types
+	superName, params, fields, elements, options, comment2, err := p.parseTypeSpecElements() //note that this can return user-defined types
 	if err != nil {
 		return err
 	}
@@ -426,7 +485,43 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) parseTypeSpec() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
+func (p *Parser) parseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string, error) {
+	tsType, tsParams, tsFields, tsElements, options, tsComment, err := p.parseTypeSpecElements()
+	if err != nil {
+		return nil, nil, "", err
+	}
+	comment = p.mergeComment(comment, tsComment) //?
+	var tsKeys, tsItems string
+	var tsUnit, tsValue string
+	switch tsType {
+	case "Array":
+		tsItems, err = p.arrayParams(tsParams)
+	case "Map":
+		tsKeys, tsItems, err = p.mapParams(tsParams)
+	case "Quantity":
+		tsValue, tsUnit, err = p.quantityParams(tsParams)
+	default:
+		if len(tsParams) != 0 {
+			//unions!?
+			err = p.syntaxError()
+		}
+	}
+	if err != nil {
+		return nil, nil, "", err
+	}
+	ts := &sadl.TypeSpec{
+		Type:     tsType,
+		Items:    tsItems,
+		Keys:     tsKeys,
+		Value:    tsValue,
+		Unit:     tsUnit,
+		Fields:   tsFields,
+		Elements: tsElements,
+	}
+	return ts, options, comment, nil
+}
+
+func (p *Parser) parseTypeSpecElements() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
 	options := &Options{}
 	typeName, err := p.expectIdentifier()
 	if err != nil {
@@ -1061,43 +1156,58 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 	if err != nil {
 		return nil, err
 	}
-	ftype, fparams, ffields, felements, foptions, fcomment, err := p.parseTypeSpec()
+	ts, foptions, fcomment, err := p.parseTypeSpec(comment)
 	if err != nil {
 		return nil, err
 	}
 	comment = p.mergeComment(comment, fcomment)
-
-	var fkeys, fitems string
-	var funit, fvalue string
-	switch ftype {
-	case "Array":
-		fitems, err = p.arrayParams(fparams)
-	case "Map":
-		fkeys, fitems, err = p.mapParams(fparams)
-	case "Quantity":
-		fvalue, funit, err = p.quantityParams(fparams)
-	default:
-		if len(fparams) != 0 {
-			//unions!
-			return nil, p.syntaxError()
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
 	field := &sadl.StructFieldDef{
-		Name:    fname,
-		Comment: comment,
-		TypeSpec: sadl.TypeSpec{
-			Type:     ftype,
-			Items:    fitems,
-			Keys:     fkeys,
-			Value:    fvalue,
-			Unit:     funit,
-			Fields:   ffields,
-			Elements: felements,
-		},
+		Name:     fname,
+		Comment:  comment,
+		TypeSpec: *ts,
 	}
+	/*
+		ftype, fparams, ffields, felements, foptions, fcomment, err := p.parseTypeSpecElements()
+		if err != nil {
+			return nil, err
+		}
+		if comment != "" {
+			panic("HERE, it is true")
+		}
+		comment = p.mergeComment(comment, fcomment)
+
+		var fkeys, fitems string
+		var funit, fvalue string
+		switch ftype {
+		case "Array":
+			fitems, err = p.arrayParams(fparams)
+		case "Map":
+			fkeys, fitems, err = p.mapParams(fparams)
+		case "Quantity":
+			fvalue, funit, err = p.quantityParams(fparams)
+		default:
+			if len(fparams) != 0 {
+				//unions!
+				return nil, p.syntaxError()
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		field := &sadl.StructFieldDef{
+			Name:    fname,
+			Comment: comment,
+			TypeSpec: sadl.TypeSpec{
+				Type:     ftype,
+				Items:    fitems,
+				Keys:     fkeys,
+				Value:    fvalue,
+				Unit:     funit,
+				Fields:   ffields,
+				Elements: felements,
+			},
+		}
+	*/
 	err = p.parseStructFieldOptions(field)
 	if err == nil {
 		if foptions != nil {
@@ -1375,10 +1485,12 @@ func (p *Parser) parseLeadingComment(comment string) string {
 
 func (p *Parser) parseTrailingComment(comment string) string {
 	tok := p.getToken()
-	if tok != nil && tok.Type == LINE_COMMENT {
-		comment = p.mergeComment(comment, tok.Text)
-	} else {
-		p.ungetToken()
+	if tok != nil {
+		if tok.Type == LINE_COMMENT {
+			comment = p.mergeComment(comment, tok.Text)
+		} else {
+			p.ungetToken()
+		}
 	}
 	return comment
 }
@@ -1402,7 +1514,32 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 			return nil, err
 		}
 	}
+	for _, op := range p.model.Operations {
+		err = p.validateOperation(op)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return p.model, err
+}
+
+func (p *Parser) validateOperation(op *sadl.HttpDef) error {
+	needsBody := op.Method == "POST" || op.Method == "PUT"
+	bodyParam := ""
+	for _, in := range op.Inputs {
+		//paramType, paramName := p.parameterSource(op.Path, in.Name)
+		if !in.Path && in.Query == "" && in.Header == "" {
+			if needsBody {
+				if bodyParam != "" {
+					return fmt.Errorf("HTTP Operation cannot have more than one body parameter (%q is already that parameter): %s", bodyParam, Pretty(op))
+				}
+				bodyParam = in.Name
+			} else {
+				return fmt.Errorf("Input parameter %q to HTTP Operation is not a header or a variable in the path: %s - %q", in.Name, Pretty(op), op.Method+" "+op.Path)
+			}
+		}
+	}
+	return nil
 }
 
 func (p *Parser) validateQuantity(td *sadl.TypeDef) error {

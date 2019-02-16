@@ -127,6 +127,10 @@ func (gen *PojoGenerator) createJavaFile(name string) {
 		return
 	}
 	path := filepath.Join(gen.pkgpath, name + ".java")
+	if fileExists(path) {
+		fmt.Printf("[%s already exists, not overwriting]\n", path)
+		return
+	}
    f, err := os.Create(path)
    if err != nil {
 		gen.err = err
@@ -152,7 +156,7 @@ func (gen *PojoGenerator) createPojo(td *sadl.TypeDef) {
 	className := capitalize(td.Name)
 	switch td.Type {
 	case "Struct":
-		gen.createStructPojo(td, className, "")
+		gen.createStructPojo(&td.TypeSpec, className, "")
 	case "Quantity":
 		gen.createQuantityPojo(td, className)
 	case "Enum":
@@ -270,7 +274,7 @@ func (gen *PojoGenerator) createEnumPojo(td *sadl.TypeDef, className string) {
 	gen.emit("}\n")
 }
 
-func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, indent string) {
+func (gen *PojoGenerator) createStructPojo(td *sadl.TypeSpec, className string, indent string) {
 	optional := false
    for _, fd := range td.Fields {
 		if !fd.Required {
@@ -284,6 +288,7 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 	} else {
 		gen.addImport("javax.validation.constraints.NotNull")
 	}
+	extends := ""
 	if indent == "" {
 		if gen.lombok {
 			gen.emit(indent + "@Data\n")
@@ -295,11 +300,11 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 			gen.emit(indent + "@NoArgsConstructor\n")
 			gen.addImport("lombok.NoArgsConstructor")
 		}
-		gen.emit(indent + "public class " + className + " {\n")
+		gen.emit(indent + "public class " + className + extends + " {\n")
 	} else {
-		gen.emit(indent + "public static class " + className + " {\n")
+		gen.emit(indent + "public static class " + className + extends + " {\n")
 	}
-	nested := make(map[string]*sadl.TypeDef, 0)
+	nested := make(map[string]*sadl.TypeSpec, 0)
 	for _, fd := range td.Fields {
 		if fd.Comment != "" {
 			gen.emit(gen.formatComment(indent + "    ", fd.Comment, 100))
@@ -310,12 +315,11 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 		tn, tanno, anonymous := gen.typeName(&fd.TypeSpec, fd.Type, fd.Required)
 		if anonymous != nil {
 			tn = capitalize(fd.Name)
-			if tn == td.Name {
+			if tn == className {
 				gen.err = fmt.Errorf("Cannot have identically named inner class with same name as containing class: %q", tn)
 				return
 			}
-			nestedDef := &sadl.TypeDef{Name: tn, TypeSpec: *anonymous}
-			nested[tn] = nestedDef
+			nested[tn] = anonymous
 		}
 		if tanno != nil {
 			for _, anno := range tanno {
@@ -326,7 +330,7 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
 	}
 	if !gen.lombok {
 		for _, fd := range td.Fields {
-			gen.emitFluidSetter(td, fd, indent)
+			gen.emitFluidSetter(className, td, fd, indent)
 		}
 		if gen.jsonutil {
 			gen.emit(`    @Override
@@ -334,17 +338,17 @@ func (gen *PojoGenerator) createStructPojo(td *sadl.TypeDef, className string, i
         return Json.pretty(this);
     }
 `)
-	}
-	if len(nested) > 0 {
-		for iname, ispec := range nested {
-			gen.createStructPojo(ispec, iname, indent + "    ")
 		}
-	}
+		if len(nested) > 0 {
+			for iname, ispec := range nested {
+				gen.createStructPojo(ispec, iname, indent + "    ")
+			}
+		}
 	}
 	gen.emit("}\n")
 }
 
-func (gen *PojoGenerator) emitFluidSetter(td *sadl.TypeDef, fd *sadl.StructFieldDef, indent string) {
+func (gen *PojoGenerator) emitFluidSetter(className string, ts *sadl.TypeSpec, fd *sadl.StructFieldDef, indent string) {
 	if gen.err != nil {
 		return
 	}
@@ -353,7 +357,7 @@ func (gen *PojoGenerator) emitFluidSetter(td *sadl.TypeDef, fd *sadl.StructField
 	if anonymous != nil {
 		tn = capitalize(fd.Name)
 	}
-	gen.emit(indent + "    public " + td.Name + " " + fd.Name + "(" + tn + " val) {\n")
+	gen.emit(indent + "    public " + className + " " + fd.Name + "(" + tn + " val) {\n")
 	gen.emit(indent + "        this." + fd.Name + " = val;\n")
 	gen.emit(indent + "        return this;\n")
 	gen.emit(indent + "    }\n\n")
@@ -413,26 +417,28 @@ func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool
 	}
 	switch name {
 	case "String":
-		if ts.Pattern != "" {
-			gen.addImport("javax.validation.constraints.Pattern")
-			annotations = append(annotations, fmt.Sprintf("@Pattern(regexp=%q)", ts.Pattern))
-		} else if ts.Values != nil {
-			//?
-		}
-		if ts.MinSize != nil || ts.MaxSize != nil {
-			gen.addImport("javax.validation.constraints.Size")
-			smin := ""
-			if ts.MinSize != nil {
-				smin = fmt.Sprintf("min=%d", *ts.MinSize)
+		if ts != nil {
+			if ts.Pattern != "" {
+				gen.addImport("javax.validation.constraints.Pattern")
+				annotations = append(annotations, fmt.Sprintf("@Pattern(regexp=%q)", ts.Pattern))
+			} else if ts.Values != nil {
+				//?
 			}
-			smax := ""
-			if ts.MaxSize != nil {
-				smax = fmt.Sprintf("max=%d", *ts.MaxSize)
+			if ts.MinSize != nil || ts.MaxSize != nil {
+				gen.addImport("javax.validation.constraints.Size")
+				smin := ""
+				if ts.MinSize != nil {
+					smin = fmt.Sprintf("min=%d", *ts.MinSize)
+				}
+				smax := ""
+				if ts.MaxSize != nil {
+					smax = fmt.Sprintf("max=%d", *ts.MaxSize)
+				}
+				if smin != "" {
+					smax = ", " + smax
+				}
+				annotations = append(annotations, fmt.Sprintf("@Size(%s%s)", smin, smax))
 			}
-			if smin != "" {
-				smax = ", " + smax
-			}
-			annotations = append(annotations, fmt.Sprintf("@Size(%s%s)", smin, smax))
 		}
 		return "String", annotations, nil
 	case "Decimal":
@@ -451,11 +457,17 @@ func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool
 		return "Timestamp", annotations, nil
 	case "Array":
 		gen.addImport("java.util.List")
+		if ts == nil {
+			return "List", annotations, nil
+		}
 		td := gen.model.FindType(ts.Items)
 		items, _, _ := gen.typeName(&td.TypeSpec, ts.Items, true)
 		return "List<" + items + ">", annotations, nil
 	case "Map":
 		gen.addImport("java.util.Map")
+		if ts == nil {
+			return "Map", annotations, nil
+		}
 		ktd := gen.model.FindType(ts.Keys)
 		keys, _, _ := gen.typeName(&ktd.TypeSpec, ts.Keys, true)
 		itd := gen.model.FindType(ts.Items)

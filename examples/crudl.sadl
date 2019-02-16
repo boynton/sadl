@@ -1,0 +1,123 @@
+// A CRUDL storage service as an example HTTP Web Service defined in SADL.
+name Crudl
+version 1
+
+//The items to be stored.
+type Item Struct {
+   id UUID (required) //the id is always provided by the client
+   modified Timestamp //the modified time is managed by the server
+   data String //other fields are arbitrary, this services just preserves them, but otherwise doesn't use them
+}
+
+type BadRequest Struct {
+   error String
+}
+
+type NotFound Struct {
+   error String
+}
+
+//
+// Create the item. The item with the updated modified time is returned.
+//
+http POST "/items" (operation=CreateItem) { //Another op comment, after the open brace.
+   //foobar
+   item Item //the new item
+
+   //The expected response upon creation of the item in the store
+   expect 201 { /* you must use this form to name the results for the generated CreateItemResponse object */
+      //item comment
+       item Item (x_body) //field comment in the expect
+   }
+
+   //The response if the item or the id is malformed in any way. Each except type can only occur once, but multiple types can have that code.
+   except 400 BadRequest //Trailing except comment.
+} //Finally, a comment after the close brace
+
+//
+// Get the item with the specified id. Conditional response is provided to 
+// avoid sending the item over the wire if it has not changed.
+//
+http GET "/items/{id}" (operation=GetItem) {
+   id UUID
+   ifNewer Timestamp (header="If-Modified-Since")
+
+   //The expected response with the item
+   expect 200 {
+      item Item
+   }
+
+   //if not modified, this is the response, with no content. "NotModified" is only used for the app to throw the exception.
+   // i.e. throw new ServiceException(new NotModified())
+   except 304 NotModified
+
+   except 404 NotFound
+
+}
+
+type NotModified Struct {
+}
+
+//Q: do I want to declare exception types in SASL? I think not, for Go at least.
+//What I do want is to declare arbitrary exception structs, and glue them into the generated objects to be useable.
+//For Java, make them a subclass of RuntimeException, and provide constructors that take a message.
+//For Go, make a type that has an Error() method
+//In both cases, provide a default error called ServiceException, that has message field constructor, and an optional
+//argument to wrap another exception. Any additional fields would work like other POJOs or Go structs, and the whole thing
+//would get serialized to JSON such that the message is available as the field "error" to be easily recognized.
+//
+//i.e. { "error": "This is the message" }. Other fields get merged with that, i.e. you cannot name a field "error" yourself.
+//
+
+//
+// Update the item. The item with the updated modified time is returned.
+//
+http PUT "/items/{id2}" (operation=PutItem) { /* Note, Ideally, I'd specific "/items/{item.id}" to avoid redundancy */
+   id2 UUID
+   item Item //the new item
+
+   //The expected response if the item exists and was updated
+   expect 200 {
+      item Item
+   }
+
+   //The response if the item or the id is malformed in any way
+   except 400 ServiceException
+
+}
+
+//
+// Delete the item from the store.
+//
+http DELETE "/items/{id}" (operation=DeleteItem) {
+   id UUID //the id of the item
+
+   //the expected response has no content
+   expect 204 {
+   }
+
+   //the response if the id is not found in the store
+   except 404 NotFoundException
+
+}
+
+type ItemList Struct {
+  items Array<Item> (required) //the array is always returned, even if empty
+  next UUID //the token to skip to the next batch is returned only if there are more
+}
+
+//
+// List the items. By default only 10 items are returned, but that can be overriden
+// with a query parameter. If more items are available than the limit, then a "next"
+// token is returned, which can be provided with a subsequent call as the "skip"
+// query parameter.
+//
+http GET "/items?limit={limit}&skip={skip}" (operation=ListItems) {
+   limit Int32 (default=10)
+   skip UUID
+
+   expect 200 {
+      items ItemList
+   }
+}
+

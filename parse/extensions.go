@@ -21,7 +21,7 @@ func (p *Parser) AddExtension(name string, handler ExtensionHandler) error {
 }
 
 func (p *Parser) expectedDirectiveError() error {
-	msg := "Expected one of 'type', 'name', 'namespace', 'version'"
+	msg := "Expected one of 'type', 'name', 'version', 'base', or an 'x_*' extended annotation"
 	if p.extensions != nil {
 		for k, _ := range p.extensions {
 			msg = msg + fmt.Sprintf(" '%s'", k)
