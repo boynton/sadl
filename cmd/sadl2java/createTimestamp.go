@@ -25,7 +25,7 @@ import java.io.IOException;
 
 @JsonSerialize(using = Timestamp.Serializer.class)
 @JsonDeserialize(using = Timestamp.Deserializer.class)
-public class Timestamp {
+public class Timestamp implements Comparable<Timestamp> {
     private String repr;
 
     public static Timestamp now() {
@@ -42,6 +42,13 @@ public class Timestamp {
     
     public String toString() {
         return repr;
+    }
+
+    public int compareTo(Timestamp another) {
+        if (another == null) {
+            return 1;
+        }
+        return this.asInstant().compareTo(another.asInstant());
     }
 
     public Instant asInstant() {

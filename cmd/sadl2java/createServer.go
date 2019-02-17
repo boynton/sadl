@@ -198,6 +198,7 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			writer.WriteString("            int status = 500;\n")
 			first := true
 			any := false
+			anyNull := false
 			for _, resp := range op.Exceptions {
 				tn, _, _ := gen.typeName(nil, resp.Type, true)
 				if tn != "ServiceException" {
@@ -209,11 +210,19 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 						writer.WriteString("            } else if (entity instanceof " + tn + ") {\n")
 					}
 					writer.WriteString(fmt.Sprintf("                status = %d;\n", resp.Status))
-//					writer.WriteString("            }\n");
+					if resp.Status == 204 || resp.Status == 304 {
+						writer.WriteString("                entity = null;\n")
+						anyNull = true
+					}
 				}
 			}
 			if any {
 				writer.WriteString("            }\n");
+			}
+			if anyNull {
+				writer.WriteString("            if (entity == null) {\n")
+				writer.WriteString("                throw new WebApplicationException(status);\n")
+				writer.WriteString("            }\n")
 			}
 			writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n");
 			writer.WriteString("        }\n")

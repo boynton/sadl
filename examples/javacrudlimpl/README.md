@@ -16,7 +16,7 @@ Then you can test it. This session uses a "json" utility to pretty-print the res
 
     $ go get github.com/boynton/hacks/json
 
-A session against the server launched as about follows:
+A session against the server launched as above follows. Note the test of conditional get based on modified time.
 
     $ curl -s 'http://localhost:8080/items' | json
     {
@@ -80,12 +80,43 @@ A session against the server launched as about follows:
           }
        ]
     }
+    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9'
+     to localhost (::1) port 8080 (#0)
+    > GET /items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9 HTTP/1.1
+    > Host: localhost:8080
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > If-Modified-Since: 2019-02-16T23:14:21.103Z
+    > 
+    < HTTP/1.1 304 Not Modified
+    < Date: Sat, 16 Feb 2019 23:15:02 GMT
+    < Server: Jetty(9.4.7.v20170914)
+    < 
+    * Connection #0 to host localhost left intact
     $ curl -s -X PUT -H "Content-type: application/json" -d '{"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f9","data":"Hi there again!!!!!"}' 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9' | json
     {
        "data": "Hi there again!!!!!",
        "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
        "modified": "2019-02-16T23:21:52.614Z"
     }
+    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9' && echo
+    *   Trying ::1...
+    * TCP_NODELAY set
+    * Connected to localhost (::1) port 8080 (#0)
+    > GET /items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9 HTTP/1.1
+    > Host: localhost:8080
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > If-Modified-Since: 2019-02-16T23:14:21.103Z
+    > 
+    < HTTP/1.1 200 OK
+    < Date: Sat, 16 Feb 2019 23:22:12 GMT
+    < Content-Type: application/json
+    < Transfer-Encoding: chunked
+    < Server: Jetty(9.4.7.v20170914)
+    < 
+    * Connection #0 to host localhost left intact
+    {"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f9","modified":"2019-02-16T23:21:52.614Z","data":"Hi there again!!!!!"}
     $ curl -s 'http://localhost:8080/items' | json
     {
        "items": [
