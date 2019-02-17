@@ -27,7 +27,7 @@ http POST "/items" (operation=CreateItem) { //Another op comment, after the open
    //The expected response upon creation of the item in the store
    expect 201 { /* you must use this form to name the results for the generated CreateItemResponse object */
       //item comment
-       item Item (x_body) //field comment in the expect
+       item Item //field comment in the expect
    }
 
    //The response if the item or the id is malformed in any way. Each except type can only occur once, but multiple types can have that code.
@@ -45,6 +45,7 @@ http GET "/items/{id}" (operation=GetItem) {
    //The expected response with the item
    expect 200 {
       item Item
+      modified Timestamp (header="Modified") //just an example of output headers
    }
 
    //if not modified, this is the response, with no content. "NotModified" is only used for the app to throw the exception.

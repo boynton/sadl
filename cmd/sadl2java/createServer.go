@@ -158,7 +158,7 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 				}
 				params = append(params, param)
 			}
-			_, etype := entityNameType(op)
+			etype := "Response"
 			paramlist := strings.Join(params, ", ")
 			return "public " + etype + " " + name + "(" + paramlist + ")"
 		},
@@ -171,7 +171,6 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 				params = append(params, in.Name)
 			}
 			ename, etype := entityNameType(op)
-//			ename := "";
 			var b bytes.Buffer
 			writer := bufio.NewWriter(&b)
 			writer.WriteString("        " + reqname + " req = new " + reqname + "()")
@@ -180,18 +179,25 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			}
 			writer.WriteString(";\n")
 			writer.WriteString("        try {\n")
-			if op.Expected.Status != 204 && op.Expected.Status != 304 {
+			if len(op.Expected.Outputs) > 0 {
 				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
-				wrappedResult := "res"
-				if ename != "" {
+				wrappedResult := ""
+				if ename != "void" && ename != "" {
 					wrappedResult = jsonWrapper(etype, "res." + ename)
 				}
-				writer.WriteString("            return " + wrappedResult + ";\n")
+				ret := fmt.Sprintf("Response.status(%d)", + op.Expected.Status)
+				for _, out := range op.Expected.Outputs {
+					if out.Header != "" {
+						ret = ret + ".header(\"" + out.Header + "\", res." + out.Name + ")"
+					}
+				}
+				if wrappedResult != "" {
+					ret = ret + ".entity(" + wrappedResult +")"
+				}
+				writer.WriteString("            return " + ret + ".build();\n")
 			} else {
 				writer.WriteString("            impl." + name + "(req);\n")
-				if etype != "void" {
-					writer.WriteString("            return null;\n")
-				}
+				writer.WriteString(fmt.Sprintf("            return Response.status(%d).build();\n", op.Expected.Status))
 			}
 			writer.WriteString("        } catch (ServiceException se) {\n")
 			writer.WriteString("            Object entity = se.entity == null? se : se.entity;\n")
