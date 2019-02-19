@@ -1505,6 +1505,10 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 		switch td.Type {
 		case "Struct":
 			err = p.validateStruct(td)
+		case "Array":
+			err = p.validateArray(td)
+		case "Map":
+			err = p.validateMap(td)
 		case "Quantity":
 			err = p.validateQuantity(td)
 		default:
@@ -1579,6 +1583,37 @@ func (p *Parser) validateStruct(td *sadl.TypeDef) error {
 		if field.Values != nil && field.Pattern != "" {
 			return fmt.Errorf("Cannot have both 'values' and 'pattern' constraints in one string field: '%s.%s'", td.Name, field.Name)
 		}
+	}
+	return nil
+}
+
+func (p *Parser) validateArray(td *sadl.TypeDef) error {
+	model := p.model
+	if td.Items == "Any" {
+		return nil
+	}
+	itd := model.FindType(td.Items)
+	if itd == nil {
+		return fmt.Errorf("Undefined type '%s' for Array items '%s'", td.Items, td.Name)
+	}
+	return nil
+}
+
+func (p *Parser) validateMap(td *sadl.TypeDef) error {
+	model := p.model
+	if td.Items == "Any" {
+		return nil
+	}
+	itd := model.FindType(td.Items)
+	if itd == nil {
+		return fmt.Errorf("Undefined type '%s' for Map items '%s'", td.Items, td.Name)
+	}
+	if td.Keys == "String" {
+		return nil
+	}
+	ktd := model.FindType(td.Keys)
+	if ktd == nil {
+		return fmt.Errorf("Undefined type '%s' for Map keys '%s'", td.Keys, td.Name)
 	}
 	return nil
 }
