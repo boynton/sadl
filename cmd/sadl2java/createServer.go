@@ -123,13 +123,11 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		},
 		"reqClass":  func(op *sadl.HttpDef) string { return reqType(opName(op))},
 		"resClass":  func(op *sadl.HttpDef) string {
-			resType, _ := gen.responsePojoName(op)
-			return resType
+			return responseType(operationName(op))
 		},
 		"handlerSig": func(op *sadl.HttpDef) string {
 			name := opName(op)
 			resType := responseType(operationName(op))
-//			resType, _ := gen.responsePojoName(op)
 			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
 		"resourceSig": func(op *sadl.HttpDef) string {

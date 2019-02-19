@@ -476,6 +476,8 @@ func (gen *PojoGenerator) typeName(ts *sadl.TypeSpec, name string, required bool
 	case "UUID":
 		gen.addImport("java.util.UUID")
 		return name, annotations, nil
+	case "Any":
+		return "Object", annotations, nil
 	default:
 		//app-defined type. Parser will have already verified its existence
 		td := gen.model.FindType(name)
