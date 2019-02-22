@@ -513,6 +513,8 @@ func operationName(op *sadl.HttpDef) string {
 		method := lowercase(op.Method)
 		_, etype := opInfo(op)
 		name = method + etype
+	} else {
+		name = uncapitalize(name)
 	}
 	return name
 }
