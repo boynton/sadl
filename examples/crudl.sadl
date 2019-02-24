@@ -25,7 +25,7 @@ http POST "/items" (operation=CreateItem) { //Another op comment, after the open
    item Item //the new item
 
    //The expected response upon creation of the item in the store
-   expect 201 { /* you must use this form to name the results for the generated CreateItemResponse object */
+   expect 201 { /* you must use this form to name the results for the generated         CreateItemResponse object */
       //item comment
        item Item //field comment in the expect
    }
@@ -49,7 +49,7 @@ http GET "/items/{id}" (operation=GetItem) {
    }
 
    //if not modified, this is the response, with no content. "NotModified" is only used for the app to throw the exception.
-   // i.e. throw new ServiceException(new NotModified())
+   // i.e. in Java: throw new ServiceException(new NotModified())
    except 304 NotModified
 
    except 404 NotFound
@@ -59,16 +59,6 @@ http GET "/items/{id}" (operation=GetItem) {
 type NotModified Struct {
 }
 
-//Q: do I want to declare exception types in SASL? I think not, for Go at least.
-//What I do want is to declare arbitrary exception structs, and glue them into the generated objects to be useable.
-//For Java, make them a subclass of RuntimeException, and provide constructors that take a message.
-//For Go, make a type that has an Error() method
-//In both cases, provide a default error called ServiceException, that has message field constructor, and an optional
-//argument to wrap another exception. Any additional fields would work like other POJOs or Go structs, and the whole thing
-//would get serialized to JSON such that the message is available as the field "error" to be easily recognized.
-//
-//i.e. { "error": "This is the message" }. Other fields get merged with that, i.e. you cannot name a field "error" yourself.
-//
 
 //
 // Update the item. The item with the updated modified time is returned.
