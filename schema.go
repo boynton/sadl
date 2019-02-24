@@ -48,6 +48,7 @@ type TypeSpec struct {
 	Variants []string          `json:"variants,omitempty"` //FIXME: a variant element, so comments/annotations can be attached
 	Unit     string            `json:"unit,omitempty"`
 	Value    string            `json:"value,omitempty"`
+	Reference string           `json:"reference,omitempty"`
 }
 
 type TypeDef struct {

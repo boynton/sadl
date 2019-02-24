@@ -662,7 +662,7 @@ func (p *Parser) parseBytesDef(td *sadl.TypeDef) error {
 }
 
 func (p *Parser) parseStringDef(td *sadl.TypeDef) error {
-	err := p.parseTypeOptions(td, "minsize", "maxsize", "pattern", "values")
+	err := p.parseTypeOptions(td, "minsize", "maxsize", "pattern", "values", "reference")
 	if err == nil {
 		td.Comment, err = p.endOfStatement(td.Comment)
 	}
@@ -678,7 +678,7 @@ func (p *Parser) parseTimestampDef(td *sadl.TypeDef) error {
 }
 
 func (p *Parser) parseUUIDDef(td *sadl.TypeDef) error {
-	err := p.parseTypeOptions(td)
+	err := p.parseTypeOptions(td, "reference")
 	if err == nil {
 		td.Comment, err = p.endOfStatement(td.Comment)
 	}
@@ -887,6 +887,7 @@ func (p *Parser) parseTypeOptions(td *sadl.TypeDef, acceptable ...string) error 
 		td.MaxSize = options.MaxSize
 		td.Min = options.Min
 		td.Max = options.Max
+		td.Reference = options.Reference
 		td.Annotations = options.Annotations
 	}
 	return err
@@ -903,6 +904,7 @@ type Options struct {
 	Max         *sadl.Decimal
 	Operation   string
 	Header      string
+	Reference   string
 	Annotations map[string]string
 }
 
@@ -946,6 +948,8 @@ func (p *Parser) parseOptions(typeName string, acceptable []string) (*Options, e
 						options.Default, err = p.parseEqualsLiteral()
 					case "operation":
 						options.Operation, err = p.expectEqualsIdentifier()
+					case "reference":
+						options.Reference, err = p.expectEqualsIdentifier()
 					case "header":
 						options.Header, err = p.expectEqualsString()
 					default:
