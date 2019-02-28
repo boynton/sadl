@@ -1,14 +1,13 @@
 package main
 
 import (
-//	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 
-//	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/parse"
+	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/extensions/graphql"
+	"github.com/boynton/sadl/parse"
 )
 
 func main() {
@@ -21,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 	path := args[0]
-	var model interface{}
+	var model *sadl.Model
 	var err error
 	parse.Verbose = *pVerbose
 	if *pGraphql {

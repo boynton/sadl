@@ -9,7 +9,8 @@ import (
 
 type Model struct {
 	Schema
-	typeIndex map[string]*TypeDef
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+	typeIndex  map[string]*TypeDef
 }
 
 func NewModel(schema *Schema) (*Model, error) {

@@ -1,6 +1,6 @@
 package main
 
-import(
+import (
 	"bufio"
 	"bytes"
 	"fmt"
@@ -11,25 +11,27 @@ import(
 	"text/template"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/extensions/graphql"
 )
 
 type serverData struct {
-	Model *sadl.Model
-	Name string
-	Package string
-	PackageLine string
-	Port int
-	MainClass string
-	ImplClass string
+	Model          *sadl.Model
+	Graphql        *graphql.Model
+	Name           string
+	Package        string
+	PackageLine    string
+	Port           int
+	MainClass      string
+	ImplClass      string
 	InterfaceClass string
 	ResourcesClass string
-	RootPath string
-	Op *sadl.HttpDef
-	Inputs []*sadl.HttpParamSpec
-	Expected *sadl.HttpExpectedSpec
-	Errors []*sadl.HttpExceptionSpec
-	Class string
-	Imports []string
+	RootPath       string
+	Op             *sadl.HttpDef
+	Inputs         []*sadl.HttpParamSpec
+	Expected       *sadl.HttpExpectedSpec
+	Errors         []*sadl.HttpExceptionSpec
+	Class          string
+	Imports        []string
 }
 
 func opInfo(op *sadl.HttpDef) (string, string) {
@@ -50,54 +52,47 @@ func opInfo(op *sadl.HttpDef) (string, string) {
 	return "anonymous", "Object"
 }
 
-func createServer(model *sadl.Model, pkg, dir, src string) error {
+func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool) error {
+	var gql *graphql.Model
+	if model.Extensions != nil && useGraphql {
+		if e, ok := model.Extensions["graphql"]; ok {
+			if g, ok := e.(*graphql.Model); ok {
+				gql = g
+			}
+		}
+	}
 	serviceName := capitalize(model.Name)
 	rootPath := model.Base
 	if rootPath == "" {
 		rootPath = "/"
 	}
 	data := &serverData{
-		RootPath: rootPath,
-		Model: model,
-		Name: model.Name,
-		Port: 8080,
-		MainClass: "Main",
-		ImplClass: serviceName + "Impl",
+		RootPath:       rootPath,
+		Model:          model,
+		Graphql:        gql,
+		Name:           model.Name,
+		Port:           8080,
+		MainClass:      "Main",
+		ImplClass:      serviceName + "Impl",
 		InterfaceClass: serviceName + "Service",
 		ResourcesClass: serviceName + "Resources",
 	}
-	lombok := false //FIXME
+	lombok := false   //FIXME
 	jsonutil := false //FIXME
-	instant := false //FIXME
-	getters := false //FIXME
+	instant := false  //FIXME
+	getters := false  //FIXME
 	gen := newPojoGenerator(model, dir, src, pkg, lombok, getters, jsonutil, instant)
 
 	opName := func(op *sadl.HttpDef) string {
 		return operationName(op)
 	}
 	entityNameType := func(op *sadl.HttpDef) (string, string) {
-//		out := op.Expected
 		for _, out := range op.Expected.Outputs {
 			if out.Header == "" {
 				tn, _, _ := gen.typeName(nil, out.Type, true)
 				return out.Name, tn
 			}
 		}
-/*		if out.Type != "" {
-			td := gen.model.FindType(out.Type)
-			if td == nil {
-				//we must generate it.
-				td = &sadl.TypeDef{
-					Name: out.Type,
-					TypeSpec: sadl.TypeSpec{
-						Type: "Struct",
-					},
-				}
-			}
-			tn, _, _ := gen.typeName(&td.TypeSpec, out.Type, true)
-			return "FIXME", tn
-		}
-*/
 		return "", "void"
 	}
 	reqType := func(name string) string {
@@ -105,7 +100,7 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
-		"methodPath":  func(op *sadl.HttpDef) string {
+		"methodPath": func(op *sadl.HttpDef) string {
 			path := op.Path
 			i := strings.Index(path, "?")
 			if i >= 0 {
@@ -113,16 +108,22 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 			}
 			return path
 		},
-		"outtype": func (op *sadl.HttpDef) string {
+		"outtype": func(op *sadl.HttpDef) string {
 			_, t := opInfo(op)
 			return t
 		},
-		"outname": func (op *sadl.HttpDef) string {
+		"outname": func(op *sadl.HttpDef) string {
 			n, _ := opInfo(op)
 			return n
 		},
-		"reqClass":  func(op *sadl.HttpDef) string { return reqType(opName(op))},
-		"resClass":  func(op *sadl.HttpDef) string {
+		"graphqlResource": func() string {
+			if useGraphql {
+				return strings.Replace(graphqlResource, "{{graphqlClass}}", graphqlClass(model), -1)
+			}
+			return ""
+		},
+		"reqClass": func(op *sadl.HttpDef) string { return reqType(opName(op)) },
+		"resClass": func(op *sadl.HttpDef) string {
 			return responseType(operationName(op))
 		},
 		"handlerSig": func(op *sadl.HttpDef) string {
@@ -181,16 +182,16 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
 				wrappedResult := ""
 				if ename != "void" && ename != "" {
-					wrappedResult = jsonWrapper(etype, "res." + ename)
+					wrappedResult = jsonWrapper(etype, "res."+ename)
 				}
-				ret := fmt.Sprintf("Response.status(%d)", + op.Expected.Status)
+				ret := fmt.Sprintf("Response.status(%d)", +op.Expected.Status)
 				for _, out := range op.Expected.Outputs {
 					if out.Header != "" {
 						ret = ret + ".header(\"" + out.Header + "\", res." + out.Name + ")"
 					}
 				}
 				if wrappedResult != "" {
-					ret = ret + ".entity(" + wrappedResult +")"
+					ret = ret + ".entity(" + wrappedResult + ")"
 				}
 				writer.WriteString("            return " + ret + ".build();\n")
 			} else {
@@ -221,14 +222,14 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 				}
 			}
 			if any {
-				writer.WriteString("            }\n");
+				writer.WriteString("            }\n")
 			}
 			if anyNull {
 				writer.WriteString("            if (entity == null) {\n")
 				writer.WriteString("                throw new WebApplicationException(status);\n")
 				writer.WriteString("            }\n")
 			}
-			writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n");
+			writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n")
 			writer.WriteString("        }\n")
 			writer.Flush()
 			return b.String()
@@ -241,16 +242,16 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 		data.PackageLine = "package " + pkg + ";\n"
 		packageDir = filepath.Join(base, javaPackageToPath(pkg))
 	}
-	
-	err := createFileFromTemplate(base, data.MainClass + ".java", mainTemplate, data, funcMap)
+
+	err := createFileFromTemplate(base, data.MainClass+".java", mainTemplate, data, funcMap)
 	if err != nil {
 		return err
 	}
-	err = createFileFromTemplate(packageDir, data.InterfaceClass + ".java", interfaceTemplate, data, funcMap)
+	err = createFileFromTemplate(packageDir, data.InterfaceClass+".java", interfaceTemplate, data, funcMap)
 	if err != nil {
 		return err
 	}
-	err = createFileFromTemplate(packageDir, data.ResourcesClass + ".java", resourcesTemplate, data, funcMap)
+	err = createFileFromTemplate(packageDir, data.ResourcesClass+".java", resourcesTemplate, data, funcMap)
 	if err != nil {
 		return err
 	}
@@ -261,14 +262,22 @@ func createServer(model *sadl.Model, pkg, dir, src string) error {
 	for _, op := range model.Operations {
 		gen.createRequestPojo(op)
 		gen.createResponsePojo(op)
-//		for _, exc := range op.Exceptions {
-//			gen.createExceptionPojo(op, exc)
-//		}
+		//		for _, exc := range op.Exceptions {
+		//			gen.createExceptionPojo(op, exc)
+		//		}
+	}
+	if gql != nil {
+		rezDir := filepath.Join(dir, rez)
+		gen.createGraphqlSchema(model, gql, rezDir)
+		gen.createGraphqlHandler(data, gql, packageDir)
+		gen.createGraphqlRequestPojo()
+		gen.createGraphqlResponsePojo()
+
 	}
 	return gen.err
 }
 
-func  jsonWrapper(etype string, val string) string {
+func jsonWrapper(etype string, val string) string {
 	switch etype {
 	case "String":
 		return "Json.string(" + val + ")"
@@ -286,6 +295,21 @@ func addImportIfNeeded(pkgs []string, pkg string) []string {
 	}
 	return pkgs
 }
+
+const graphqlResource = `    @POST
+    @Path("/graphql")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public GraphqlResponse query(GraphqlRequest req) throws Exception {
+        try {
+            GraphqlResponse res = {{graphqlClass}}.execute(req, impl);
+            return res;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+`
 
 const reqTemplate = `//
 // Created by sadl2java
@@ -317,12 +341,12 @@ func createFileFromTemplate(dir, file string, tmplSource string, data interface{
 		fmt.Printf("[%s already exists, not overwriting]\n", path)
 		return nil
 	}
-   f, err := os.Create(path)
-   if err != nil {
+	f, err := os.Create(path)
+	if err != nil {
 		return err
-   }
+	}
 	defer f.Close()
-   writer := bufio.NewWriter(f)
+	writer := bufio.NewWriter(f)
 	tmpl, err := template.New(file).Funcs(funcMap).Parse(tmplSource)
 	if err != nil {
 		return err
@@ -389,7 +413,6 @@ public class {{.MainClass}} {
 }
 `
 
-
 const resourcesTemplate = `//
 // Example resources generated by sadl2java
 //
@@ -413,6 +436,7 @@ public class {{.ResourcesClass}} {
     {{resourceSig .}} {{openBrace}}
 {{resourceBody .}}    }
 {{end}}
+{{graphqlResource}}
 }
 `
 
@@ -530,7 +554,7 @@ func (gen *PojoGenerator) createRequestPojo(op *sadl.HttpDef) {
 		ts.Fields = append(ts.Fields, &in.StructFieldDef)
 	}
 	className := requestType(operationName(op))
-   var b bytes.Buffer
+	var b bytes.Buffer
 	gen.writer = bufio.NewWriter(&b) //first write to a string
 	gen.createStructPojo(ts, className, "")
 	gen.writer.Flush()
@@ -558,7 +582,7 @@ func (gen *PojoGenerator) createResponsePojo(op *sadl.HttpDef) {
 	for _, spec := range op.Expected.Outputs {
 		ts.Fields = append(ts.Fields, &spec.StructFieldDef)
 	}
-   var b bytes.Buffer
+	var b bytes.Buffer
 	gen.writer = bufio.NewWriter(&b) //first write to a string
 	gen.createStructPojo(ts, className, "")
 	gen.writer.Flush()

@@ -1,6 +1,6 @@
 package main
 
-import(
+import (
 	"bufio"
 	"fmt"
 	"os"
@@ -8,22 +8,25 @@ import(
 	"strings"
 )
 
-func createPom(domain, name, dir string, lombok bool) error {
+func createPom(domain, name, dir string, lombok, graphql bool) error {
 	path := filepath.Join(dir, "pom.xml")
 	if fileExists(path) {
 		fmt.Println("[pom.xml already exists, not overwriting]")
 		return nil
 	}
-   f, err := os.Create(path)
-   if err != nil {
+	f, err := os.Create(path)
+	if err != nil {
 		return err
-   }
-   writer := bufio.NewWriter(f)
+	}
+	writer := bufio.NewWriter(f)
 	dependsMgt := jerseyDependsMgt
 	depends := jerseyDepends
 	versions := jerseyVersion
 	if lombok {
 		depends = depends + lombokDepends
+	}
+	if graphql {
+		depends = depends + graphqlDepends
 	}
 	s := pomTemplate
 	s = strings.Replace(s, "{{domain}}", domain, -1)
@@ -71,6 +74,13 @@ const lombokDepends = `      <dependency>
         <artifactId>lombok</artifactId>
         <version>1.18.6</version>
         <scope>provided</scope>
+      </dependency>
+`
+
+const graphqlDepends = `      <dependency>
+        <groupId>com.graphql-java</groupId>
+        <artifactId>graphql-java</artifactId>
+        <version>2019-02-20T00-59-31-9356c3d</version>
       </dependency>
 `
 

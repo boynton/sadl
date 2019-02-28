@@ -1,0 +1,55 @@
+type PartId String (reference=Part)
+
+//A part (character) in a film
+type Part Struct {
+   id PartId (required)
+   name String
+   eyecolor String
+}
+
+type FilmId String (reference=Film)
+
+// A film
+type Film Struct {
+   id FilmId (required)
+   name String
+   released Timestamp //the date the film was released
+   cast Array<Part>
+}
+
+/* a typical web service interface */
+
+http GET "/parts/{id}" (operation=GetPart) {
+    id PartId (required)
+    expect 200 {
+        part Part
+    }
+}
+
+http GET "/films/{id}" (operation=GetFilm) {
+    id FilmId (required)
+    expect 200 {
+        film Film
+    }
+}
+
+http GET "/parts" (operation=ListParts) {
+    expect 200 {
+        parts Array<Part>
+    }
+}
+
+http GET "/films" (operation=ListFilms) {
+    expect 200 {
+        films Array<Film>
+    }
+}
+
+/* Graphql query operations bult on the above HTTP resources */
+
+graphql "/graphql" {
+   parts() Array<Part> (operation=ListParts)
+   films() Array<Film> (operation=ListFilms)
+   part(id String) Part (operation=GetPart)
+   film(id String) Film (operation=GetFilm)
+}

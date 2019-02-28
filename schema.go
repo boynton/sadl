@@ -34,21 +34,21 @@ type Schema struct {
 }
 
 type TypeSpec struct {
-	Type     string            `json:"type"`
-	Pattern  string            `json:"pattern,omitempty"`
-	Values   []string          `json:"values,omitempty"`
-	MinSize  *int32            `json:"minSize,omitempty"`
-	MaxSize  *int32            `json:"maxSize,omitempty"`
-	Fields   []*StructFieldDef `json:"fields,omitempty"`
-	Elements []*EnumElementDef `json:"elements,omitempty"`
-	Min      *Decimal          `json:"min,string,omitempty"`
-	Max      *Decimal          `json:"max,string,omitempty"`
-	Items    string            `json:"items,omitempty"`
-	Keys     string            `json:"keys,omitempty"`
-	Variants []string          `json:"variants,omitempty"` //FIXME: a variant element, so comments/annotations can be attached
-	Unit     string            `json:"unit,omitempty"`
-	Value    string            `json:"value,omitempty"`
-	Reference string           `json:"reference,omitempty"`
+	Type      string            `json:"type"`
+	Pattern   string            `json:"pattern,omitempty"`
+	Values    []string          `json:"values,omitempty"`
+	MinSize   *int32            `json:"minSize,omitempty"`
+	MaxSize   *int32            `json:"maxSize,omitempty"`
+	Fields    []*StructFieldDef `json:"fields,omitempty"`
+	Elements  []*EnumElementDef `json:"elements,omitempty"`
+	Min       *Decimal          `json:"min,string,omitempty"`
+	Max       *Decimal          `json:"max,string,omitempty"`
+	Items     string            `json:"items,omitempty"`
+	Keys      string            `json:"keys,omitempty"`
+	Variants  []string          `json:"variants,omitempty"` //FIXME: a variant element, so comments/annotations can be attached
+	Unit      string            `json:"unit,omitempty"`
+	Value     string            `json:"value,omitempty"`
+	Reference string            `json:"reference,omitempty"`
 }
 
 type TypeDef struct {

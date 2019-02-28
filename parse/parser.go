@@ -23,7 +23,7 @@ func File(path string, extensions ...Extension) (*sadl.Model, error) {
 // ...
 // model, err :- parse.String("...")
 //
-func String(src string, extensions ... Extension) (*sadl.Model, error) {
+func String(src string, extensions ...Extension) (*sadl.Model, error) {
 	return parseString(src, extensions)
 }
 
@@ -44,6 +44,7 @@ type Parser struct {
 
 type Extension interface {
 	Name() string
+	Result() interface{}
 	Parse(p *Parser) error
 	Validate(p *Parser) error
 }
@@ -72,6 +73,10 @@ func parseString(src string, extensions []Extension) (*sadl.Model, error) {
 
 func (p *Parser) CurrentComment() string {
 	return p.currentComment
+}
+
+func (p *Parser) Model() *sadl.Model {
+	return p.model
 }
 
 func (p *Parser) UngetToken() {
@@ -115,7 +120,10 @@ func (p *Parser) Source() string {
 
 func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 	for _, ext := range extensions {
-		p.registerExtension(ext)
+		err := p.registerExtension(ext)
+		if err != nil {
+			return nil, err
+		}
 	}
 	p.schema = &sadl.Schema{
 		Types: make([]*sadl.TypeDef, 0),
@@ -174,6 +182,12 @@ func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 	p.schema = nil
 	if err != nil {
 		return nil, err
+	}
+	if extensions != nil {
+		p.model.Extensions = make(map[string]interface{})
+		for _, ext := range extensions {
+			p.model.Extensions[ext.Name()] = ext.Result()
+		}
 	}
 	return p.Validate()
 }
@@ -1210,7 +1224,7 @@ func (p *Parser) parseStructFieldOptions(field *sadl.StructFieldDef) error {
 	var acceptable []string
 	switch field.Type {
 	case "String":
-		acceptable = []string{"pattern", "values", "minsize", "maxsize","reference"}
+		acceptable = []string{"pattern", "values", "minsize", "maxsize", "reference"}
 	case "UUID":
 		acceptable = []string{"reference"}
 	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
@@ -1551,7 +1565,7 @@ func (p *Parser) validateStringDef(td *sadl.TypeDef) error {
 			if i >= 0 {
 				j := strings.Index(td.Pattern[i:], "}")
 				if j > 0 {
-					name := td.Pattern[i+1:i+j]
+					name := td.Pattern[i+1 : i+j]
 					tpat := p.model.FindType(name)
 					if tpat != nil {
 						if tpat.Type == "String" {
@@ -1681,4 +1695,3 @@ func (p *Parser) expectedDirectiveError() error {
 	msg = msg + " or an 'x_*' style extended annotation"
 	return p.Error(msg)
 }
-
