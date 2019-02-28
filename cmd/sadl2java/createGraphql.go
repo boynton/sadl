@@ -34,7 +34,6 @@ func (gen *PojoGenerator) createGraphqlSchema(model *sadl.Model, gql *graphql.Mo
 		return
 	}
 	schema := gen.graphqlSchema(model, gql)
-	fmt.Println("dir:", dir)
 	gen.err = os.MkdirAll(dir, 0755)
 	if gen.err != nil {
 		return
@@ -132,7 +131,6 @@ func (gen *PojoGenerator) graphqlSchema(model *sadl.Model, gql *graphql.Model) s
 	writer.WriteString("\n}\n")
 	writer.Flush()
 	s := b.String()
-	fmt.Printf("generated schema:\n%s", s)
 	return s
 }
 
