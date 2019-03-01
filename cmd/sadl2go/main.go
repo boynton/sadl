@@ -8,15 +8,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/parse"
+	"github.com/boynton/sadl/extensions/graphql"
 )
 
 func main() {
 	pOutdir := flag.String("dir", "", "output directory for generated source")
 	pPackage := flag.String("package", "", "Go package for generated source")
-	pRuntime := flag.Bool("runtime", false, "Use SADL runtime library for base types. If false, they are generated in the target package")
+	pRuntime := flag.Bool("runtime", true, "Use SADL runtime library for base types. If false, they are generated in the target package")
+	pServer := flag.Bool("server", false, "generate server code")
+	pGraphql := flag.Bool("graphql", false, "generate graphql endpoint that resolves to http operations")
 	flag.Parse()
 	argv := flag.Args()
 	argc := len(argv)
@@ -24,7 +28,16 @@ func main() {
 		fmt.Fprintf(os.Stderr, "usage: sadl2go -dir outdir -package go_package_name -runtime some_model.sadl\n")
 		os.Exit(1)
 	}
-	model, err := parse.File(argv[0])
+	if pServer != nil {
+		fmt.Println("[Warning: -server NYI]")
+	}
+	var model *sadl.Model
+	var err error
+	if *pGraphql {
+		model, err = parse.File(argv[0], graphql.NewExtension())
+	} else {
+		model, err = parse.File(argv[0])
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
 		os.Exit(1)
@@ -207,6 +220,22 @@ func (gen *GoGenerator) nativeTypeName(ts *sadl.TypeSpec, name string) string {
 		its := gen.model.FindType(ts.Items)
 		kts := gen.model.FindType(ts.Keys)
 		return "map[" + gen.nativeTypeName(&kts.TypeSpec, ts.Keys) +"]" + gen.nativeTypeName(&its.TypeSpec, ts.Items)
+	case "Timestamp":
+		if gen.runtime {
+			gen.addImport("github.com/boynton/sadl")
+			return "*sadl." + name
+		} else {
+			//FIXME
+			return "*" + name
+		}
+	case "Quantity":
+		if gen.runtime {
+			gen.addImport("github.com/boynton/sadl")
+			return "*sadl." + name
+		} else {
+			//FIXME
+			return "*" + name
+		}
 	default:
 		//must be a app-defined class. Parser should have already verified its existence
 		td := gen.model.FindType(name)
@@ -229,7 +258,10 @@ func (gen *GoGenerator) emitType(td *sadl.TypeDef) {
 		gen.emitQuantityType(td)
 	case "Enum":
 		gen.emitEnumType(td)
+	case "String":
+		gen.emit("type " + td.Name + " string\n")
 	default:
+		fmt.Println(td.Type)
 		panic("Check this")
 		//do nothing, i.e. a String subclass
 	}
@@ -251,19 +283,34 @@ func (gen *GoGenerator) emitStructType(td *sadl.TypeDef) {
 	gen.emit("}\n\n")
 }
 
-func (gen *GoGenerator) emitQuantityType(td *sadl.TypeDef) {
-	panic("NYI")
-}
-
-func (gen *GoGenerator) emitEnumType(td *sadl.TypeDef) {
-	panic("NYI")
-}
-
 func capitalize(s string) string {
 	return strings.ToUpper(s[0:1]) + s[1:]
 }
 
 func uncapitalize(s string) string {
 	return strings.ToLower(s[0:1]) + s[1:]
+}
+
+func (gen *GoGenerator) emitTemplate(name string, tmplSource string, data interface{}, funcMap template.FuncMap) {
+	if gen.err != nil {
+		fmt.Println("emitTemplate -> already have an error, do not continue:", gen.err)
+		return
+	}
+	var b bytes.Buffer
+	writer := bufio.NewWriter(&b) //first write to a string
+	tmpl, err := template.New(name).Funcs(funcMap).Parse(tmplSource)
+	if err != nil {
+		fmt.Println("emitTemplate -> cannot create template:", gen.err)
+		gen.err = err
+		return
+	}
+	err = tmpl.Execute(writer, data)
+	if err != nil {
+		fmt.Println("emitTemplate -> cannot execute template:", gen.err)
+		gen.err = err
+		return
+	}
+	writer.Flush()
+	gen.emit(b.String())
 }
 
