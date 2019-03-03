@@ -1310,7 +1310,7 @@ func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
 	case "null":
 		return nil, nil
 	default:
-		return tok.Text, nil
+		return nil, fmt.Errorf("Not a valid symbol: %s", tok.Text)
 	}
 }
 func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
@@ -1375,6 +1375,8 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 				return nil, err
 			}
 			obj[*pkey] = val
+		} else if tok.Type == SYMBOL {
+			return nil, p.Error("Expected String key for JSON object, found symbol '" + tok.Text + "'")
 		} else {
 			//fmt.Println("ignoring this token:", tok)
 		}
@@ -1531,8 +1533,6 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 			err = p.validateStringDef(td)
 		case "UUID":
 			err = p.validateReference(td)
-		default:
-			//			fmt.Println("VALIDATE ME:", td)
 		}
 		if err != nil {
 			return nil, err

@@ -28,7 +28,13 @@ type AlphaName String (pattern="[a-zA-Z_]+") //one or more alpha characters
 type StringTest Struct {
      name SimpleName (required);
      parent CompoundName (required);
-     names Array<SimpleName> ; //names comment
+     names Array<SimpleName>; //names comment
+}
+
+example StringTest {
+   "name": "foo23",
+   "parent": "foo.bar",
+   "names": ["one", "two", "three"]
 }
 
 type NakedStruct Struct
@@ -52,6 +58,13 @@ type BigNumber Decimal (max=3141592653589793238462643383279502884197169399375105
 
 type MapTest Struct {
     locations Map<String,Int32>
+}
+
+example MapTest {
+   "locations": {
+      "one": 1,
+      "two": 2
+   }
 }
 
 type ArrayOfInt Array<Int32> (maxsize=3)

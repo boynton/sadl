@@ -11,7 +11,7 @@ func (u *UUID) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
 	if err == nil {
-		v := Parse(string(j))
+		v := ParseUUID(string(j))
 		if v != "" {
 			*u = v
 			return nil
@@ -22,7 +22,7 @@ func (u *UUID) UnmarshalJSON(b []byte) error {
 
 const Length = 36
 
-func Parse(text string) UUID {
+func ParseUUID(text string) UUID {
 	if len(text) != Length {
 		return UUID("")
 	}
