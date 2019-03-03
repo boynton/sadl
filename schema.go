@@ -28,6 +28,7 @@ type Schema struct {
 	Version     string            `json:"version,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Types       []*TypeDef        `json:"types,omitempty"`
+	Examples    []*ExampleDef     `json:"examples,omitempty"`
 	Operations  []*HttpDef        `json:"operations,omitempty"`
 	Base        string            `json:"base,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -71,6 +72,13 @@ type StructFieldDef struct {
 	Required    bool              `json:"required,omitempty"`
 	Default     interface{}       `json:"default,omitempty"`
 	TypeSpec
+}
+
+type ExampleDef struct {
+	Type        string            `json:"type"`
+	Example     interface{}       `json:"example,omitempty"`
+	Comment     string            `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type HttpDef struct {

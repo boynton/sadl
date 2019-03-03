@@ -147,6 +147,8 @@ func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 				err = p.parseVersionDirective(comment)
 			case "type":
 				err = p.parseTypeDirective(comment)
+			case "example":
+				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
 			case "http":
@@ -459,6 +461,22 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 			return false, comment, nil
 		}
 	}
+}
+
+func (p *Parser) parseExampleDirective(comment string) error {
+	typeName, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	val, err := p.parseLiteralValue()
+	if err == nil {
+		ex := &sadl.ExampleDef{
+			Type:    typeName,
+			Example: val,
+		}
+		p.schema.Examples = append(p.schema.Examples, ex)
+	}
+	return err
 }
 
 func (p *Parser) parseTypeDirective(comment string) error {
@@ -1520,6 +1538,12 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 			return nil, err
 		}
 	}
+	for _, ex := range p.model.Examples {
+		err = p.validateExample(ex)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, op := range p.model.Operations {
 		err = p.validateOperation(op)
 		if err != nil {
@@ -1533,6 +1557,14 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 		}
 	}
 	return p.model, err
+}
+
+func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
+	t := p.model.FindType(ex.Type)
+	if t == nil {
+		return fmt.Errorf("Undefined type '%s' in example: %s", ex.Type, Pretty(ex))
+	}
+	return p.model.ValidateAgainstTypeSpec("example for "+ex.Type, &t.TypeSpec, ex.Example)
 }
 
 func (p *Parser) validateOperation(op *sadl.HttpDef) error {
@@ -1630,7 +1662,7 @@ func (p *Parser) validateStruct(td *sadl.TypeDef) error {
 			if field.Required {
 				return fmt.Errorf("Cannot have a default value for required field: '%s.%s'", td.Name, field.Name)
 			}
-			err := model.ValidateAgainstTypeSpec(&field.TypeSpec, field.Default)
+			err := model.ValidateAgainstTypeSpec(field.Type, &field.TypeSpec, field.Default)
 			if err != nil {
 				return err
 			}

@@ -76,3 +76,29 @@ func (d *Decimal) AsFloat64() float64 {
 func (d *Decimal) AsBigFloat() *big.Float {
 	return &d.Float
 }
+
+func DecimalValue(val *Decimal, defval interface{}) *Decimal {
+	if val != nil {
+		return val
+	}
+	if defval != nil {
+		switch n := defval.(type) {
+		case *Decimal:
+			return n
+		case int64:
+			d, _ := ParseDecimal(fmt.Sprint(n))
+			return d
+		case int32:
+			return NewDecimal(float64(n))
+		case int16:
+			return NewDecimal(float64(n))
+		case int8:
+			return NewDecimal(float64(n))
+		case float32:
+			return NewDecimal(float64(n))
+		case float64:
+			return NewDecimal(n)
+		}
+	}
+	return nil
+}
