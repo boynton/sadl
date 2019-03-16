@@ -89,6 +89,37 @@ func TestBadDecimal(test *testing.T) {
 	}
 }
 
+func TestLargeDecimal(test *testing.T) {
+	jsonData := `3.141592653589793238462643383279502884197169399375105819`
+	pi, err := ParseDecimal(jsonData)
+	if err != nil {
+		test.Errorf("%v", err)
+		return
+	}
+	fmt.Println("pi:", pi)
+
+	encoded, err := encode(pi)
+	if err != nil {
+		test.Errorf("%v", err)
+		return
+	}
+	if jsonData != encoded {
+		test.Errorf("Decimal did not encode accurately, should be %s, but encoded to %s", jsonData, encoded)
+	}
+	fmt.Printf("Decimal encoding succeeded: Pi correctly encoded to %s\n", encoded)
+
+	var d *Decimal
+	err = decode(jsonData, &d)
+	if err != nil {
+		test.Errorf("%v", err)
+		return
+	}
+	if pi.Cmp(d.AsBigFloat()) != 0 {
+		fmt.Printf("Decimal decoding loss of precision: decoded %s to %s\n", jsonData, d.String())
+		fmt.Println("[This is a known problem with golang's JSON decoder]")
+	}
+}
+
 func TestQuantity(test *testing.T) {
 	val := 100.0
 	unit := "USD"

@@ -87,6 +87,19 @@ type Test Struct {
 
 }
 
+func TestDecimalDefault(test *testing.T) {
+	v, err := parseString(`
+type Test Struct {
+   foo Decimal (default=3.141592653589793238462643383279502884197169399375105819)
+}
+`, nil)
+	if err != nil {
+		test.Errorf("Cannot parse valid Decimal default value: %v", err)
+	} else {
+		fmt.Println(Pretty(v))
+	}
+}
+
 func TestFieldDefaultRequired(test *testing.T) {
 	v, err := parseString(`
 //Test comment.
