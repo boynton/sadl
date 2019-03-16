@@ -13,7 +13,7 @@ func testParse(test *testing.T, expectSuccess bool, src string) {
 		}
 	} else {
 		if err == nil {
-			test.Errorf("Expected failure, but it parsed: %v", v)
+			test.Errorf("Expected failure, but this:\n%s\nparsed anyway: %v", src, Pretty(v))
 		}
 	}
 }
@@ -273,4 +273,35 @@ type Foo Struct {
 	} else {
 		fmt.Println("[Correctly detected error]", err)
 	}
+}
+
+func TestActionCombos(test *testing.T) {
+	header := `
+type BarRequest Struct {
+   name String
+}
+type BarResponse Struct {
+   greeting String
+}
+type BadRequestError Struct {
+   message String
+}
+type GenericError Struct {
+   message String
+}
+`
+	testParse(test, true, header+"action Bar()\n")
+	testParse(test, true, header+"action Bar(BarRequest)\n")
+	testParse(test, true, header+"action Bar() BarResponse\n")
+	testParse(test, true, header+"action Bar(BarRequest) BarResponse\n")
+	testParse(test, true, header+"action Bar(BarRequest) BarResponse except BadRequestError\n")
+	testParse(test, true, header+"action Bar(BarRequest) BarResponse except BadRequestError, GenericError\n")
+	testParse(test, true, header+"action Bar() except BadRequestError\n")
+	testParse(test, true, header+"action Bar() except BadRequestError, GenericError\n")
+	testParse(test, true, header+"action Bar() BarResponse except BadRequestError, GenericError\n")
+	testParse(test, true, header+"action Bar(BarRequest) except BadRequestError\n")
+	testParse(test, false, header+"action Bar(BarRequest) except\n")
+	testParse(test, false, header+"action Bar\n")
+	testParse(test, false, header+"action Bar(BarResponse\n")
+	testParse(test, false, header+"action Bar(BarResponse) BarResponse BadRequestError\n")
 }

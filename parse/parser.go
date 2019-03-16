@@ -151,6 +151,8 @@ func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
+			case "action":
+				err = p.parseActionDirective(comment)
 			case "http":
 				err = p.parseHttpDirective(comment)
 			default:
@@ -230,6 +232,96 @@ func (p *Parser) parseBaseDirective(comment string) error {
 	return err
 }
 
+func (p *Parser) parseActionDirective(comment string) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	err = p.expect(OPEN_PAREN)
+	if err != nil {
+		return err
+	}
+	tok := p.GetToken()
+	if tok == nil {
+		return p.EndOfFileError()
+	}
+	input := ""
+	if tok.Type == SYMBOL {
+		input = tok.Text
+		tok = p.GetToken()
+		if tok == nil {
+			return p.EndOfFileError()
+		}
+	}
+	if tok.Type != CLOSE_PAREN {
+		return p.SyntaxError()
+	}
+	output := ""
+	var options *Options
+	var etypes []string
+	tok = p.GetToken()
+	if tok != nil {
+		if tok.Type == SYMBOL {
+			if tok.Text != "except" {
+				output = tok.Text
+				tok = p.GetToken()
+			}
+			if tok != nil && tok.Type == SYMBOL && tok.Text == "except" {
+				for {
+					etype := p.getIdentifier()
+					if etype == "" {
+						if len(etypes) == 0 {
+							return p.SyntaxError()
+						}
+						break
+					}
+					etypes = append(etypes, etype)
+				}
+			} else {
+				if tok != nil {
+					if tok.Type == SYMBOL {
+						return p.SyntaxError()
+					}
+					p.UngetToken()
+				}
+			}
+		} else {
+			p.UngetToken()
+		}
+	}
+	options, err = p.ParseOptions("action", []string{})
+	if err != nil {
+		return err
+	}
+	comment, err = p.EndOfStatement(comment)
+	action := &sadl.ActionDef{
+		Name:        name,
+		Input:       input,
+		Output:      output,
+		Exceptions:  etypes,
+		Comment:     comment,
+		Annotations: options.Annotations,
+	}
+	p.schema.Actions = append(p.schema.Actions, action)
+	return nil
+}
+
+func (p *Parser) getIdentifier() string {
+	tok := p.GetToken()
+	if tok == nil {
+		return ""
+	}
+	if tok.Type == COMMA {
+		//ignore the comma, try again
+		return p.getIdentifier()
+	}
+	if tok.Type == SYMBOL {
+		return tok.Text
+	}
+	p.UngetToken()
+	return ""
+}
+
 func (p *Parser) parseHttpDirective(comment string) error {
 	sym, err := p.ExpectIdentifier()
 	if err != nil {
@@ -276,7 +368,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 			}
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
-		p.schema.Operations = append(p.schema.Operations, op)
+		p.schema.HttpActions = append(p.schema.HttpActions, op)
 	} else {
 		return p.SyntaxError()
 	}
@@ -1544,8 +1636,14 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 			return nil, err
 		}
 	}
-	for _, op := range p.model.Operations {
-		err = p.validateOperation(op)
+	for _, action := range p.model.Actions {
+		err = p.validateAction(action)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, hact := range p.model.HttpActions {
+		err = p.validateHttpAction(hact)
 		if err != nil {
 			return nil, err
 		}
@@ -1567,20 +1665,42 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Type, &t.TypeSpec, ex.Example)
 }
 
-func (p *Parser) validateOperation(op *sadl.HttpDef) error {
-	needsBody := op.Method == "POST" || op.Method == "PUT"
+func (p *Parser) validateHttpAction(hact *sadl.HttpDef) error {
+	needsBody := hact.Method == "POST" || hact.Method == "PUT"
 	bodyParam := ""
-	for _, in := range op.Inputs {
-		//paramType, paramName := p.parameterSource(op.Path, in.Name)
+	for _, in := range hact.Inputs {
+		//paramType, paramName := p.parameterSource(hact.Path, in.Name)
 		if !in.Path && in.Query == "" && in.Header == "" {
 			if needsBody {
 				if bodyParam != "" {
-					return fmt.Errorf("HTTP Operation cannot have more than one body parameter (%q is already that parameter): %s", bodyParam, Pretty(op))
+					return fmt.Errorf("HTTP action cannot have more than one body parameter (%q is already that parameter): %s", bodyParam, Pretty(hact))
 				}
 				bodyParam = in.Name
 			} else {
-				return fmt.Errorf("Input parameter %q to HTTP Operation is not a header or a variable in the path: %s - %q", in.Name, Pretty(op), op.Method+" "+op.Path)
+				return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", in.Name, Pretty(hact), hact.Method+" "+hact.Path)
 			}
+		}
+	}
+	return nil
+}
+
+func (p *Parser) validateAction(action *sadl.ActionDef) error {
+	if action.Input != "" {
+		t := p.model.FindType(action.Input)
+		if t == nil {
+			return fmt.Errorf("Action '%s' input type '%s' is not defined", action.Name, action.Input)
+		}
+	}
+	if action.Output != "" {
+		t := p.model.FindType(action.Output)
+		if t == nil {
+			return fmt.Errorf("Action '%s' output type '%s' is not defined", action.Name, action.Output)
+		}
+	}
+	for _, etype := range action.Exceptions {
+		t := p.model.FindType(etype)
+		if t == nil {
+			return fmt.Errorf("Action '%s' exception type '%s' is not defined", action.Name, etype)
 		}
 	}
 	return nil

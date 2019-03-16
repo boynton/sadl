@@ -29,7 +29,8 @@ type Schema struct {
 	Comment     string            `json:"comment,omitempty"`
 	Types       []*TypeDef        `json:"types,omitempty"`
 	Examples    []*ExampleDef     `json:"examples,omitempty"`
-	Operations  []*HttpDef        `json:"operations,omitempty"`
+	Actions     []*ActionDef      `json:"actions,omitempty"`
+	HttpActions []*HttpDef        `json:"httpactions,omitempty"`
 	Base        string            `json:"base,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
@@ -81,12 +82,21 @@ type ExampleDef struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+type ActionDef struct {
+	Name        string            `json:"name,omitempty"`
+	Comment     string            `json:"comment,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Input       string            `json:"input,omitempty"`
+	Output      string            `json:"output,omitempty"`
+	Exceptions  []string          `json:"exceptions,omitempty"`
+}
+
 type HttpDef struct {
-	Method      string               `json:"method"`
-	Path        string               `json:"path"`
 	Name        string               `json:"name,omitempty"`
 	Comment     string               `json:"comment,omitempty"`
 	Annotations map[string]string    `json:"annotations,omitempty"`
+	Method      string               `json:"method"`
+	Path        string               `json:"path"`
 	Inputs      []*HttpParamSpec     `json:"inputs,omitempty"`
 	Expected    *HttpExpectedSpec    `json:"expected,omitempty"`
 	Exceptions  []*HttpExceptionSpec `json:"exceptions,omitempty"`

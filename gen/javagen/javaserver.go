@@ -22,7 +22,7 @@ type ServerData struct {
 	InterfaceClass string
 	ResourcesClass string
 	RootPath       string
-	Op             *sadl.HttpDef
+	HttpAction             *sadl.HttpDef
 	Inputs         []*sadl.HttpParamSpec
 	Expected       *sadl.HttpExpectedSpec
 	Errors         []*sadl.HttpExceptionSpec
@@ -54,11 +54,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		InterfaceClass: serviceName + "Service",
 		ResourcesClass: serviceName + "Resources",
 	}
-	opName := func(op *sadl.HttpDef) string {
-		return gen.OperationName(op)
-	}
-	entityNameType := func(op *sadl.HttpDef) (string, string) {
-		for _, out := range op.Expected.Outputs {
+	entityNameType := func(hact *sadl.HttpDef) (string, string) {
+		for _, out := range hact.Expected.Outputs {
 			if out.Header == "" {
 				tn, _, _ := gen.TypeName(nil, out.Type, true)
 				return out.Name, tn
@@ -71,35 +68,35 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
-		"methodPath": func(op *sadl.HttpDef) string {
-			path := op.Path
+		"methodPath": func(hact *sadl.HttpDef) string {
+			path := hact.Path
 			i := strings.Index(path, "?")
 			if i >= 0 {
 				path = path[0:i]
 			}
 			return path
 		},
-		"outtype": func(op *sadl.HttpDef) string {
-			_, t := gen.OperationInfo(op)
+		"outtype": func(hact *sadl.HttpDef) string {
+			_, t := gen.ActionInfo(hact)
 			return t
 		},
-		"outname": func(op *sadl.HttpDef) string {
-			n, _ := gen.OperationInfo(op)
+		"outname": func(hact *sadl.HttpDef) string {
+			n, _ := gen.ActionInfo(hact)
 			return n
 		},
-		"reqClass": func(op *sadl.HttpDef) string { return reqType(opName(op)) },
-		"resClass": func(op *sadl.HttpDef) string {
-			return gen.ResponseType(gen.OperationName(op))
+		"reqClass": func(hact *sadl.HttpDef) string { return reqType(gen.ActionName(hact)) },
+		"resClass": func(hact *sadl.HttpDef) string {
+			return gen.ResponseType(gen.ActionName(hact))
 		},
-		"handlerSig": func(op *sadl.HttpDef) string {
-			name := opName(op)
-			resType := gen.ResponseType(gen.OperationName(op))
+		"handlerSig": func(hact *sadl.HttpDef) string {
+			name := gen.ActionName(hact)
+			resType := gen.ResponseType(gen.ActionName(hact))
 			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
-		"resourceSig": func(op *sadl.HttpDef) string {
-			name := opName(op) //i.e. "getFoo"
+		"resourceSig": func(hact *sadl.HttpDef) string {
+			name := gen.ActionName(hact) //i.e. "getFoo"
 			var params []string
-			for _, in := range op.Inputs {
+			for _, in := range hact.Inputs {
 				tn, _, _ := gen.TypeName(nil, in.Type, false)
 				param := tn + " " + in.Name
 				if in.Query != "" {
@@ -126,15 +123,15 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			paramlist := strings.Join(params, ", ")
 			return "public " + etype + " " + name + "(" + paramlist + ")"
 		},
-		"resourceBody": func(op *sadl.HttpDef) string {
-			name := opName(op) //i.e. "Hello"
+		"resourceBody": func(hact *sadl.HttpDef) string {
+			name := gen.ActionName(hact)
 			reqname := reqType(name)
-			resname := gen.ResponseType(gen.OperationName(op))
+			resname := gen.ResponseType(gen.ActionName(hact))
 			var params []string
-			for _, in := range op.Inputs {
+			for _, in := range hact.Inputs {
 				params = append(params, in.Name)
 			}
-			ename, etype := entityNameType(op)
+			ename, etype := entityNameType(hact)
 			var b bytes.Buffer
 			writer := bufio.NewWriter(&b)
 			writer.WriteString("        " + reqname + " req = new " + reqname + "()")
@@ -143,14 +140,14 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			}
 			writer.WriteString(";\n")
 			writer.WriteString("        try {\n")
-			if len(op.Expected.Outputs) > 0 {
+			if len(hact.Expected.Outputs) > 0 {
 				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
 				wrappedResult := ""
 				if ename != "void" && ename != "" {
 					wrappedResult = jsonWrapper(etype, "res."+ename)
 				}
-				ret := fmt.Sprintf("Response.status(%d)", +op.Expected.Status)
-				for _, out := range op.Expected.Outputs {
+				ret := fmt.Sprintf("Response.status(%d)", +hact.Expected.Status)
+				for _, out := range hact.Expected.Outputs {
 					if out.Header != "" {
 						ret = ret + ".header(\"" + out.Header + "\", res." + out.Name + ")"
 					}
@@ -161,7 +158,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				writer.WriteString("            return " + ret + ".build();\n")
 			} else {
 				writer.WriteString("            impl." + name + "(req);\n")
-				writer.WriteString(fmt.Sprintf("            return Response.status(%d).build();\n", op.Expected.Status))
+				writer.WriteString(fmt.Sprintf("            return Response.status(%d).build();\n", hact.Expected.Status))
 			}
 			writer.WriteString("        } catch (ServiceException se) {\n")
 			writer.WriteString("            Object entity = se.entity == null? se : se.entity;\n")
@@ -169,7 +166,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			first := true
 			any := false
 			anyNull := false
-			for _, resp := range op.Exceptions {
+			for _, resp := range hact.Exceptions {
 				tn, _, _ := gen.TypeName(nil, resp.Type, true)
 				if tn != "ServiceException" {
 					any = true
@@ -217,9 +214,9 @@ func (gen *Generator) CreateServer(src, rez string) {
 	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
 	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
 	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
-	for _, op := range gen.Model.Operations {
-		gen.CreateRequestPojo(op)
-		gen.CreateResponsePojo(op)
+	for _, hact := range gen.Model.HttpActions {
+		gen.CreateRequestPojo(hact)
+		gen.CreateResponsePojo(hact)
 	}
 }
 
@@ -262,7 +259,7 @@ public class {{.MainClass}} {
 
     // Stubs for an implementation of the service follow
     static class {{.ImplClass}} implements {{.InterfaceClass}} {
-{{range .Model.Operations}}
+{{range .Model.HttpActions}}
         {{handlerSig .}} {{openBrace}}
             return new {{resClass .}}(); //implement me!
         }
@@ -282,7 +279,7 @@ import static javax.ws.rs.core.Response.Status;
 public class {{.ResourcesClass}} {
     @Inject
     private {{.InterfaceClass}} impl;
-{{range .Model.Operations}}
+{{range .Model.HttpActions}}
     
     @{{.Method}}
     @Path("{{methodPath .}}")
@@ -296,7 +293,7 @@ public class {{.ResourcesClass}} {
 
 const interfaceTemplate = `
 public interface {{.InterfaceClass}} {
-{{range .Model.Operations}}
+{{range .Model.HttpActions}}
     {{handlerSig .}};
 {{end}}
 }
@@ -353,22 +350,22 @@ public class ServiceException extends RuntimeException {
 }
 `
 
-func (gen *Generator) CreateRequestPojo(op *sadl.HttpDef) {
+func (gen *Generator) CreateRequestPojo(hact *sadl.HttpDef) {
 	if gen.Err != nil {
 		return
 	}
 	ts := &sadl.TypeSpec{
 		Type: "Struct",
 	}
-	for _, in := range op.Inputs {
+	for _, in := range hact.Inputs {
 		ts.Fields = append(ts.Fields, &in.StructFieldDef)
 	}
-	className := gen.RequestType(gen.OperationName(op))
+	className := gen.RequestType(gen.ActionName(hact))
 	gen.CreatePojo(ts, className, "")
 }
 
-func (gen *Generator) responsePojoName(op *sadl.HttpDef) (string, bool) {
-	for _, out := range op.Expected.Outputs {
+func (gen *Generator) responsePojoName(hact *sadl.HttpDef) (string, bool) {
+	for _, out := range hact.Expected.Outputs {
 		if out.Header == "" {
 			tn, _, _ := gen.TypeName(nil, out.Type, true)
 			return tn, false
@@ -377,30 +374,30 @@ func (gen *Generator) responsePojoName(op *sadl.HttpDef) (string, bool) {
 	return "void", false
 }
 
-func (gen *Generator) CreateResponsePojo(op *sadl.HttpDef) {
+func (gen *Generator) CreateResponsePojo(hact *sadl.HttpDef) {
 	if gen.Err != nil {
 		return
 	}
-	className := gen.ResponseType(gen.OperationName(op))
+	className := gen.ResponseType(gen.ActionName(hact))
 	ts := &sadl.TypeSpec{
 		Type: "Struct",
 	}
-	for _, spec := range op.Expected.Outputs {
+	for _, spec := range hact.Expected.Outputs {
 		ts.Fields = append(ts.Fields, &spec.StructFieldDef)
 	}
 	gen.CreatePojo(ts, className, "")
 }
 
-func (gen *Generator) OperationInfo(op *sadl.HttpDef) (string, string) {
-	switch op.Method {
+func (gen *Generator) ActionInfo(hact *sadl.HttpDef) (string, string) {
+	switch hact.Method {
 	case "POST", "PUT":
-		for _, in := range op.Inputs {
+		for _, in := range hact.Inputs {
 			if in.Query == "" && in.Header == "" && !in.Path {
 				return in.Name, in.Type
 			}
 		}
 	default:
-		for _, out := range op.Expected.Outputs {
+		for _, out := range hact.Expected.Outputs {
 			if out.Header == "" {
 				return out.Name, out.Type
 			}
@@ -409,11 +406,11 @@ func (gen *Generator) OperationInfo(op *sadl.HttpDef) (string, string) {
 	return "anonymous", "Object"
 }
 
-func (gen *Generator) OperationName(op *sadl.HttpDef) string {
-	name := op.Name
+func (gen *Generator) ActionName(hact *sadl.HttpDef) string {
+	name := hact.Name
 	if name == "" {
-		method := strings.ToLower(op.Method)
-		_, etype := gen.OperationInfo(op)
+		method := strings.ToLower(hact.Method)
+		_, etype := gen.ActionInfo(hact)
 		name = method + etype
 	} else {
 		name = gen.Uncapitalize(name)
