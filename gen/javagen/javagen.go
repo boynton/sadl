@@ -11,7 +11,6 @@ import(
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/gen"
-	"github.com/boynton/sadl/extensions/graphql"
 )
 
 type Generator struct {
@@ -38,7 +37,7 @@ func (gen *Generator) AddImport(fullReference string) {
 }
 
 
-func NewGenerator(model *sadl.Model, outdir, srcdir, rezdir, pkg string, useGraphql, useLombok, useInstants, useGetters bool) *Generator {
+func NewGenerator(model *sadl.Model, outdir, srcdir, rezdir, pkg string, useLombok, useInstants, useGetters bool) *Generator {
 	gen := &Generator{
 		Generator: gen.Generator{
 			Model: model,
@@ -57,13 +56,6 @@ func NewGenerator(model *sadl.Model, outdir, srcdir, rezdir, pkg string, useGrap
 	err := os.MkdirAll(pdir, 0755)
 	if err != nil {
 		gen.Err = err
-	}
-	if useGraphql && gen.Model.Extensions != nil {
-		if e, ok := gen.Model.Extensions["graphql"]; ok {
-			if g, ok := e.(*graphql.Model); ok {
-				gen.Generator.Graphql = g
-			}
-		}
 	}
 	return gen
 }

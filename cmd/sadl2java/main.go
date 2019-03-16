@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/extensions/graphql"
-	"github.com/boynton/sadl/parse"
+	//	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/gen/javagen"
+	"github.com/boynton/sadl/parse"
 )
 
 func main() {
@@ -17,7 +16,6 @@ func main() {
 	pRez := flag.String("rez", "src/main/resources", "output directory for generated resources, relative to dir")
 	pPackage := flag.String("package", "", "Java package for generated source")
 	pServer := flag.Bool("server", false, "generate server code")
-	pGraphql := flag.Bool("graphql", false, "generate graphql endpoint that resolves to http operations")
 	pLombok := flag.Bool("lombok", false, "generate Lombok annotations")
 	pGetters := flag.Bool("getters", false, "generate setters/getters instead of the default fluent style")
 	pInstants := flag.Bool("instants", false, "Use java.time.Instant. By default, use generated Timestamp class")
@@ -29,18 +27,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "usage: sadl2java -dir projdir -src relative_source_dir -rez relative_resource_dir -package java.package.name -pom -server -getters -lombok some_model.sadl\n")
 		os.Exit(1)
 	}
-	var model *sadl.Model
-	var err error
-	if *pGraphql {
-		model, err = parse.File(argv[0], graphql.NewExtension())
-	} else {
-		model, err = parse.File(argv[0])
-	}
+	model, err := parse.File(argv[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
 		os.Exit(1)
 	}
-	gen := javagen.NewGenerator(model, *pDir, *pSrc, *pRez, *pPackage, *pGraphql, *pLombok, *pGetters, *pInstants)
+	gen := javagen.NewGenerator(model, *pDir, *pSrc, *pRez, *pPackage, *pLombok, *pGetters, *pInstants)
 	for _, td := range model.Types {
 		gen.CreatePojoFromDef(td)
 	}
@@ -53,14 +45,14 @@ func main() {
 		os.Exit(1)
 	}
 	if *pServer {
-		gen.CreateServer(*pSrc, *pRez, *pGraphql)
+		gen.CreateServer(*pSrc, *pRez)
 	}
 	if *pPom {
 		domain := os.Getenv("DOMAIN")
 		if domain == "" {
 			domain = "my.domain"
 		}
-		gen.CreatePom(domain, model.Name, *pDir, *pLombok, *pGraphql)
+		gen.CreatePom(domain, model.Name, *pDir, *pLombok, "")
 	}
 	if gen.Err != nil {
 		fmt.Fprintf(os.Stderr, "*** %v\n", gen.Err)

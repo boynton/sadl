@@ -12,7 +12,6 @@ import (
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/parse"
-	"github.com/boynton/sadl/extensions/graphql"
 )
 
 func main() {
@@ -20,7 +19,6 @@ func main() {
 	pPackage := flag.String("package", "", "Go package for generated source")
 	pRuntime := flag.Bool("runtime", true, "Use SADL runtime library for base types. If false, they are generated in the target package")
 	pServer := flag.Bool("server", false, "generate server code")
-	pGraphql := flag.Bool("graphql", false, "generate graphql endpoint that resolves to http operations")
 	flag.Parse()
 	argv := flag.Args()
 	argc := len(argv)
@@ -31,13 +29,7 @@ func main() {
 	if pServer != nil {
 		fmt.Println("[Warning: -server NYI]")
 	}
-	var model *sadl.Model
-	var err error
-	if *pGraphql {
-		model, err = parse.File(argv[0], graphql.NewExtension())
-	} else {
-		model, err = parse.File(argv[0])
-	}
+	model, err := parse.File(argv[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
 		os.Exit(1)

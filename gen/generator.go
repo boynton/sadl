@@ -9,12 +9,10 @@ import(
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/extensions/graphql"
 )
 
 type Generator struct {
 	Model *sadl.Model
-	Graphql        *graphql.Model //optional
 	OutDir string
 	Err error
 	buf bytes.Buffer

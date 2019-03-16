@@ -32,8 +32,6 @@ proper::
 	go vet github.com/boynton/sadl/cmd/sadl
 	go fmt github.com/boynton/sadl/cmd/sadl2java
 	go vet github.com/boynton/sadl/cmd/sadl2java
-	go fmt github.com/boynton/sadl/extensions/graphql
-	go vet github.com/boynton/sadl/extensions/graphql
 
 clean::
 	rm -rf bin

@@ -6,7 +6,7 @@ import (
 	"text/template"
 )
 
-func (gen *Generator) CreatePom(domain, name, dir string, lombok, graphql bool) {
+func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepends string) {
 	path := filepath.Join(dir, "pom.xml")
 	if gen.FileExists(path) {
 		fmt.Println("[pom.xml already exists, not overwriting]")
@@ -24,8 +24,8 @@ func (gen *Generator) CreatePom(domain, name, dir string, lombok, graphql bool) 
 	if lombok {
 		depends = depends + lombokDepends
 	}
-	if graphql {
-		depends = depends + graphqlDepends
+	if extraDepends != "" {
+		depends = depends + extraDepends
 	}
 	funcMap := template.FuncMap{
 		"domain": func() string { return domain },
@@ -88,13 +88,6 @@ const lombokDepends = `      <dependency>
         <artifactId>lombok</artifactId>
         <version>1.18.6</version>
         <scope>provided</scope>
-      </dependency>
-`
-
-const graphqlDepends = `      <dependency>
-        <groupId>com.graphql-java</groupId>
-        <artifactId>graphql-java</artifactId>
-        <version>2019-02-20T00-59-31-9356c3d</version>
       </dependency>
 `
 

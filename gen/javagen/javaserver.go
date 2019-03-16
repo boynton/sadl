@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"bufio"
 	"fmt"
-	"path/filepath"
+//	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/gen/graphql"
 )
 
 type ServerData struct {
@@ -29,10 +28,10 @@ type ServerData struct {
 	Errors         []*sadl.HttpExceptionSpec
 	Class          string
 	Imports        []string
+	Funcs template.FuncMap
 }
 
-
-func (gen *Generator) CreateServer(src, rez string, useGraphql bool) {
+func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if gen.Err != nil {
 		return
 	}
@@ -51,12 +50,6 @@ func (gen *Generator) CreateServer(src, rez string, useGraphql bool) {
 		InterfaceClass: serviceName + "Service",
 		ResourcesClass: serviceName + "Resources",
 	}
-//	lombok := false   //FIXME
-//	jsonutil := false //FIXME
-//	instant := false  //FIXME
-//	getters := false  //FIXME
-//	gen := newPojoGenerator(model, dir, src, pkg, lombok, getters, jsonutil, instant)
-
 	opName := func(op *sadl.HttpDef) string {
 		return gen.OperationName(op)
 	}
@@ -89,9 +82,6 @@ func (gen *Generator) CreateServer(src, rez string, useGraphql bool) {
 		"outname": func(op *sadl.HttpDef) string {
 			n, _ := gen.OperationInfo(op)
 			return n
-		},
-		"graphqlResource": func() string {
-			return gen.GraphqlResourceAsString()
 		},
 		"reqClass": func(op *sadl.HttpDef) string { return reqType(opName(op)) },
 		"resClass": func(op *sadl.HttpDef) string {
@@ -205,29 +195,27 @@ func (gen *Generator) CreateServer(src, rez string, useGraphql bool) {
 			writer.Flush()
 			return b.String()
 		},
+		"extraResources": func() string { return "" },
 	}
 	gen.ServerData.Package = gen.Package
 	if gen.Package != "" {
 		gen.ServerData.PackageLine = "package " + gen.Package + ";\n"
 	}
-	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, funcMap, "")
-	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, funcMap, gen.Package)
-	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, funcMap, gen.Package)
-	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, funcMap, gen.Package)
+	gen.ServerData.Funcs = funcMap
+}
+
+func (gen *Generator) CreateServer(src, rez string) {
+	if gen.Err != nil {
+		return
+	}
+	gen.CreateServerDataAndFuncMap(src, rez)
+	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, gen.ServerData.Funcs, "")
+	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
 	for _, op := range gen.Model.Operations {
 		gen.CreateRequestPojo(op)
 		gen.CreateResponsePojo(op)
-	}
-	if gen.Graphql != nil {
-		gqlgen := &graphql.Generator{
-			Generator: gen.Generator,
-		}
-		rezDir := filepath.Join(gen.OutDir, rez)
-		gqlgen.CreateGraphqlSchema(rezDir)
-		gen.CreateGraphqlHandler()
-		gen.CreateGraphqlRequestPojo()
-		gen.CreateGraphqlResponsePojo()
-
 	}
 }
 
@@ -298,7 +286,7 @@ public class {{.ResourcesClass}} {
     {{resourceSig .}} {{openBrace}}
 {{resourceBody .}}    }
 {{end}}
-{{graphqlResource}}
+{{extraResources}}
 }
 `
 
