@@ -1,13 +1,15 @@
-package main
+package javagen
 
-func (gen *PojoGenerator) createTimestamp() {
-	gen.createJavaFile("Timestamp")
-	if gen.err != nil {
+func (gen *Generator) CreateTimestamp() {
+	if gen.Err != nil {
 		return
 	}
-	gen.emit(javaTimestamp)
-	gen.writer.Flush()
-	gen.file.Close()
+	gen.Begin()
+	gen.Emit(javaTimestamp)
+	result := gen.End()
+	if gen.Err == nil {
+		gen.WriteJavaFile("Timestamp", result, gen.Package)
+	}
 }
 
 var javaTimestamp = `

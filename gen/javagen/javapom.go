@@ -1,24 +1,23 @@
-package main
+package javagen
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
+	"text/template"
 )
 
-func createPom(domain, name, dir string, lombok, graphql bool) error {
+func (gen *Generator) CreatePom(domain, name, dir string, lombok, graphql bool) {
 	path := filepath.Join(dir, "pom.xml")
-	if fileExists(path) {
+	if gen.FileExists(path) {
 		fmt.Println("[pom.xml already exists, not overwriting]")
-		return nil
+		return
 	}
-	f, err := os.Create(path)
+/*	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	writer := bufio.NewWriter(f)
+*/
 	dependsMgt := jerseyDependsMgt
 	depends := jerseyDepends
 	versions := jerseyVersion
@@ -28,6 +27,20 @@ func createPom(domain, name, dir string, lombok, graphql bool) error {
 	if graphql {
 		depends = depends + graphqlDepends
 	}
+	funcMap := template.FuncMap{
+		"domain": func() string { return domain },
+		"name": func() string { return name },
+		"dependsMgt": func() string { return dependsMgt },
+		"depends": func() string { return depends },
+		"versions": func() string { return versions },
+	}
+	gen.Begin()
+	gen.EmitTemplate("pom.xml", pomTemplate, gen, funcMap)
+	result := gen.End()
+	if gen.Err == nil {
+		gen.WriteFile(path, result)
+	}
+/*
 	s := pomTemplate
 	s = strings.Replace(s, "{{domain}}", domain, -1)
 	s = strings.Replace(s, "{{name}}", name, -1)
@@ -38,6 +51,7 @@ func createPom(domain, name, dir string, lombok, graphql bool) error {
 	writer.Flush()
 	f.Close()
 	return err
+*/
 }
 
 const jerseyVersion = `    <jersey.version>2.27</jersey.version>                                                                          `

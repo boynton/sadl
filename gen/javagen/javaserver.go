@@ -1,23 +1,20 @@
-package main
+package javagen
 
 import (
-	"bufio"
 	"bytes"
+	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/extensions/graphql"
+	"github.com/boynton/sadl/gen/graphql"
 )
 
-type serverData struct {
-	Model          *sadl.Model
-	Graphql        *graphql.Model
+type ServerData struct {
 	Name           string
+	Model          *sadl.Model
 	Package        string
 	PackageLine    string
 	Port           int
@@ -34,69 +31,46 @@ type serverData struct {
 	Imports        []string
 }
 
-func opInfo(op *sadl.HttpDef) (string, string) {
-	switch op.Method {
-	case "POST", "PUT":
-		for _, in := range op.Inputs {
-			if in.Query == "" && in.Header == "" && !in.Path {
-				return in.Name, in.Type
-			}
-		}
-	default:
-		for _, out := range op.Expected.Outputs {
-			if out.Header == "" {
-				return out.Name, out.Type
-			}
-		}
-	}
-	return "anonymous", "Object"
-}
 
-func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool) error {
-	var gql *graphql.Model
-	if model.Extensions != nil && useGraphql {
-		if e, ok := model.Extensions["graphql"]; ok {
-			if g, ok := e.(*graphql.Model); ok {
-				gql = g
-			}
-		}
+func (gen *Generator) CreateServer(src, rez string, useGraphql bool) {
+	if gen.Err != nil {
+		return
 	}
-	serviceName := capitalize(model.Name)
-	rootPath := model.Base
+	serviceName := gen.Capitalize(gen.Model.Name)
+	rootPath := gen.Model.Base
 	if rootPath == "" {
 		rootPath = "/"
 	}
-	data := &serverData{
+	gen.ServerData = &ServerData{
 		RootPath:       rootPath,
-		Model:          model,
-		Graphql:        gql,
-		Name:           model.Name,
+		Model: gen.Model,
+		Name:           serviceName,
 		Port:           8080,
 		MainClass:      "Main",
 		ImplClass:      serviceName + "Impl",
 		InterfaceClass: serviceName + "Service",
 		ResourcesClass: serviceName + "Resources",
 	}
-	lombok := false   //FIXME
-	jsonutil := false //FIXME
-	instant := false  //FIXME
-	getters := false  //FIXME
-	gen := newPojoGenerator(model, dir, src, pkg, lombok, getters, jsonutil, instant)
+//	lombok := false   //FIXME
+//	jsonutil := false //FIXME
+//	instant := false  //FIXME
+//	getters := false  //FIXME
+//	gen := newPojoGenerator(model, dir, src, pkg, lombok, getters, jsonutil, instant)
 
 	opName := func(op *sadl.HttpDef) string {
-		return operationName(op)
+		return gen.OperationName(op)
 	}
 	entityNameType := func(op *sadl.HttpDef) (string, string) {
 		for _, out := range op.Expected.Outputs {
 			if out.Header == "" {
-				tn, _, _ := gen.typeName(nil, out.Type, true)
+				tn, _, _ := gen.TypeName(nil, out.Type, true)
 				return out.Name, tn
 			}
 		}
 		return "", "void"
 	}
 	reqType := func(name string) string {
-		return requestType(name)
+		return gen.RequestType(name)
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
@@ -109,33 +83,30 @@ func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool)
 			return path
 		},
 		"outtype": func(op *sadl.HttpDef) string {
-			_, t := opInfo(op)
+			_, t := gen.OperationInfo(op)
 			return t
 		},
 		"outname": func(op *sadl.HttpDef) string {
-			n, _ := opInfo(op)
+			n, _ := gen.OperationInfo(op)
 			return n
 		},
 		"graphqlResource": func() string {
-			if useGraphql {
-				return strings.Replace(graphqlResource, "{{graphqlClass}}", graphqlClass(model), -1)
-			}
-			return ""
+			return gen.GraphqlResourceAsString()
 		},
 		"reqClass": func(op *sadl.HttpDef) string { return reqType(opName(op)) },
 		"resClass": func(op *sadl.HttpDef) string {
-			return responseType(operationName(op))
+			return gen.ResponseType(gen.OperationName(op))
 		},
 		"handlerSig": func(op *sadl.HttpDef) string {
 			name := opName(op)
-			resType := responseType(operationName(op))
+			resType := gen.ResponseType(gen.OperationName(op))
 			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
 		"resourceSig": func(op *sadl.HttpDef) string {
 			name := opName(op) //i.e. "getFoo"
 			var params []string
 			for _, in := range op.Inputs {
-				tn, _, _ := gen.typeName(nil, in.Type, false)
+				tn, _, _ := gen.TypeName(nil, in.Type, false)
 				param := tn + " " + in.Name
 				if in.Query != "" {
 					param = `@QueryParam("` + in.Query + `") ` + param
@@ -164,7 +135,7 @@ func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool)
 		"resourceBody": func(op *sadl.HttpDef) string {
 			name := opName(op) //i.e. "Hello"
 			reqname := reqType(name)
-			resname := responseType(operationName(op))
+			resname := gen.ResponseType(gen.OperationName(op))
 			var params []string
 			for _, in := range op.Inputs {
 				params = append(params, in.Name)
@@ -205,7 +176,7 @@ func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool)
 			any := false
 			anyNull := false
 			for _, resp := range op.Exceptions {
-				tn, _, _ := gen.typeName(nil, resp.Type, true)
+				tn, _, _ := gen.TypeName(nil, resp.Type, true)
 				if tn != "ServiceException" {
 					any = true
 					if first {
@@ -235,133 +206,32 @@ func createServer(model *sadl.Model, pkg, dir, src, rez string, useGraphql bool)
 			return b.String()
 		},
 	}
-	base := filepath.Join(dir, src)
-	packageDir := base
-	if pkg != "" {
-		data.Package = pkg
-		data.PackageLine = "package " + pkg + ";\n"
-		packageDir = filepath.Join(base, javaPackageToPath(pkg))
+	gen.ServerData.Package = gen.Package
+	if gen.Package != "" {
+		gen.ServerData.PackageLine = "package " + gen.Package + ";\n"
 	}
+	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, funcMap, "")
+	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, funcMap, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, funcMap, gen.Package)
+	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, funcMap, gen.Package)
+	for _, op := range gen.Model.Operations {
+		gen.CreateRequestPojo(op)
+		gen.CreateResponsePojo(op)
+	}
+	if gen.Graphql != nil {
+		gqlgen := &graphql.Generator{
+			Generator: gen.Generator,
+		}
+		rezDir := filepath.Join(gen.OutDir, rez)
+		gqlgen.CreateGraphqlSchema(rezDir)
+		gen.CreateGraphqlHandler()
+		gen.CreateGraphqlRequestPojo()
+		gen.CreateGraphqlResponsePojo()
 
-	err := createFileFromTemplate(base, data.MainClass+".java", mainTemplate, data, funcMap)
-	if err != nil {
-		return err
-	}
-	err = createFileFromTemplate(packageDir, data.InterfaceClass+".java", interfaceTemplate, data, funcMap)
-	if err != nil {
-		return err
-	}
-	err = createFileFromTemplate(packageDir, data.ResourcesClass+".java", resourcesTemplate, data, funcMap)
-	if err != nil {
-		return err
-	}
-	err = createFileFromTemplate(packageDir, "ServiceException.java", exceptionTemplate, data, funcMap)
-	if err != nil {
-		return err
-	}
-	for _, op := range model.Operations {
-		gen.createRequestPojo(op)
-		gen.createResponsePojo(op)
-		//		for _, exc := range op.Exceptions {
-		//			gen.createExceptionPojo(op, exc)
-		//		}
-	}
-	if gql != nil {
-		rezDir := filepath.Join(dir, rez)
-		gen.createGraphqlSchema(model, gql, rezDir)
-		gen.createGraphqlHandler(data, gql, packageDir)
-		gen.createGraphqlRequestPojo()
-		gen.createGraphqlResponsePojo()
-
-	}
-	return gen.err
-}
-
-func jsonWrapper(etype string, val string) string {
-	switch etype {
-	case "String":
-		return "Json.string(" + val + ")"
-	default:
-		return val //these are already valid JSON objects
 	}
 }
 
-func addImportIfNeeded(pkgs []string, pkg string) []string {
-	switch pkg {
-	case "UUID":
-		return adjoin(pkgs, "java.util.UUID")
-	case "Timestamp":
-		return adjoin(pkgs, "java.time.Instant")
-	}
-	return pkgs
-}
-
-const graphqlResource = `    @POST
-    @Path("/graphql")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public GraphqlResponse query(GraphqlRequest req) throws Exception {
-        try {
-            GraphqlResponse res = {{graphqlClass}}.execute(req, impl);
-            return res;
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
-    }
-`
-
-const reqTemplate = `//
-// Created by sadl2java
-//
-{{.PackageLine}}{{range .Imports}}
-import {{.}};{{end}}
-
-public class {{reqClass}} {{openBrace}}
-{{range .Inputs}}{{if .Name}}
-    public {{javaType .}} {{.Name}};
-    public {{reqClass}} {{.Name}}({{javaType .}} {{.Name}}) { this.{{.Name}} = {{.Name}}; return this; }{{end}}
-{{end}}
-}
-`
-
-const resTemplate = `//
-// Created by sadl2java
-//
-{{.PackageLine}}
-public class {{reqClass}} {{openBrace}}
-{{if .Output.Outputs}}    public {{outtype .Op}} {{outname .Op}};
-    public {{reqClass}} {{outname .Op}}({{outtype .Op}} {{outname .Op}}) { this.{{outname .Op}} = {{outname .Op}}; return this; }{{end}}
-}
-`
-
-func createFileFromTemplate(dir, file string, tmplSource string, data interface{}, funcMap template.FuncMap) error {
-	path := filepath.Join(dir, file)
-	if fileExists(path) {
-		fmt.Printf("[%s already exists, not overwriting]\n", path)
-		return nil
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	writer := bufio.NewWriter(f)
-	tmpl, err := template.New(file).Funcs(funcMap).Parse(tmplSource)
-	if err != nil {
-		return err
-	}
-	err = tmpl.Execute(writer, data)
-	if err != nil {
-		return err
-	}
-	writer.Flush()
-	return nil
-}
-
-const mainTemplate = `//
-// Sample server main program generated by sadl2java
-//
+const mainTemplate = `
 import org.eclipse.jetty.server.Server;
 import org.glassfish.jersey.jetty.JettyHttpContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -372,10 +242,9 @@ import java.io.IOException;
 import java.net.URI;
 {{if .Package}}import {{.Package}}.*;{{end}}
 
+// A placeholder implementation and launcher for the service
 public class {{.MainClass}} {
-
     public static String BASE_URI = "http://localhost:{{.Port}}/";
-
     public static void main(String[] args) {
         try {
             Server server = startServer(new {{.ImplClass}}());
@@ -384,7 +253,6 @@ public class {{.MainClass}} {
             System.err.println("*** " + e);
         }
     }
-
     public static Server startServer({{.ImplClass}} impl) throws Exception {
         URI baseUri = UriBuilder.fromUri(BASE_URI).build();
         ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
@@ -400,9 +268,7 @@ public class {{.MainClass}} {
         return server;
     }
 
-
     // Stubs for an implementation of the service follow
-
     static class {{.ImplClass}} implements {{.InterfaceClass}} {
 {{range .Model.Operations}}
         {{handlerSig .}} {{openBrace}}
@@ -413,11 +279,7 @@ public class {{.MainClass}} {
 }
 `
 
-const resourcesTemplate = `//
-// Example resources generated by sadl2java
-//
-{{.PackageLine}}
-
+const resourcesTemplate = `
 import java.util.*;
 import javax.inject.Inject;
 import javax.ws.rs.*;
@@ -440,11 +302,7 @@ public class {{.ResourcesClass}} {
 }
 `
 
-const interfaceTemplate = `//
-// Example resources generated by sadl2java
-//
-{{.PackageLine}}
-
+const interfaceTemplate = `
 public interface {{.InterfaceClass}} {
 {{range .Model.Operations}}
     {{handlerSig .}};
@@ -452,11 +310,7 @@ public interface {{.InterfaceClass}} {
 }
 `
 
-const exceptionTemplate = `//
-// Generated by sadl2java
-//
-{{.PackageLine}}
-
+const exceptionTemplate = `
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.core.JsonParser;
@@ -507,44 +361,8 @@ public class ServiceException extends RuntimeException {
 }
 `
 
-func (gen *PojoGenerator) finishPojo(b bytes.Buffer, className string) {
-	if gen.err == nil {
-		gen.createJavaFile(className) //then create file and write the header with imports
-		if len(gen.imports) > 0 {
-			sort.Strings(gen.imports)
-			for _, pack := range gen.imports {
-				gen.emit("import " + pack + ";\n")
-			}
-			gen.emit("\n")
-		}
-		b.WriteTo(gen.writer) //and append the originally written output after that
-		gen.writer.Flush()
-		gen.file.Close()
-	}
-}
-
-func requestType(name string) string {
-	return capitalize(name) + "Request"
-}
-
-func responseType(name string) string {
-	return capitalize(name) + "Response"
-}
-
-func operationName(op *sadl.HttpDef) string {
-	name := op.Name
-	if name == "" {
-		method := lowercase(op.Method)
-		_, etype := opInfo(op)
-		name = method + etype
-	} else {
-		name = uncapitalize(name)
-	}
-	return name
-}
-
-func (gen *PojoGenerator) createRequestPojo(op *sadl.HttpDef) {
-	if gen.err != nil {
+func (gen *Generator) CreateRequestPojo(op *sadl.HttpDef) {
+	if gen.Err != nil {
 		return
 	}
 	ts := &sadl.TypeSpec{
@@ -553,38 +371,77 @@ func (gen *PojoGenerator) createRequestPojo(op *sadl.HttpDef) {
 	for _, in := range op.Inputs {
 		ts.Fields = append(ts.Fields, &in.StructFieldDef)
 	}
-	className := requestType(operationName(op))
-	var b bytes.Buffer
-	gen.writer = bufio.NewWriter(&b) //first write to a string
-	gen.createStructPojo(ts, className, "")
-	gen.writer.Flush()
-	gen.finishPojo(b, className)
+	className := gen.RequestType(gen.OperationName(op))
+	gen.CreatePojo(ts, className, "")
 }
 
-func (gen *PojoGenerator) responsePojoName(op *sadl.HttpDef) (string, bool) {
+func (gen *Generator) responsePojoName(op *sadl.HttpDef) (string, bool) {
 	for _, out := range op.Expected.Outputs {
 		if out.Header == "" {
-			tn, _, _ := gen.typeName(nil, out.Type, true)
+			tn, _, _ := gen.TypeName(nil, out.Type, true)
 			return tn, false
 		}
 	}
 	return "void", false
 }
 
-func (gen *PojoGenerator) createResponsePojo(op *sadl.HttpDef) {
-	if gen.err != nil {
+func (gen *Generator) CreateResponsePojo(op *sadl.HttpDef) {
+	if gen.Err != nil {
 		return
 	}
-	className := responseType(operationName(op))
+	className := gen.ResponseType(gen.OperationName(op))
 	ts := &sadl.TypeSpec{
 		Type: "Struct",
 	}
 	for _, spec := range op.Expected.Outputs {
 		ts.Fields = append(ts.Fields, &spec.StructFieldDef)
 	}
-	var b bytes.Buffer
-	gen.writer = bufio.NewWriter(&b) //first write to a string
-	gen.createStructPojo(ts, className, "")
-	gen.writer.Flush()
-	gen.finishPojo(b, className)
+	gen.CreatePojo(ts, className, "")
+}
+
+func (gen *Generator) OperationInfo(op *sadl.HttpDef) (string, string) {
+	switch op.Method {
+	case "POST", "PUT":
+		for _, in := range op.Inputs {
+			if in.Query == "" && in.Header == "" && !in.Path {
+				return in.Name, in.Type
+			}
+		}
+	default:
+		for _, out := range op.Expected.Outputs {
+			if out.Header == "" {
+				return out.Name, out.Type
+			}
+		}
+	}
+	return "anonymous", "Object"
+}
+
+func (gen *Generator) OperationName(op *sadl.HttpDef) string {
+	name := op.Name
+	if name == "" {
+		method := strings.ToLower(op.Method)
+		_, etype := gen.OperationInfo(op)
+		name = method + etype
+	} else {
+		name = gen.Uncapitalize(name)
+	}
+	return name
+}
+
+func (gen *Generator) RequestType(name string) string {
+	return gen.Capitalize(name) + "Request"
+}
+
+func (gen *Generator) ResponseType(name string) string {
+	return gen.Capitalize(name) + "Response"
+}
+
+func jsonWrapper(etype string, val string) string {
+	switch etype {
+	case "String":
+		return "Json.string(" + val + ")"
+	default:
+		return val //these are already valid JSON objects
+	}
 }
