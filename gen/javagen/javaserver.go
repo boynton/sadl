@@ -29,10 +29,14 @@ type ServerData struct {
 	Class          string
 	Imports        []string
 	Funcs template.FuncMap
+	ExtraResources string
 }
 
 func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if gen.Err != nil {
+		return
+	}
+	if gen.ServerData != nil {
 		return
 	}
 	serviceName := gen.Capitalize(gen.Model.Name)
@@ -195,7 +199,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			writer.Flush()
 			return b.String()
 		},
-		"extraResources": func() string { return "" },
+		"extraResources": func() string { return gen.ServerData.ExtraResources },
 	}
 	gen.ServerData.Package = gen.Package
 	if gen.Package != "" {
