@@ -11,10 +11,10 @@ type Model struct {
 	Path        string            `json:"path"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	Operations  []*Operation      `json:"operations,omitempty"`
+	Actions  []*Action      `json:"actions,omitempty"`
 }
 
-type Operation struct {
+type Action struct {
 	Name        string            `json:"name"`
 	Params      []*Param          `json:"params"`
 	Return      *sadl.TypeSpec    `json:"return"`
@@ -106,19 +106,19 @@ func (gql *Extension) parseQuerySpec(p *parse.Parser, comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("graphql", []string{"operation"})
+	options, err := p.ParseOptions("graphql", []string{"action"})
 	if err != nil {
 		return err
 	}
 	qcomment, err = p.EndOfStatement(qcomment)
-	op := &Operation{
+	op := &Action{
 		Name:     qName,
 		Params:   params,
 		Return:   ts,
-		Provider: options.Operation,
+		Provider: options.Action,
 		Comment:  qcomment,
 	}
-	gql.Model.Operations = append(gql.Model.Operations, op)
+	gql.Model.Actions = append(gql.Model.Actions, op)
 	return nil
 }
 
@@ -161,8 +161,8 @@ func (gql *Extension) parseParams(p *parse.Parser, qName string) ([]*Param, erro
 
 }
 
-func (gql *Extension) IsOperation(opname string, p *parse.Parser) bool {
-	for _, op := range p.Model().Operations {
+func (gql *Extension) IsAction(opname string, p *parse.Parser) bool {
+	for _, op := range p.Model().Actions {
 		if op.Name == opname {
 			return true
 		}
@@ -171,9 +171,9 @@ func (gql *Extension) IsOperation(opname string, p *parse.Parser) bool {
 }
 
 func (gql *Extension) Validate(p *parse.Parser) error {
-	for _, op := range gql.Model.Operations {
-		if !gql.IsOperation(op.Provider, p) {
-			return fmt.Errorf("GraphQL query operation '%s' has an undefined HTTP operation: %q", op.Name, op.Provider)
+	for _, op := range gql.Model.Actions {
+		if !gql.IsAction(op.Provider, p) {
+			return fmt.Errorf("GraphQL query action '%s' has an undefined HTTP action: %q", op.Name, op.Provider)
 		}
 	}
 	return nil
