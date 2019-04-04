@@ -1,4 +1,4 @@
-package javagen
+package java
 
 import (
 	"fmt"

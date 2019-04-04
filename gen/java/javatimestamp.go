@@ -1,4 +1,4 @@
-package javagen
+package java
 
 func (gen *Generator) CreateTimestamp() {
 	if gen.Err != nil {

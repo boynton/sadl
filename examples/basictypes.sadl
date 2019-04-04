@@ -37,6 +37,8 @@ example StringTest {
    "names": ["one", "two", "three"]
 }
 
+example StringTest.name "foo23"
+
 type NakedStruct Struct
 
 type AZaz String (pattern="[a-zA-Z]+")

@@ -1,0 +1,23 @@
+//
+// Swagger Petstore
+//
+
+name petstore
+version "1.0.0"
+
+type Pet Struct {
+   id Int64 (required)
+   name String (required)
+   tag String
+}
+
+type Pets Array<Pet>
+
+//
+// hey this is a typedef comment for Error
+//
+type Error Struct {
+   code Int32 (required)
+   message String (required)
+}
+

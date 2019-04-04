@@ -30,7 +30,7 @@ type Schema struct {
 	Types       []*TypeDef        `json:"types,omitempty"`
 	Examples    []*ExampleDef     `json:"examples,omitempty"`
 	Actions     []*ActionDef      `json:"actions,omitempty"`
-	HttpActions []*HttpDef        `json:"httpactions,omitempty"`
+	Http        []*HttpDef        `json:"http,omitempty"`
 	Base        string            `json:"base,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
@@ -39,8 +39,8 @@ type TypeSpec struct {
 	Type      string            `json:"type"`
 	Pattern   string            `json:"pattern,omitempty"`
 	Values    []string          `json:"values,omitempty"`
-	MinSize   *int32            `json:"minSize,omitempty"`
-	MaxSize   *int32            `json:"maxSize,omitempty"`
+	MinSize   *int64            `json:"minSize,omitempty"`
+	MaxSize   *int64            `json:"maxSize,omitempty"`
 	Fields    []*StructFieldDef `json:"fields,omitempty"`
 	Elements  []*EnumElementDef `json:"elements,omitempty"`
 	Min       *Decimal          `json:"min,string,omitempty"`
@@ -76,7 +76,7 @@ type StructFieldDef struct {
 }
 
 type ExampleDef struct {
-	Type        string            `json:"type"`
+	Target      string            `json:"target"`
 	Example     interface{}       `json:"example,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`

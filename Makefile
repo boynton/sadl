@@ -1,3 +1,13 @@
+debug: bin/oas2sadl
+#	./bin/oas2sadl examples/petstore.json
+#	./bin/oas2sadl _work/listings_oas2.json
+	./bin/oas2sadl _work/fba_oas2.json
+#	./bin/oas2sadl _work/ftxg_openapi.json
+
+dbg: bin/sadl
+	./bin/sadl examples/crudl.sadl
+
+
 all:: bin/sadl bin/sadl2java bin/sadl2go
 
 install:: all
@@ -23,6 +33,10 @@ bin/sadl2go:: lib
 	mkdir -p bin
 	go build -o bin/sadl2go github.com/boynton/sadl/cmd/sadl2go
 
+bin/oas2sadl:: lib
+	mkdir -p bin
+	go build -o bin/oas2sadl github.com/boynton/sadl/cmd/oas2sadl
+
 proper::
 	go fmt github.com/boynton/sadl
 	go vet github.com/boynton/sadl
@@ -32,6 +46,8 @@ proper::
 	go vet github.com/boynton/sadl/cmd/sadl
 	go fmt github.com/boynton/sadl/cmd/sadl2java
 	go vet github.com/boynton/sadl/cmd/sadl2java
+	go fmt github.com/boynton/sadl/cmd/oas2sadl
+	go vet github.com/boynton/sadl/cmd/oas2sadl
 
 clean::
 	rm -rf bin

@@ -1,12 +1,31 @@
+//
 // A CRUDL storage service as an example HTTP Web Service defined in SADL.
+//
 name Crudl
-version 1
+version "1"
 
-//The items to be stored.
+//
+// The items to be stored.
+//
 type Item Struct {
-   id UUID (required) //the id is always provided by the client
-   modified Timestamp //the modified time is managed by the server
-   data String //other fields are arbitrary, this services just preserves them, but otherwise doesn't use them
+   id UUID (required) // The id is always provided by the client
+   modified Timestamp // The modified time is managed by the server
+   data String // Other fields are arbitrary, this services just preserves them, but otherwise doesn't use them
+}
+
+//
+// A paginated list of items
+//
+type ItemList Struct {
+   items Array<Item> (required) // The array is always returned, even if empty.
+   next UUID // The token to skip to the next batch is returned only if there are more.
+}
+
+//
+// If not modified, this is the response, with no content. "NotModified" is only used for the app to
+// throw the exception. i.e. in Java: throw new ServiceException(new NotModified())
+//
+type NotModified Struct {
 }
 
 type BadRequest Struct {
@@ -17,93 +36,77 @@ type NotFound Struct {
    error String
 }
 
+
 //
 // Create the item. The item with the updated modified time is returned.
 //
-http POST "/items" (operation=CreateItem) { //Another op comment, after the open brace.
-   //foobar
-   item Item //the new item
+http POST "/items" (action=CreateItem) {
+   item Item // The new item
 
-   //The expected response upon creation of the item in the store
-   expect 201 { /* you must use this form to name the results for the generated         CreateItemResponse object */
-      //item comment
-       item Item //field comment in the expect
+   // The expected response upon creation of the item in the store
+   expect 201 {
+      item Item
    }
 
-   //The response if the item or the id is malformed in any way. Each except type can only occur once, but multiple types can have that code.
-   except 400 BadRequest //Trailing except comment.
-} //Finally, a comment after the close brace
+   // The response if the item or the id is malformed in any way. Each except type can only occur
+   // once, but multiple types can have that code.
+   except 400 BadRequest
+}
 
 //
-// Get the item with the specified id. Conditional response is provided to 
-// avoid sending the item over the wire if it has not changed.
+// Get the item with the specified id. Conditional response is provided to avoid sending the item
+// over the wire if it has not changed.
 //
-http GET "/items/{id}" (operation=GetItem) {
+http GET "/items/{id}" (action=GetItem) {
    id UUID
    ifNewer Timestamp (header="If-Modified-Since")
 
-   //The expected response with the item
+   // The expected response with the item
    expect 200 {
       item Item
-      modified Timestamp (header="Modified") //just an example of output headers
+      modified Timestamp (header="Modified") // Just an example of output headers
    }
 
-   //if not modified, this is the response, with no content. "NotModified" is only used for the app to throw the exception.
-   // i.e. in Java: throw new ServiceException(new NotModified())
    except 304 NotModified
-
    except 404 NotFound
-
 }
-
-type NotModified Struct {
-}
-
 
 //
 // Update the item. The item with the updated modified time is returned.
 //
-http PUT "/items/{id2}" (operation=PutItem) { /* Note, Ideally, I'd specific "/items/{item.id}" to avoid redundancy */
+http PUT "/items/{id2}" (action=PutItem) {
    id2 UUID
-   item Item //the new item
+   item Item // The new item
 
-   //The expected response if the item exists and was updated
+   // The expected response if the item exists and was updated
    expect 200 {
       item Item
    }
 
-   //The response if the item or the id is malformed in any way
+   // The response if the item or the id is malformed in any way
    except 400 ServiceException
-
 }
 
 //
 // Delete the item from the store.
 //
-http DELETE "/items/{id}" (operation=DeleteItem) {
-   id UUID //the id of the item
+http DELETE "/items/{id}" (action=DeleteItem) {
+   id UUID // The id of the item
 
-   //the expected response has no content
+   // The expected response has no content
    expect 204 {
    }
 
-   //the response if the id is not found in the store
+   // The response if the id is not found in the store
    except 404 NotFoundException
-
-}
-
-type ItemList Struct {
-  items Array<Item> (required) //the array is always returned, even if empty
-  next UUID //the token to skip to the next batch is returned only if there are more
 }
 
 //
-// List the items. By default only 10 items are returned, but that can be overriden
-// with a query parameter. If more items are available than the limit, then a "next"
-// token is returned, which can be provided with a subsequent call as the "skip"
-// query parameter.
+// List the items. By default only 10 items are returned, but that can be overridden with a query
+// parameter. If more items are available than the limit, then a "next" token is returned, which can
+// be provided with a subsequent call as the "skip" query parameter.
 //
-http GET "/items?limit={limit}&skip={skip}" (operation=ListItems) {
+http GET "/items?limit={limit}&skip={skip}" (action=ListItems) {
    limit Int32 (default=10)
    skip UUID
 

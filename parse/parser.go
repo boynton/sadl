@@ -151,13 +151,15 @@ func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
-			case "action":
+			case "rpc", "action":
 				err = p.parseActionDirective(comment)
 			case "http":
 				err = p.parseHttpDirective(comment)
 			default:
 				if strings.HasPrefix(tok.Text, "x_") {
-					p.schema.Annotations, err = p.parseExtendedOption(p.schema.Annotations, tok.Text)
+					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
+					p.schema.Annotations, comment, err = p.parseExtendedOptionTopLevel(p.schema.Annotations, tok.Text)
+					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
 				} else {
 					if p.extensions != nil {
 						if handler, ok := p.extensions[tok.Text]; ok {
@@ -339,14 +341,14 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("http", []string{"operation"})
+	options, err := p.ParseOptions("http", []string{"action"})
 	if err != nil {
 		return err
 	}
 	op := &sadl.HttpDef{
 		Method:      method,
 		Path:        pathTemplate,
-		Name:        options.Operation,
+		Name:        options.Action,
 		Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -363,12 +365,13 @@ func (p *Parser) parseHttpDirective(comment string) error {
 				break
 			}
 			err := p.parseHttpSpec(op, comment, true)
+			comment = ""
 			if err != nil {
 				return err
 			}
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
-		p.schema.HttpActions = append(p.schema.HttpActions, op)
+		p.schema.Http = append(p.schema.Http, op)
 	} else {
 		return p.SyntaxError()
 	}
@@ -442,7 +445,7 @@ func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error
 
 func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	if op.Expected != nil {
-		return p.Error("Only a single 'expect' directive is allowed per HTTP operation")
+		return p.Error("Only a single 'expect' directive is allowed per HTTP action")
 	}
 	estatus, err := p.expectInt32()
 	if err != nil {
@@ -538,7 +541,7 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 		if tok.Type == CLOSE_BRACE {
 			return true, comment, nil
 		} else if tok.Type == LINE_COMMENT {
-			comment = p.MergeComment("", tok.Text)
+			comment = p.MergeComment(comment, tok.Text)
 			tok = p.GetToken()
 			if tok == nil {
 				return false, comment, p.EndOfFileError()
@@ -556,14 +559,14 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 }
 
 func (p *Parser) parseExampleDirective(comment string) error {
-	typeName, err := p.ExpectIdentifier()
+	target, err := p.ExpectCompoundIdentifier()
 	if err != nil {
 		return err
 	}
 	val, err := p.parseLiteralValue()
 	if err == nil {
 		ex := &sadl.ExampleDef{
-			Type:    typeName,
+			Target:  target,
 			Example: val,
 		}
 		p.schema.Examples = append(p.schema.Examples, ex)
@@ -912,6 +915,27 @@ func (p *Parser) ExpectIdentifier() (string, error) {
 	return p.assertIdentifier(tok)
 }
 
+func (p *Parser) ExpectCompoundIdentifier() (string, error) {
+	tok := p.GetToken()
+	s, err := p.assertIdentifier(tok)
+	if err != nil {
+		return s, err
+	}
+	tok = p.GetToken()
+	if tok == nil {
+		return s, nil
+	}
+	if tok.Type != DOT {
+		p.UngetToken()
+		return s, nil
+	}
+	ss, err := p.ExpectCompoundIdentifier()
+	if err != nil {
+		return "", err
+	}
+	return s + "." + ss, nil
+}
+
 func (p *Parser) expectEqualsIdentifier() (string, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
@@ -979,6 +1003,31 @@ func (p *Parser) expectEqualsInt32() (*int32, error) {
 	return &val, nil
 }
 
+func (p *Parser) expectInt64() (int64, error) {
+	tok := p.GetToken()
+	if tok == nil {
+		return 0, p.EndOfFileError()
+	}
+	if tok.IsNumeric() {
+		l, err := strconv.ParseInt(tok.Text, 10, 64)
+		return int64(l), err
+	}
+	return 0, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
+}
+
+func (p *Parser) expectEqualsInt64() (*int64, error) {
+	var val int64
+	err := p.expect(EQUALS)
+	if err != nil {
+		return nil, err
+	}
+	val, err = p.expectInt64()
+	if err != nil {
+		return nil, err
+	}
+	return &val, nil
+}
+
 func (p *Parser) expectNumber() (*sadl.Decimal, error) {
 	tok := p.GetToken()
 	if tok == nil {
@@ -1040,11 +1089,11 @@ type Options struct {
 	Default     interface{}
 	Pattern     string
 	Values      []string
-	MinSize     *int32
-	MaxSize     *int32
+	MinSize     *int64
+	MaxSize     *int64
 	Min         *sadl.Decimal
 	Max         *sadl.Decimal
-	Operation   string
+	Action      string
 	Header      string
 	Reference   string
 	Annotations map[string]string
@@ -1077,9 +1126,9 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 					case "max":
 						options.Max, err = p.expectEqualsNumber()
 					case "minsize":
-						options.MinSize, err = p.expectEqualsInt32()
+						options.MinSize, err = p.expectEqualsInt64()
 					case "maxsize":
-						options.MaxSize, err = p.expectEqualsInt32()
+						options.MaxSize, err = p.expectEqualsInt64()
 					case "pattern":
 						options.Pattern, err = p.expectEqualsString()
 					case "values":
@@ -1088,8 +1137,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Required = true
 					case "default":
 						options.Default, err = p.parseEqualsLiteral()
-					case "operation":
-						options.Operation, err = p.expectEqualsIdentifier()
+					case "action":
+						options.Action, err = p.expectEqualsIdentifier()
 					case "reference":
 						options.Reference, err = p.expectEqualsIdentifier()
 					case "header":
@@ -1113,6 +1162,50 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 		p.UngetToken()
 		return options, nil
 	}
+}
+
+//parse the next string. And also a line comment, and the end of line, if present. Anything else is an error
+func (p *Parser) parseStringToEndOfLine() (string, string, error) {
+	val := ""
+	comment := ""
+	tok := p.GetToken()
+	if tok == nil {
+		return val, comment, nil
+	}
+	if tok.Type == EQUALS {
+		//ignore it except error if at end of file
+		tok = p.GetToken()
+		if tok == nil {
+			return "", "", p.EndOfFileError()
+		}
+	}
+	if tok.Type == STRING {
+		val = tok.Text
+		tok = p.GetToken()
+	}
+	if tok == nil {
+		return val, comment, nil
+	}
+	if tok.Type == LINE_COMMENT {
+		comment = tok.Text
+		tok = p.GetToken()
+	}
+	if tok == nil {
+		return val, comment, nil
+	}
+	if tok.Type != NEWLINE {
+		return "", "", p.SyntaxError()
+	}
+	return val, comment, nil
+}
+
+func (p *Parser) parseExtendedOptionTopLevel(annos map[string]string, anno string) (map[string]string, string, error) {
+	val, comment, err := p.parseStringToEndOfLine()
+	if annos == nil {
+		annos = make(map[string]string, 0)
+	}
+	annos[anno] = val
+	return annos, comment, err
 }
 
 func (p *Parser) parseExtendedOption(annos map[string]string, anno string) (map[string]string, error) {
@@ -1173,10 +1266,10 @@ func (p *Parser) parseBytesOptions(typedef *sadl.TypeDef) error {
 					return err
 				}
 				if expected == "minsize" {
-					i := val.AsInt32()
+					i := val.AsInt64()
 					typedef.MinSize = &i
 				} else if expected == "maxsize" {
-					i := val.AsInt32()
+					i := val.AsInt64()
 					typedef.MinSize = &i
 				} else {
 					return p.Error("bytes option must have numeric value")
@@ -1217,7 +1310,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 		}
 		if tok.Type == STRING {
 			values = append(values, tok.Text)
-		} else if tok.Type == COMMA {
+		} else if tok.Type == COMMA || tok.Type == NEWLINE {
 			//ignore
 		} else {
 			return nil, p.SyntaxError()
@@ -1505,13 +1598,13 @@ func (p *Parser) parseCollectionOptions(typedef *sadl.TypeDef) error {
 			if tok.Type == SYMBOL {
 				switch tok.Text {
 				case "minsize":
-					num, err := p.expectEqualsInt32()
+					num, err := p.expectEqualsInt64()
 					if err != nil {
 						return err
 					}
 					typedef.MinSize = num
 				case "maxsize":
-					num, err := p.expectEqualsInt32()
+					num, err := p.expectEqualsInt64()
 					if err != nil {
 						return err
 					}
@@ -1606,7 +1699,13 @@ func (p *Parser) ParseTrailingComment(comment string) string {
 }
 
 func (p *Parser) MergeComment(comment1 string, comment2 string) string {
-	return strings.TrimSpace(comment1 + " " + comment2)
+	if comment1 == "" {
+		return strings.TrimSpace(comment2)
+	}
+	if comment2 == "" {
+		return strings.TrimSpace(comment1)
+	}
+	return strings.TrimSpace(comment1) + " " + strings.TrimSpace(comment2)
 }
 
 func (p *Parser) Validate() (*sadl.Model, error) {
@@ -1642,8 +1741,8 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 			return nil, err
 		}
 	}
-	for _, hact := range p.model.HttpActions {
-		err = p.validateHttpAction(hact)
+	for _, hdef := range p.model.Http {
+		err = p.validateHttp(hdef)
 		if err != nil {
 			return nil, err
 		}
@@ -1658,14 +1757,20 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 }
 
 func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
-	t := p.model.FindType(ex.Type)
+	lst := strings.Split(ex.Target, ".")
+	theType := lst[0]
+	t := p.model.FindType(theType)
 	if t == nil {
-		return fmt.Errorf("Undefined type '%s' in example: %s", ex.Type, Pretty(ex))
+		return fmt.Errorf("Undefined type '%s' in example: %s", theType, Pretty(ex))
 	}
-	return p.model.ValidateAgainstTypeSpec("example for "+ex.Type, &t.TypeSpec, ex.Example)
+	if len(lst) > 1 {
+		fmt.Println("warning: validation against arbitrary example target NYI:", ex.Example)
+		return nil
+	}
+	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, &t.TypeSpec, ex.Example)
 }
 
-func (p *Parser) validateHttpAction(hact *sadl.HttpDef) error {
+func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
 	needsBody := hact.Method == "POST" || hact.Method == "PUT"
 	bodyParam := ""
 	for _, in := range hact.Inputs {

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/boynton/sadl/gen/sadl"
 	"github.com/boynton/sadl/parse"
 )
 
 func main() {
 	pVerbose := flag.Bool("v", false, "set to true to enable verbose output")
+	pFormat := flag.Bool("f", false, "set to true to format the file as SADL (unparse after parsing), else output JSON parse result")
 	flag.Parse()
 	args := flag.Args()
 	if len(args) != 1 {
@@ -23,5 +25,9 @@ func main() {
 		fmt.Println(err)
 		os.Exit(2)
 	}
-	fmt.Println(parse.Pretty(model))
+	if *pFormat {
+		fmt.Println(sadl.Decompile(model))
+	} else {
+		fmt.Println(parse.Pretty(model))
+	}
 }

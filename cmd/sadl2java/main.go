@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	//	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/gen/javagen"
+	"github.com/boynton/sadl/gen/java"
 	"github.com/boynton/sadl/parse"
 )
 
@@ -32,7 +31,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "*** %v\n", err)
 		os.Exit(1)
 	}
-	gen := javagen.NewGenerator(model, *pDir, *pSrc, *pRez, *pPackage, *pLombok, *pGetters, *pInstants)
+	gen := java.NewGenerator(model, *pDir, *pSrc, *pRez, *pPackage, *pLombok, *pGetters, *pInstants)
 	for _, td := range model.Types {
 		gen.CreatePojoFromDef(td)
 	}

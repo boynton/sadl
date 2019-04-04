@@ -1,4 +1,4 @@
-package javagen
+package java
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ type ServerData struct {
 	InterfaceClass string
 	ResourcesClass string
 	RootPath       string
-	HttpAction             *sadl.HttpDef
+	Http           []*sadl.HttpDef
 	Inputs         []*sadl.HttpParamSpec
 	Expected       *sadl.HttpExpectedSpec
 	Errors         []*sadl.HttpExceptionSpec
@@ -214,7 +214,7 @@ func (gen *Generator) CreateServer(src, rez string) {
 	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
 	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
 	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
-	for _, hact := range gen.Model.HttpActions {
+	for _, hact := range gen.Model.Http {
 		gen.CreateRequestPojo(hact)
 		gen.CreateResponsePojo(hact)
 	}
@@ -259,7 +259,7 @@ public class {{.MainClass}} {
 
     // Stubs for an implementation of the service follow
     static class {{.ImplClass}} implements {{.InterfaceClass}} {
-{{range .Model.HttpActions}}
+{{range .Model.Http}}
         {{handlerSig .}} {{openBrace}}
             return new {{resClass .}}(); //implement me!
         }
@@ -279,7 +279,7 @@ import static javax.ws.rs.core.Response.Status;
 public class {{.ResourcesClass}} {
     @Inject
     private {{.InterfaceClass}} impl;
-{{range .Model.HttpActions}}
+{{range .Model.Http}}
     
     @{{.Method}}
     @Path("{{methodPath .}}")
@@ -293,7 +293,7 @@ public class {{.ResourcesClass}} {
 
 const interfaceTemplate = `
 public interface {{.InterfaceClass}} {
-{{range .Model.HttpActions}}
+{{range .Model.Http}}
     {{handlerSig .}};
 {{end}}
 }

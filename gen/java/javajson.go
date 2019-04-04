@@ -1,4 +1,4 @@
-package javagen
+package java
 
 func (gen *Generator) CreateJsonUtil() {
 	if gen.Err != nil {
