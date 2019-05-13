@@ -319,7 +319,7 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 }
 
 func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
-	fmt.Println(sadl.Pretty(v2))
+//	fmt.Println(sadl.Pretty(v2))
 	v3 := &oas3.OpenAPI{
 		Components: &oas3.Components{
 		},
@@ -337,7 +337,7 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 
 func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 	var err error
-	fmt.Println("v2 type:", xname, sadl.Pretty(v2))
+//	fmt.Println("v2 type:", xname, sadl.Pretty(v2))
 	v3 := &oas3.Schema{
 		Description: v2.Description,
 	}
@@ -353,9 +353,7 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 		case "string":
 			v3.Type = "string"
 			//todo restrictions
-			fmt.Println("Got a string")
 		case "array":
-			fmt.Println("Got an array. Handle it")
 			v3.Type = "array"
 			v3.Items, err = convertSchema("", v2.Items.Schema)
 			if err != nil {
@@ -374,12 +372,20 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 				}
 				v3.Properties = schemas
 			}
+		case "boolean":
+			v3.Type = "boolean"
+		case "number":
+			v3.Type = "number"
+			v3.Format = v2.Format
+		case "integer":
+			v3.Type = "number"
+			v3.Format = "int32"
 		default:
 			fmt.Println("FIX THIS:", sadl.Pretty(v2))
 			panic("here")
 		}
 	}
-	fmt.Println("--------->", sadl.Pretty(v3))
+//	fmt.Println("--------->", sadl.Pretty(v3))
 	return v3, nil
 }
 

@@ -1,8 +1,5 @@
 debug: bin/oas2sadl
-#	./bin/oas2sadl examples/petstore.json
-#	./bin/oas2sadl _work/listings_oas2.json
-	./bin/oas2sadl _work/fba_oas2.json
-#	./bin/oas2sadl _work/ftxg_openapi.json
+	./bin/oas2sadl -d examples/petstore.yaml
 
 dbg: bin/sadl
 	./bin/sadl examples/crudl.sadl
@@ -33,7 +30,7 @@ bin/sadl2go:: lib
 	mkdir -p bin
 	go build -o bin/sadl2go github.com/boynton/sadl/cmd/sadl2go
 
-bin/oas2sadl:: lib
+bin/oas2sadl::
 	mkdir -p bin
 	go build -o bin/oas2sadl github.com/boynton/sadl/cmd/oas2sadl
 

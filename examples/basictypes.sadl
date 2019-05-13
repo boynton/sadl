@@ -26,9 +26,9 @@ type AlphaName String (pattern="[a-zA-Z_]+") //one or more alpha characters
 
 /* note that semicolons are optional */
 type StringTest Struct {
-     name SimpleName (required);
-     parent CompoundName (required);
-     names Array<SimpleName>; //names comment
+	name SimpleName (required);
+	parent CompoundName (required);
+	names Array<SimpleName>; //names comment
 }
 
 example StringTest {
@@ -59,7 +59,7 @@ type BigNumber Decimal (max=3141592653589793238462643383279502884197169399375105
 
 
 type MapTest Struct {
-    locations Map<String,Int32>
+	locations Map<String,Int32>
 }
 
 example MapTest {
@@ -71,50 +71,50 @@ example MapTest {
 
 type ArrayOfInt Array<Int32> (maxsize=3)
 type MapArrayTest Struct {
-    locations Map<String,ArrayOfInt>
+	locations Map<String,ArrayOfInt>
 }
 
 type IntOOBTest Struct {
-    theyear   Year
+	theyear   Year
 }
 
 type NegativeNumberTest Struct {
-    mylatitude Latitude
+	mylatitude Latitude
 }
 
 type UUIDTest Struct {
-    myid UUID
+	myid UUID
 }
 
 type TimestampTest Struct {
-    mytime Timestamp
+	mytime Timestamp
 }
 
 type Test Struct {
-    name String (required)
-    utfname String (required)
-    mybool Bool (required)
-    mybool2 Bool (required)
-    myint Int32 (required)
-    mylong Int64 (required)
-    mydbl Float64 (required)
-    intarray ArrayOfInt
-    mynestedstruct Struct {
+	name String (required)
+	utfname String (required)
+	mybool Bool (required)
+	mybool2 Bool (required)
+	myint Int32 (required)
+	mylong Int64 (required)
+	mydbl Float64 (required)
+	intarray ArrayOfInt
+	mynestedstruct Struct {
       something String
       orAnother Int32
-    } (default={"something": "foo", "orAnother": 23})
-    my_int_array Array<Int32> (required)
-    my_str_array Array<String> (required)
-    myuuid UUID (required)
-    myaz AZaz (required)
-    myyear Year (required)
-    mypi Pi (required)
-    myotherlong LongNumber (required)
-    mytime Timestamp (required)
-    myoptions Options (required)
-    co1 NonSymbolicOptions (required)
-    co2 String (values=["a:b","c:d","e:f"], required)
-    co3 NonSymbolicOptions
+	} (default={"something": "foo", "orAnother": 23})
+	my_int_array Array<Int32> (required)
+	my_str_array Array<String> (required)
+	myuuid UUID (required)
+	myaz AZaz (required)
+	myyear Year (required)
+	mypi Pi (required)
+	myotherlong LongNumber (required)
+	mytime Timestamp (required)
+	myoptions Options (required)
+	co1 NonSymbolicOptions (required)
+	co2 String (values=["a:b","c:d","e:f"], required)
+	co3 NonSymbolicOptions
 }
 
 type Foo String (x_ok)

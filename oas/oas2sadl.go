@@ -276,7 +276,7 @@ func convertOasPathToAction(schema *sadl.Schema, pathItem *oas3.PathItem) (*sadl
 	}
 	act := &sadl.ActionDef{
 		Name: name,
-		Comment: op.Description,
+		Comment: op.Summary,
 	}
 	//need a single input. Generate the op.OperationID
 	reqTypeName := capitalize(name) + "Request"
@@ -401,7 +401,7 @@ func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error)
 		Name: op.OperationID,
 		Path: path,
 		Method: method,
-		Comment: op.Description,
+		Comment: op.Summary,
 	}
 	var queries []string
 	for _, param := range op.Parameters {
@@ -539,7 +539,7 @@ func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error)
 				status = "200" //?
 			}
 			code, err := strconv.Atoi(status)
-			fmt.Println("code, err, param:", code, err, param)
+			fmt.Println("FIX ME response(code, err, param):", code, err, param)
 		}
 	}
 //	panic("here")
