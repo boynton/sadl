@@ -74,8 +74,8 @@ http GET "/items/{id}" (action=GetItem) {
 //
 // Update the item. The item with the updated modified time is returned.
 //
-http PUT "/items/{id2}" (action=PutItem) {
-   id2 UUID
+http PUT "/items/{id}" (action=PutItem) {
+   id UUID
    item Item // The new item
 
    // The expected response if the item exists and was updated

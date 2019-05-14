@@ -116,8 +116,3 @@ type Test Struct {
 	co2 String (values=["a:b","c:d","e:f"], required)
 	co3 NonSymbolicOptions
 }
-
-type Foo String (x_ok)
-type Bar Struct (x_ok) {
-   foo String
-}

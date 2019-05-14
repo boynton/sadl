@@ -29,6 +29,9 @@ descriptions, optimized for simplicity and speed.
 
 TBD. For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples) directory.
 
+For an example of integrated GraphQL, see [this](https://github.com/boynton/sadl2javagql). That project defines a graphql
+extension to SADL, built on normal HTTP actions (i.e. the graphql only knows to make the same calls your http interface defines).
+
 ## Usage
 
 To just parse, show errors, and output the JSON representation of the resulting model:
