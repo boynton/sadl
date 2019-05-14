@@ -319,7 +319,7 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 }
 
 func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
-//	fmt.Println(sadl.Pretty(v2))
+	fmt.Println(sadl.Pretty(v2))
 	v3 := &oas3.OpenAPI{
 		Components: &oas3.Components{
 		},
@@ -332,7 +332,22 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 		}
 		v3.Components.Schemas[name] = val3
 	}
+	v3.Paths = make(map[string]*oas3.PathItem, 0)
+	for tmpl, pathItem := range v2.Paths {
+		path, err := convertPath(pathItem)
+		if err != nil {
+			return nil, err
+		}
+		v3.Paths[tmpl] = path
+	}
+	//to do: the actions
 	return v3, nil
+}
+
+func convertPath(v2Path *PathItem) (*oas3.PathItem, error) {
+	v3Path := &oas3.PathItem{}
+	v3Path.Extensions = v2Path.Extensions
+	return v3Path, nil
 }
 
 func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {

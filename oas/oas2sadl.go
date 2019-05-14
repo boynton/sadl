@@ -12,6 +12,8 @@ import(
 
 var examples []*sadl.ExampleDef
 
+var methods = []string{"GET","PUT","POST","DELETE","DELETE","HEAD"} //to do: "PATCH", "OPTIONS", "TRACE"
+
 func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	comment := oas.V3.Info.Title
    if oas.V3.Info.Description != "" {
@@ -53,33 +55,37 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	httpBindings := true //For "review" purposes, the http part is not as interesting.
 	actions := false
 	for tmpl, path := range oas.V3.Paths {
-		if strings.HasPrefix(tmpl, "x-") {
-			continue
-		}
-		if actions {
-			act, err := convertOasPathToAction(schema, path)
-			if err != nil {
-				return nil, err
+		for _, method := range methods {
+			op := getPathOperation(path, method)
+			if op != nil {
+				if strings.HasPrefix(tmpl, "x-") {
+					continue
+				}
+				if actions {
+					act, err := convertOasPathToAction(schema, op, method)
+					if err != nil {
+						return nil, err
+					}
+					schema.Actions = append(schema.Actions, act)
+				}
+				if httpBindings {
+					hact, err := convertOasPath(tmpl, op, method)
+					if err != nil {
+						return nil, err
+					}
+					schema.Http = append(schema.Http, hact)
+					//fmt.Println(tmpl, sadl.Pretty(path))
+				}
 			}
-			schema.Actions = append(schema.Actions, act)
-		}
-		if httpBindings {
-			hact, err := convertOasPath(tmpl, path)
-			if err != nil {
-				return nil, err
-			}
-			schema.Http = append(schema.Http, hact)
-			//fmt.Println(tmpl, sadl.Pretty(path))
 		}
 	}
-
 	for _, server := range oas.V3.Servers {
 		if schema.Annotations == nil {
 			schema.Annotations = make(map[string]string, 0)
 		}
 		schema.Annotations["x_server"] = server.URL
 	}
-
+	
 	schema.Examples = examples;
 	return sadl.NewModel(schema)
 }
@@ -261,11 +267,7 @@ func makeIdentifier(text string) string {
 	return reg.ReplaceAllString(text, "")
 }
 
-func convertOasPathToAction(schema *sadl.Schema, pathItem *oas3.PathItem) (*sadl.ActionDef, error) {
-	op, method := getPathOperation(pathItem)
-	if op == nil {
-		return nil, fmt.Errorf("PathItem has no operation: %s", sadl.AsString(pathItem))
-	}
+func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method string) (*sadl.ActionDef, error) {
 	name := op.OperationID
 	synthesizedName := guessOperationName(op, method)
 	if name == "" {
@@ -392,11 +394,7 @@ func convertOasPathToAction(schema *sadl.Schema, pathItem *oas3.PathItem) (*sadl
 	return act, nil
 }
 
-func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error) {
-	op, method := getPathOperation(pathItem)
-	if op == nil {
-		return nil, fmt.Errorf("PathItem has no operation: %s", sadl.AsString(pathItem))
-	}
+func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpDef, error) {
 	hact := &sadl.HttpDef{
 		Name: op.OperationID,
 		Path: path,
@@ -497,14 +495,14 @@ func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error)
 			break
 		}
 	}
-//	if expectedStatus == "default" {
-//		expectedStatus = "200" //?
-//	}
+	//	if expectedStatus == "default" {
+	//		expectedStatus = "200" //?
+	//	}
 	if expectedStatus != "" {
 		eparam := op.Responses[expectedStatus]
 		var err error
 		code := 200
-		if expectedStatus != "default" {
+		if expectedStatus != "default" && strings.Index(expectedStatus, "X") < 0 {
 			code, err = strconv.Atoi(expectedStatus)
 			if err != nil {
 				return nil, err
@@ -526,8 +524,8 @@ func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error)
 						result.TypeSpec, err = convertOasType(hact.Name + ".Expected.payload", schref)
 					}
 					ex.Outputs = append(ex.Outputs, result)
-//				} else {
-//					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(eparam))
+				} else {
+					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(eparam))
 				}
 			}
 		}
@@ -535,47 +533,65 @@ func convertOasPath(path string, pathItem *oas3.PathItem) (*sadl.HttpDef, error)
 	}
 	for status, param := range op.Responses {
 		if status != expectedStatus {
+			//the status can be "default", or "4XX" (where 'X' is a wildcard) or "404". If the latter, it takes precedence.
+			//for SADL, not specifying the response is a bug. So "default" will be turned into "500". The wildcards
 			if status == "default" {
-				status = "200" //?
+				status = "500" //because you should do better when you speficy your API!!!
+			} else if strings.Index(status, "X") >= 0 {
+				panic("wildcard response codes not supported")
 			}
 			code, err := strconv.Atoi(status)
-			fmt.Println("FIX ME response(code, err, param):", code, err, param)
+			if err != nil {
+				return nil, fmt.Errorf("Invalid status code: %q", status)
+			}
+			ex := &sadl.HttpExceptionSpec{
+				Status: int32(code),
+				Comment: param.Description,
+			}
+			for contentType, mediadef := range param.Content {
+				if contentType == "application/json" { //hack
+					schref := mediadef.Schema
+					if schref != nil {
+						if schref.Ref != "" {
+							ex.Type = oasTypeRef(schref)
+						} else {
+							panic("inline response types not yet supported")
+						}
+						break
+					}
+				}
+			}
+			hact.Exceptions = append(hact.Exceptions, ex)
 		}
 	}
-//	panic("here")
 	//tags: add `x-tags="one,two"` annotation
 	return hact, nil
 }
 
-func getPathOperation(oasPathItem *oas3.PathItem) (*oas3.Operation, string) {
-	if oasPathItem.Get != nil {
-		return oasPathItem.Get, "GET"
+func getPathOperation(oasPathItem *oas3.PathItem, method string) *oas3.Operation {
+	switch method {
+	case "GET":
+		return oasPathItem.Get
+	case "PUT":
+		return oasPathItem.Put
+	case "POST":
+		return oasPathItem.Post
+	case "DELETE":
+		return oasPathItem.Delete
+	case "HEAD":
+		return oasPathItem.Head
+/*
+	case "PATCH":
+		return oasPathItem.Patch
+	case "OPTIONS":
+		return oasPathItem.Options
+	case "TRACE":
+		return oasPathItem.Trace
+	case "CONNECT":
+		return oasPathItem.Connect
+*/
 	}
-	if oasPathItem.Put != nil {
-		return oasPathItem.Put, "PUT"
-	}
-	if oasPathItem.Post != nil {
-		return oasPathItem.Post, "POST"
-	}
-	if oasPathItem.Delete != nil {
-		return oasPathItem.Delete, "DELETE"
-	}
-	if oasPathItem.Head != nil {
-		return oasPathItem.Head, "HEAD"
-	}
-	if oasPathItem.Patch != nil {
-		return oasPathItem.Patch, "PATCH"
-	}
-	if oasPathItem.Options != nil {
-		return oasPathItem.Options, "OPTIONS"
-	}
-	if oasPathItem.Trace != nil {
-		return oasPathItem.Trace, "TRACE"
-	}
-	if oasPathItem.Connect != nil {
-		return oasPathItem.Trace, "CONNECT"
-	}
-	return nil, ""
+	return nil
 }
 
 func guessOperationName(op *oas3.Operation, method string) string {
