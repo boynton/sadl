@@ -5,28 +5,19 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/exporters"
 )
 
 const indentAmount = "   "
 
-type Generator struct {
-	exporters.Generator
-}
-
-func NewGenerator(model *sadl.Model, outdir string) *Generator {
+func NewGenerator(model *Model, outdir string) *Generator {
 	gen := &Generator{
-		Generator: exporters.Generator{
-			Model:  model,
-			OutDir: outdir,
-		},
+		Model:  model,
+		OutDir: outdir,
 	}
 	return gen
 }
 
-func Decompile(model *sadl.Model) string {
+func Decompile(model *Model) string {
 	g := NewGenerator(model, "")
 	sadlSource := g.Generate()
 	if g.Err != nil {
@@ -57,10 +48,10 @@ func (g *Generator) Generate() string {
 			}
 			return s
 		},
-		"typedef": func(td *sadl.TypeDef) string {
+		"typedef": func(td *TypeDef) string {
 			return fmt.Sprintf("type %s %s\n", td.Name, g.sadlTypeSpec(&td.TypeSpec, nil, ""))
 		},
-		"action": func(act *sadl.ActionDef) string {
+		"action": func(act *ActionDef) string {
 			out := ""
 			exc := ""
 			if act.Output != "" {
@@ -74,7 +65,7 @@ func (g *Generator) Generate() string {
 			}
 			return fmt.Sprintf("action %s(%s)%s%s\n", act.Name, act.Input, out, exc)
 		},
-		"http": func(hact *sadl.HttpDef) string {
+		"http": func(hact *HttpDef) string {
 			return g.sadlHttpSpec(hact)
 		},
 	}
@@ -96,7 +87,7 @@ func (g *Generator) CreateSadlSource() {
 	}
 }
 
-func (g *Generator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string) string {
+func (g *Generator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string) string {
 	switch ts.Type {
 	case "Enum":
 		//Q: what if this is a required field, defined inline in a struct?!
@@ -184,11 +175,9 @@ func (g *Generator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string
 		}
 		return fmt.Sprintf("%s%s", ts.Type, sopts)
 	}
-	panic("fix me")
-	return "???"
 }
 
-func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
+func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 	var opts []string
 	if hact.Name != "" {
 		opts = append(opts, "action="+hact.Name)
@@ -203,7 +192,7 @@ func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
 	}
 	bcom := ""
 	if hact.Expected == nil {
-		hact.Expected = &sadl.HttpExpectedSpec{
+		hact.Expected = &HttpExpectedSpec{
 			Status: 200,
 		}
 	}
@@ -229,13 +218,13 @@ func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
 	return s
 }
 
-func (g *Generator) sadlParamSpec(ps *sadl.HttpParamSpec) string {
+func (g *Generator) sadlParamSpec(ps *HttpParamSpec) string {
 	var opts []string
 	if ps.Required {
 		opts = append(opts, "required")
 	}
 	if ps.Default != nil {
-		opts = append(opts, "default="+sadl.AsString(ps.Default))
+		opts = append(opts, "default="+AsString(ps.Default))
 	}
 	if ps.Header != "" {
 		opts = append(opts, fmt.Sprintf("header=%q", ps.Header))

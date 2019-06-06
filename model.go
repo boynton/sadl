@@ -366,17 +366,6 @@ func (model *Model) fail(td *TypeSpec, val interface{}, msg string) error {
 	return fmt.Errorf("Validation error: not a valid %s%s: %s", td.Type, msg, v)
 }
 
-func Pretty(obj interface{}) string {
-	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(&obj); err != nil {
-		return fmt.Sprint(obj)
-	}
-	return string(buf.String())
-}
-
 func AsString(obj interface{}) string {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)

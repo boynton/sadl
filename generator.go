@@ -1,4 +1,4 @@
-package exporters
+package sadl
 
 import (
 	"bufio"
@@ -7,12 +7,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
-
-	"github.com/boynton/sadl"
 )
 
 type Generator struct {
-	Model  *sadl.Model
+	Model  *Model
 	OutDir string
 	Err    error
 	buf    bytes.Buffer

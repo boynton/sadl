@@ -1,13 +1,13 @@
-package main
+package golang
 
-func (gen *GoGenerator) emitDecimalType() {
+func (gen *GoGenerator) EmitDecimalType() {
 	if gen.err != nil {
 		return
 	}
 	gen.addImport("encoding/json")
 	gen.addImport("fmt")
 	gen.addImport("math/big")
-	gen.emit(decimalType)
+	gen.Emit(decimalType)
 }
 
 const decimalType = `// Decimal is a big.Float equivalent, but marshals to JSON as strings to preserve precision.

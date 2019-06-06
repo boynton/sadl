@@ -10,11 +10,10 @@ import (
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/exporters"
 )
 
 type Generator struct {
-	exporters.Generator
+	sadl.Generator
 	Package        string
 	Header         string
 	SourceDir      string
@@ -38,7 +37,7 @@ func (gen *Generator) AddImport(fullReference string) {
 
 func NewGenerator(model *sadl.Model, outdir, srcdir, rezdir, pkg string, useLombok, useInstants, useGetters bool) *Generator {
 	gen := &Generator{
-		Generator: exporters.Generator{
+		Generator: sadl.Generator{
 			Model:  model,
 			OutDir: outdir,
 		},

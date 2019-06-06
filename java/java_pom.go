@@ -12,12 +12,12 @@ func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepe
 		fmt.Println("[pom.xml already exists, not overwriting]")
 		return
 	}
-/*	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	writer := bufio.NewWriter(f)
-*/
+	/*	f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		writer := bufio.NewWriter(f)
+	*/
 	dependsMgt := jerseyDependsMgt
 	depends := jerseyDepends
 	versions := jerseyVersion
@@ -28,11 +28,11 @@ func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepe
 		depends = depends + extraDepends
 	}
 	funcMap := template.FuncMap{
-		"domain": func() string { return domain },
-		"name": func() string { return name },
+		"domain":     func() string { return domain },
+		"name":       func() string { return name },
 		"dependsMgt": func() string { return dependsMgt },
-		"depends": func() string { return depends },
-		"versions": func() string { return versions },
+		"depends":    func() string { return depends },
+		"versions":   func() string { return versions },
 	}
 	gen.Begin()
 	gen.EmitTemplate("pom.xml", pomTemplate, gen, funcMap)
@@ -40,18 +40,18 @@ func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepe
 	if gen.Err == nil {
 		gen.WriteFile(path, result)
 	}
-/*
-	s := pomTemplate
-	s = strings.Replace(s, "{{domain}}", domain, -1)
-	s = strings.Replace(s, "{{name}}", name, -1)
-	s = strings.Replace(s, "{{dependsMgt}}", dependsMgt, -1)
-	s = strings.Replace(s, "{{depends}}", depends, -1)
-	s = strings.Replace(s, "{{versions}}", versions, -1)
-	_, err = writer.WriteString(s)
-	writer.Flush()
-	f.Close()
-	return err
-*/
+	/*
+		s := pomTemplate
+		s = strings.Replace(s, "{{domain}}", domain, -1)
+		s = strings.Replace(s, "{{name}}", name, -1)
+		s = strings.Replace(s, "{{dependsMgt}}", dependsMgt, -1)
+		s = strings.Replace(s, "{{depends}}", depends, -1)
+		s = strings.Replace(s, "{{versions}}", versions, -1)
+		_, err = writer.WriteString(s)
+		writer.Flush()
+		f.Close()
+		return err
+	*/
 }
 
 const jerseyVersion = `    <jersey.version>2.27</jersey.version>                                                                          `

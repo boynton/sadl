@@ -1,19 +1,19 @@
-package main
+package golang
 
-import(
+import (
 	"text/template"
 
 	"github.com/boynton/sadl"
-
 )
-func (gen *GoGenerator) emitEnumType(td *sadl.TypeDef) {
+
+func (gen *GoGenerator) EmitEnumType(td *sadl.TypeDef) {
 	if gen.err != nil {
 		return
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
 	}
-	gen.emitTemplate("enumType", enumTemplate, td, funcMap)
+	gen.EmitTemplate("enumType", enumTemplate, td, funcMap)
 }
 
 const enumTemplate = `type {{.Name}} int
@@ -50,4 +50,3 @@ func (e *{{.Name}}) UnmarshalJSON(b []byte) error {
     return err
 }
 `
-

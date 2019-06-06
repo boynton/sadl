@@ -1,10 +1,10 @@
 package java
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
 	"fmt"
-//	"path/filepath"
+	//	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -28,7 +28,7 @@ type ServerData struct {
 	Errors         []*sadl.HttpExceptionSpec
 	Class          string
 	Imports        []string
-	Funcs template.FuncMap
+	Funcs          template.FuncMap
 	ExtraResources string
 }
 
@@ -46,7 +46,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	}
 	gen.ServerData = &ServerData{
 		RootPath:       rootPath,
-		Model: gen.Model,
+		Model:          gen.Model,
 		Name:           serviceName,
 		Port:           8080,
 		MainClass:      "Main",

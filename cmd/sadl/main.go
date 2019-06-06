@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/boynton/sadl/parse"
-	"github.com/boynton/sadl/exporters/sadl"
+	"github.com/boynton/sadl"
 )
 
 func main() {
@@ -19,8 +18,8 @@ func main() {
 		os.Exit(1)
 	}
 	path := args[0]
-	parse.Verbose = *pVerbose
-	model, err := parse.File(path)
+	sadl.Verbose = *pVerbose
+	model, err := sadl.ParseFile(path)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
@@ -28,6 +27,6 @@ func main() {
 	if *pFormat {
 		fmt.Println(sadl.Decompile(model))
 	} else {
-		fmt.Println(parse.Pretty(model))
+		fmt.Println(sadl.Pretty(model))
 	}
 }
