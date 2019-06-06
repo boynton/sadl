@@ -1,29 +1,27 @@
-package parse
+package sadl
 
 import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
-
-	"github.com/boynton/sadl"
 )
 
 //
-// import "github.com/boynton/sadl/parse"
+// import "github.com/boynton/sadl"
 // ...
-// model, err :- parse.File("/some/path")
+// model, err := sadl.ParseFile("/some/path")
 //
-func File(path string, extensions ...Extension) (*sadl.Model, error) {
+func ParseFile(path string, extensions ...Extension) (*Model, error) {
 	return parseFile(path, extensions)
 }
 
 //
-// import "github.com/boynton/sadl/parse"
+// import "github.com/boynton/sadl"
 // ...
-// model, err :- parse.String("...")
+// model, err := sadl.ParseString("...")
 //
-func String(src string, extensions ...Extension) (*sadl.Model, error) {
+func ParseString(src string, extensions ...Extension) (*Model, error) {
 	return parseString(src, extensions)
 }
 
@@ -33,8 +31,8 @@ type Parser struct {
 	path           string
 	source         string
 	scanner        *Scanner
-	model          *sadl.Model
-	schema         *sadl.Schema
+	model          *Model
+	schema         *Schema
 	lastToken      *Token
 	prevLastToken  *Token
 	ungottenToken  *Token
@@ -49,7 +47,7 @@ type Extension interface {
 	Validate(p *Parser) error
 }
 
-func parseFile(path string, extensions []Extension) (*sadl.Model, error) {
+func parseFile(path string, extensions []Extension) (*Model, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -63,7 +61,7 @@ func parseFile(path string, extensions []Extension) (*sadl.Model, error) {
 	return p.Parse(extensions)
 }
 
-func parseString(src string, extensions []Extension) (*sadl.Model, error) {
+func parseString(src string, extensions []Extension) (*Model, error) {
 	p := &Parser{
 		scanner: NewScanner(strings.NewReader(src)),
 		source:  src,
@@ -75,7 +73,7 @@ func (p *Parser) CurrentComment() string {
 	return p.currentComment
 }
 
-func (p *Parser) Model() *sadl.Model {
+func (p *Parser) Model() *Model {
 	return p.model
 }
 
@@ -118,15 +116,15 @@ func (p *Parser) Source() string {
 	return source
 }
 
-func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
+func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 	for _, ext := range extensions {
 		err := p.registerExtension(ext)
 		if err != nil {
 			return nil, err
 		}
 	}
-	p.schema = &sadl.Schema{
-		Types: make([]*sadl.TypeDef, 0),
+	p.schema = &Schema{
+		Types: make([]*TypeDef, 0),
 	}
 	if p.schema.Name == "" {
 		p.schema.Name = BaseFileName(p.path)
@@ -184,7 +182,7 @@ func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
 		}
 	}
 	var err error
-	p.model, err = sadl.NewModel(p.schema)
+	p.model, err = NewModel(p.schema)
 	p.schema = nil
 	if err != nil {
 		return nil, err
@@ -296,7 +294,7 @@ func (p *Parser) parseActionDirective(comment string) error {
 		return err
 	}
 	comment, err = p.EndOfStatement(comment)
-	action := &sadl.ActionDef{
+	action := &ActionDef{
 		Name:        name,
 		Input:       input,
 		Output:      output,
@@ -345,7 +343,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	op := &sadl.HttpDef{
+	op := &HttpDef{
 		Method:      method,
 		Path:        pathTemplate,
 		Name:        options.Action,
@@ -378,7 +376,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error {
+func (p *Parser) parseHttpSpec(op *HttpDef, comment string, top bool) error {
 	pathTemplate := op.Path
 	ename, err := p.ExpectIdentifier()
 	if err != nil {
@@ -409,8 +407,8 @@ func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error
 		return err
 	}
 	comment, err = p.EndOfStatement(comment)
-	spec := &sadl.HttpParamSpec{
-		StructFieldDef: sadl.StructFieldDef{
+	spec := &HttpParamSpec{
+		StructFieldDef: StructFieldDef{
 			Name:        ename,
 			Annotations: options.Annotations,
 			Comment:     comment,
@@ -443,7 +441,7 @@ func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error
 	return nil
 }
 
-func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
+func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 	if op.Expected != nil {
 		return p.Error("Only a single 'expect' directive is allowed per HTTP action")
 	}
@@ -455,7 +453,7 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	if err != nil {
 		return err
 	}
-	op.Expected = &sadl.HttpExpectedSpec{
+	op.Expected = &HttpExpectedSpec{
 		Status:      estatus,
 		Annotations: options.Annotations,
 	}
@@ -484,7 +482,7 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	return err
 }
 
-func (p *Parser) parseHttpExceptionSpec(op *sadl.HttpDef, comment string) error {
+func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
 	estatus, err := p.expectInt32()
 	if err != nil {
 		return err
@@ -497,7 +495,7 @@ func (p *Parser) parseHttpExceptionSpec(op *sadl.HttpDef, comment string) error 
 	if err != nil {
 		return err
 	}
-	exc := &sadl.HttpExceptionSpec{
+	exc := &HttpExceptionSpec{
 		Type:        etype,
 		Status:      estatus,
 		Annotations: options.Annotations,
@@ -565,7 +563,7 @@ func (p *Parser) parseExampleDirective(comment string) error {
 	}
 	val, err := p.parseLiteralValue()
 	if err == nil {
-		ex := &sadl.ExampleDef{
+		ex := &ExampleDef{
 			Target:  target,
 			Example: val,
 		}
@@ -584,8 +582,8 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		return err
 	}
 	comment = p.MergeComment(comment, comment2)
-	td := &sadl.TypeDef{
-		TypeSpec: sadl.TypeSpec{
+	td := &TypeDef{
+		TypeSpec: TypeSpec{
 			Type: superName,
 		},
 		Name:    typeName,
@@ -630,7 +628,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string, error) {
+func (p *Parser) ParseTypeSpec(comment string) (*TypeSpec, *Options, string, error) {
 	tsType, tsParams, tsFields, tsElements, options, tsComment, err := p.ParseTypeSpecElements()
 	if err != nil {
 		return nil, nil, "", err
@@ -654,7 +652,7 @@ func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string
 	if err != nil {
 		return nil, nil, "", err
 	}
-	ts := &sadl.TypeSpec{
+	ts := &TypeSpec{
 		Type:     tsType,
 		Items:    tsItems,
 		Keys:     tsKeys,
@@ -666,7 +664,7 @@ func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string
 	return ts, options, comment, nil
 }
 
-func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
+func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, []*EnumElementDef, *Options, string, error) {
 	options := &Options{}
 	typeName, err := p.ExpectIdentifier()
 	if err != nil {
@@ -723,7 +721,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 			comment := p.ParseTrailingComment("")
 			switch typeName {
 			case "Struct":
-				var fields []*sadl.StructFieldDef
+				var fields []*StructFieldDef
 				tok := p.GetToken()
 				if tok == nil {
 					return typeName, nil, fields, nil, options, comment, p.SyntaxError()
@@ -745,7 +743,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 				p.UngetToken() //the closing brace
 				return typeName, nil, fields, nil, options, comment, nil
 			case "Enum":
-				var elements []*sadl.EnumElementDef
+				var elements []*EnumElementDef
 				tok := p.GetToken()
 				if tok == nil {
 					return typeName, nil, nil, nil, options, comment, p.SyntaxError()
@@ -774,7 +772,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 	return typeName, nil, nil, nil, options, "", nil
 }
 
-func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
+func (p *Parser) parseAnyDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -782,7 +780,7 @@ func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseBoolDef(td *sadl.TypeDef) error {
+func (p *Parser) parseBoolDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -790,7 +788,7 @@ func (p *Parser) parseBoolDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseNumberDef(td *sadl.TypeDef) error {
+func (p *Parser) parseNumberDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "min", "max")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -798,7 +796,7 @@ func (p *Parser) parseNumberDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseBytesDef(td *sadl.TypeDef) error {
+func (p *Parser) parseBytesDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "minsize", "maxsize")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -806,7 +804,7 @@ func (p *Parser) parseBytesDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseStringDef(td *sadl.TypeDef) error {
+func (p *Parser) parseStringDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "minsize", "maxsize", "pattern", "values", "reference")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -814,7 +812,7 @@ func (p *Parser) parseStringDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseTimestampDef(td *sadl.TypeDef) error {
+func (p *Parser) parseTimestampDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -822,7 +820,7 @@ func (p *Parser) parseTimestampDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseUUIDDef(td *sadl.TypeDef) error {
+func (p *Parser) parseUUIDDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "reference")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -830,7 +828,7 @@ func (p *Parser) parseUUIDDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseQuantityDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseQuantityDef(td *TypeDef, params []string) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Value, td.Unit, err = p.quantityParams(params)
@@ -841,7 +839,7 @@ func (p *Parser) parseQuantityDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseArrayDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseArrayDef(td *TypeDef, params []string) error {
 	var err error
 	td.Items, err = p.arrayParams(params)
 	if err == nil {
@@ -853,7 +851,7 @@ func (p *Parser) parseArrayDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseMapDef(td *TypeDef, params []string) error {
 	var err error
 	td.Keys, td.Items, err = p.mapParams(params)
 	if err == nil {
@@ -865,7 +863,7 @@ func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef) error {
+func (p *Parser) parseStructDef(td *TypeDef, fields []*StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Fields = fields
@@ -873,12 +871,12 @@ func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef)
 	return err
 }
 
-func (p *Parser) parseEnumDef(td *sadl.TypeDef, elements []*sadl.EnumElementDef) error {
+func (p *Parser) parseEnumDef(td *TypeDef, elements []*EnumElementDef) error {
 	td.Elements = elements
 	return nil
 }
 
-func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseUnionDef(td *TypeDef, params []string) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Variants = params
@@ -1028,18 +1026,18 @@ func (p *Parser) expectEqualsInt64() (*int64, error) {
 	return &val, nil
 }
 
-func (p *Parser) expectNumber() (*sadl.Decimal, error) {
+func (p *Parser) expectNumber() (*Decimal, error) {
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
 	if tok.IsNumeric() {
-		return sadl.ParseDecimal(tok.Text)
+		return ParseDecimal(tok.Text)
 	}
 	return nil, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
 
-func (p *Parser) expectEqualsNumber() (*sadl.Decimal, error) {
+func (p *Parser) expectEqualsNumber() (*Decimal, error) {
 	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
@@ -1069,7 +1067,7 @@ func containsOption(options []string, option string) bool {
 	return false
 }
 
-func (p *Parser) parseTypeOptions(td *sadl.TypeDef, acceptable ...string) error {
+func (p *Parser) parseTypeOptions(td *TypeDef, acceptable ...string) error {
 	options, err := p.ParseOptions(td.Type, acceptable)
 	if err == nil {
 		td.Pattern = options.Pattern
@@ -1091,8 +1089,8 @@ type Options struct {
 	Values      []string
 	MinSize     *int64
 	MaxSize     *int64
-	Min         *sadl.Decimal
-	Max         *sadl.Decimal
+	Min         *Decimal
+	Max         *Decimal
 	Action      string
 	Header      string
 	Reference   string
@@ -1231,7 +1229,7 @@ func (p *Parser) parseExtendedOption(annos map[string]string, anno string) (map[
 	return annos, err
 }
 
-func (p *Parser) parseBytesOptions(typedef *sadl.TypeDef) error {
+func (p *Parser) parseBytesOptions(typedef *TypeDef) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.SyntaxError()
@@ -1261,7 +1259,7 @@ func (p *Parser) parseBytesOptions(typedef *sadl.TypeDef) error {
 				if expected == "" {
 					return p.SyntaxError()
 				}
-				val, err := sadl.ParseDecimal(tok.Text)
+				val, err := ParseDecimal(tok.Text)
 				if err != nil {
 					return err
 				}
@@ -1319,7 +1317,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	return values, nil
 }
 
-func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
+func (p *Parser) parseEnumElementDef() (*EnumElementDef, error) {
 	comment := ""
 	sym := ""
 	var err error
@@ -1347,7 +1345,7 @@ func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
 		return nil, err
 	}
 	comment = p.ParseTrailingComment(comment)
-	return &sadl.EnumElementDef{
+	return &EnumElementDef{
 		Symbol:      sym,
 		Comment:     comment,
 		Annotations: options.Annotations,
@@ -1366,7 +1364,7 @@ func (p *Parser) expectNewline() error {
 	return nil
 }
 
-func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
+func (p *Parser) parseStructFieldDef() (*StructFieldDef, error) {
 	var comment string
 	tok := p.GetToken()
 	if tok == nil {
@@ -1400,7 +1398,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 		return nil, err
 	}
 	comment = p.MergeComment(comment, fcomment)
-	field := &sadl.StructFieldDef{
+	field := &StructFieldDef{
 		Name:     fname,
 		Comment:  comment,
 		TypeSpec: *ts,
@@ -1423,7 +1421,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 	return field, nil
 }
 
-func (p *Parser) parseStructFieldOptions(field *sadl.StructFieldDef) error {
+func (p *Parser) parseStructFieldOptions(field *StructFieldDef) error {
 	var acceptable []string
 	switch field.Type {
 	case "String":
@@ -1508,7 +1506,7 @@ func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 }
 
 func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
-	num, err := sadl.ParseDecimal(tok.Text)
+	num, err := ParseDecimal(tok.Text)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
 	}
@@ -1581,7 +1579,7 @@ func (p *Parser) arrayParams(params []string) (string, error) {
 	return items, nil
 }
 
-func (p *Parser) parseCollectionOptions(typedef *sadl.TypeDef) error {
+func (p *Parser) parseCollectionOptions(typedef *TypeDef) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.SyntaxError()
@@ -1708,7 +1706,7 @@ func (p *Parser) MergeComment(comment1 string, comment2 string) string {
 	return strings.TrimSpace(comment1) + " " + strings.TrimSpace(comment2)
 }
 
-func (p *Parser) Validate() (*sadl.Model, error) {
+func (p *Parser) Validate() (*Model, error) {
 	var err error
 	for _, td := range p.model.Types {
 		switch td.Type {
@@ -1756,7 +1754,7 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 	return p.model, err
 }
 
-func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
+func (p *Parser) validateExample(ex *ExampleDef) error {
 	lst := strings.Split(ex.Target, ".")
 	theType := lst[0]
 	t := p.model.FindType(theType)
@@ -1770,7 +1768,7 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, &t.TypeSpec, ex.Example)
 }
 
-func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
+func (p *Parser) validateHttp(hact *HttpDef) error {
 	needsBody := hact.Method == "POST" || hact.Method == "PUT"
 	bodyParam := ""
 	for _, in := range hact.Inputs {
@@ -1789,7 +1787,7 @@ func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
 	return nil
 }
 
-func (p *Parser) validateAction(action *sadl.ActionDef) error {
+func (p *Parser) validateAction(action *ActionDef) error {
 	if action.Input != "" {
 		t := p.model.FindType(action.Input)
 		if t == nil {
@@ -1811,7 +1809,7 @@ func (p *Parser) validateAction(action *sadl.ActionDef) error {
 	return nil
 }
 
-func (p *Parser) validateStringDef(td *sadl.TypeDef) error {
+func (p *Parser) validateStringDef(td *TypeDef) error {
 	if td.Pattern != "" {
 		if td.Values != nil {
 			return fmt.Errorf("Both 'pattern' and 'values' options cannot coexist in String type %s", td.Name)
@@ -1848,7 +1846,7 @@ func (p *Parser) validateStringDef(td *sadl.TypeDef) error {
 	return p.validateReference(td)
 }
 
-func (p *Parser) validateReference(td *sadl.TypeDef) error {
+func (p *Parser) validateReference(td *TypeDef) error {
 	if td.Reference != "" {
 		t := p.model.FindType(td.Reference)
 		if t == nil {
@@ -1858,7 +1856,7 @@ func (p *Parser) validateReference(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateQuantity(td *sadl.TypeDef) error {
+func (p *Parser) validateQuantity(td *TypeDef) error {
 	vt := p.model.FindType(td.Value)
 	if vt == nil {
 		return fmt.Errorf("Undefined type '%s' for %s quantity type", td.Value, td.Name)
@@ -1876,7 +1874,7 @@ func (p *Parser) validateQuantity(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateStruct(td *sadl.TypeDef) error {
+func (p *Parser) validateStruct(td *TypeDef) error {
 	model := p.model
 	for _, field := range td.Fields {
 		ftd := model.FindType(field.Type)
@@ -1899,7 +1897,7 @@ func (p *Parser) validateStruct(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateArray(td *sadl.TypeDef) error {
+func (p *Parser) validateArray(td *TypeDef) error {
 	model := p.model
 	if td.Items == "Any" {
 		return nil
@@ -1911,7 +1909,7 @@ func (p *Parser) validateArray(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateMap(td *sadl.TypeDef) error {
+func (p *Parser) validateMap(td *TypeDef) error {
 	model := p.model
 	if td.Items == "Any" {
 		return nil

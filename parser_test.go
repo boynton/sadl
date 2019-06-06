@@ -1,4 +1,4 @@
-package parse
+package sadl
 
 import (
 	"fmt"
@@ -164,7 +164,7 @@ type Bar Int32
 	}
 }
 
-func TestQuantity(test *testing.T) {
+func TestParseQuantity(test *testing.T) {
 	v, err := parseString(`type Money Quantity<Decimal,String>`, nil)
 	if err != nil {
 		test.Errorf("%v", err)

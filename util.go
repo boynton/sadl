@@ -1,12 +1,12 @@
-package parse
+package sadl
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/boynton/sadl"
 )
 
 var Verbose bool
@@ -26,7 +26,14 @@ func str(arg interface{}) string {
 }
 
 func Pretty(obj interface{}) string {
-	return sadl.Pretty(obj)
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(&obj); err != nil {
+		return fmt.Sprint(obj)
+	}
+	return string(buf.String())
 }
 
 func BaseFileName(path string) string {

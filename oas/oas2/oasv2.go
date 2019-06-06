@@ -1,43 +1,43 @@
 package oas2
 
-import(
+import (
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/importers/oas/oas3"
+	"github.com/boynton/sadl/oas/oas3"
+	"github.com/ghodss/yaml"
 )
 
 type OpenAPI struct {
-	Extensions          map[string]interface{} `json:"-"`
-	ID                  string                 `json:"id,omitempty"`
-	Consumes            []string               `json:"consumes,omitempty"`
-	Produces            []string               `json:"produces,omitempty"`
-	Schemes             []string               `json:"schemes,omitempty"`
-	Swagger             string                 `json:"swagger,omitempty"`
-	Info                *Info                  `json:"info,omitempty"`
-	Host                string                 `json:"host,omitempty"`
-	BasePath            string                 `json:"basePath,omitempty"`
-	Paths        map[string]*PathItem    `json:"paths,omitempty"`
-	Definitions         map[string]*Schema            `json:"definitions,omitempty"`
-	Parameters          map[string]*Parameter   `json:"parameters,omitempty"`
-	Responses           map[string]*Response    `json:"responses,omitempty"`
+	Extensions          map[string]interface{}     `json:"-"`
+	ID                  string                     `json:"id,omitempty"`
+	Consumes            []string                   `json:"consumes,omitempty"`
+	Produces            []string                   `json:"produces,omitempty"`
+	Schemes             []string                   `json:"schemes,omitempty"`
+	Swagger             string                     `json:"swagger,omitempty"`
+	Info                *Info                      `json:"info,omitempty"`
+	Host                string                     `json:"host,omitempty"`
+	BasePath            string                     `json:"basePath,omitempty"`
+	Paths               map[string]*PathItem       `json:"paths,omitempty"`
+	Definitions         map[string]*Schema         `json:"definitions,omitempty"`
+	Parameters          map[string]*Parameter      `json:"parameters,omitempty"`
+	Responses           map[string]*Response       `json:"responses,omitempty"`
 	SecurityDefinitions map[string]*SecurityScheme `json:"securityDefinitions,omitempty"`
-	Security            []map[string][]string  `json:"security,omitempty"`
-	Tags                []Tag                  `json:"tags,omitempty"`
-	ExternalDocs        *ExternalDocumentation `json:"externalDocs,omitempty"`
+	Security            []map[string][]string      `json:"security,omitempty"`
+	Tags                []Tag                      `json:"tags,omitempty"`
+	ExternalDocs        *ExternalDocumentation     `json:"externalDocs,omitempty"`
 }
 
 type Info struct {
-	Extensions map[string]interface{} `json:"-"`
-	Title          string       `json:"title,omitempty"`
-	Description    string       `json:"description,omitempty"`
-	TermsOfService string       `json:"termsOfService,omitempty"`
-	Contact        *ContactInfo `json:"contact,omitempty"`
-	License        *License     `json:"license,omitempty"`
-	Version        string       `json:"version,omitempty"`
+	Extensions     map[string]interface{} `json:"-"`
+	Title          string                 `json:"title,omitempty"`
+	Description    string                 `json:"description,omitempty"`
+	TermsOfService string                 `json:"termsOfService,omitempty"`
+	Contact        *ContactInfo           `json:"contact,omitempty"`
+	License        *License               `json:"license,omitempty"`
+	Version        string                 `json:"version,omitempty"`
 }
 
 type ContactInfo struct {
@@ -53,18 +53,18 @@ type License struct {
 
 type PathItem struct {
 	Extensions map[string]interface{} `json:"-"`
-	Get        *Operation  `json:"get,omitempty"`
-	Put        *Operation  `json:"put,omitempty"`
-	Post       *Operation  `json:"post,omitempty"`
-	Delete     *Operation  `json:"delete,omitempty"`
-	Options    *Operation  `json:"options,omitempty"`
-	Head       *Operation  `json:"head,omitempty"`
-	Patch      *Operation  `json:"patch,omitempty"`
-	Parameters []Parameter `json:"parameters,omitempty"`
+	Get        *Operation             `json:"get,omitempty"`
+	Put        *Operation             `json:"put,omitempty"`
+	Post       *Operation             `json:"post,omitempty"`
+	Delete     *Operation             `json:"delete,omitempty"`
+	Options    *Operation             `json:"options,omitempty"`
+	Head       *Operation             `json:"head,omitempty"`
+	Patch      *Operation             `json:"patch,omitempty"`
+	Parameters []Parameter            `json:"parameters,omitempty"`
 }
 
 type Operation struct {
-	Extensions map[string]interface{} `json:"-"`
+	Extensions   map[string]interface{} `json:"-"`
 	Description  string                 `json:"description,omitempty"`
 	Consumes     []string               `json:"consumes,omitempty"`
 	Produces     []string               `json:"produces,omitempty"`
@@ -85,16 +85,17 @@ type ExternalDocumentation struct {
 }
 
 type Parameter struct {
-	Extensions map[string]interface{} `json:"-"`
-	Description     string  `json:"description,omitempty"`
-	Name            string  `json:"name,omitempty"`
-	In              string  `json:"in,omitempty"`
-	Required        bool    `json:"required,omitempty"`
-	Schema          *Schema `json:"schema,omitempty"`
-	AllowEmptyValue bool    `json:"allowEmptyValue,omitempty"`
+	Extensions      map[string]interface{} `json:"-"`
+	Description     string                 `json:"description,omitempty"`
+	Name            string                 `json:"name,omitempty"`
+	In              string                 `json:"in,omitempty"`
+	Required        bool                   `json:"required,omitempty"`
+	Schema          *Schema                `json:"schema,omitempty"`
+	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"`
 }
 
 type StringOrArray []string
+
 func (s *StringOrArray) UnmarshalJSON(data []byte) error {
 	var first byte
 	if len(data) > 1 {
@@ -130,6 +131,7 @@ type SchemaOrArray struct {
 	Schema  *Schema
 	Schemas []Schema
 }
+
 func (s *SchemaOrArray) UnmarshalJSON(data []byte) error {
 	var nw SchemaOrArray
 	var first byte
@@ -156,6 +158,7 @@ type SchemaOrStringArray struct {
 	Schema   *Schema
 	Property []string
 }
+
 func (s *SchemaOrStringArray) UnmarshalJSON(data []byte) error {
 	var first byte
 	if len(data) > 1 {
@@ -182,6 +185,7 @@ type SchemaOrBool struct {
 	Allows bool
 	Schema *Schema
 }
+
 func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
 	var nw SchemaOrBool
 	if len(data) >= 4 {
@@ -201,57 +205,57 @@ func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
 type Dependencies map[string]SchemaOrStringArray
 
 type Schema struct {
-	Extensions map[string]interface{} `json:"-"`
-	ID                   string            `json:"id,omitempty"`
-	Ref                  string               `json:"$ref,omitempty"`
-	Schema               string         `json:"-"` //{"$schema": string(r)} //FIXME
-	Description          string            `json:"description,omitempty"`
-	Type                 StringOrArray     `json:"type,omitempty"`
-	Format               string            `json:"format,omitempty"`
-	Title                string            `json:"title,omitempty"`
-	Default              interface{}       `json:"default,omitempty"`
-	Maximum              *float64          `json:"maximum,omitempty"`
-	ExclusiveMaximum     bool              `json:"exclusiveMaximum,omitempty"`
-	Minimum              *float64          `json:"minimum,omitempty"`
-	ExclusiveMinimum     bool              `json:"exclusiveMinimum,omitempty"`
-	MaxLength            *int64            `json:"maxLength,omitempty"`
-	MinLength            *int64            `json:"minLength,omitempty"`
-	Pattern              string            `json:"pattern,omitempty"`
-	MaxItems             *int64            `json:"maxItems,omitempty"`
-	MinItems             *int64            `json:"minItems,omitempty"`
-	UniqueItems          bool              `json:"uniqueItems,omitempty"`
-	MultipleOf           *float64          `json:"multipleOf,omitempty"`
-	Enum                 []interface{}     `json:"enum,omitempty"`
-	MaxProperties        *int64            `json:"maxProperties,omitempty"`
-	MinProperties        *int64            `json:"minProperties,omitempty"`
-	Required             []string          `json:"required,omitempty"`
-	Items                *SchemaOrArray    `json:"items,omitempty"`
-	AllOf                []*Schema          `json:"allOf,omitempty"`
-	OneOf                []*Schema          `json:"oneOf,omitempty"`
-	AnyOf                []*Schema          `json:"anyOf,omitempty"`
-	Not                  *Schema           `json:"not,omitempty"`
-	Properties           map[string]*Schema `json:"properties,omitempty"`
-	AdditionalProperties *SchemaOrBool     `json:"additionalProperties,omitempty"`
-	PatternProperties    map[string]*Schema `json:"patternProperties,omitempty"`
-	Dependencies         Dependencies      `json:"dependencies,omitempty"`
-	AdditionalItems      *SchemaOrBool     `json:"additionalItems,omitempty"`
-	Definitions          map[string]*Schema       `json:"definitions,omitempty"`
-	Discriminator string                 `json:"discriminator,omitempty"` //swagger extension
-	ReadOnly      bool                   `json:"readOnly,omitempty"` //swagger extension
-	XML           *XMLObject             `json:"xml,omitempty"` //swagger extension
-	ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitempty"` //swagger extension
-	Example       interface{}            `json:"example,omitempty"` //swagger extension
+	Extensions           map[string]interface{} `json:"-"`
+	ID                   string                 `json:"id,omitempty"`
+	Ref                  string                 `json:"$ref,omitempty"`
+	Schema               string                 `json:"-"` //{"$schema": string(r)} //FIXME
+	Description          string                 `json:"description,omitempty"`
+	Type                 StringOrArray          `json:"type,omitempty"`
+	Format               string                 `json:"format,omitempty"`
+	Title                string                 `json:"title,omitempty"`
+	Default              interface{}            `json:"default,omitempty"`
+	Maximum              *float64               `json:"maximum,omitempty"`
+	ExclusiveMaximum     bool                   `json:"exclusiveMaximum,omitempty"`
+	Minimum              *float64               `json:"minimum,omitempty"`
+	ExclusiveMinimum     bool                   `json:"exclusiveMinimum,omitempty"`
+	MaxLength            *int64                 `json:"maxLength,omitempty"`
+	MinLength            *int64                 `json:"minLength,omitempty"`
+	Pattern              string                 `json:"pattern,omitempty"`
+	MaxItems             *int64                 `json:"maxItems,omitempty"`
+	MinItems             *int64                 `json:"minItems,omitempty"`
+	UniqueItems          bool                   `json:"uniqueItems,omitempty"`
+	MultipleOf           *float64               `json:"multipleOf,omitempty"`
+	Enum                 []interface{}          `json:"enum,omitempty"`
+	MaxProperties        *int64                 `json:"maxProperties,omitempty"`
+	MinProperties        *int64                 `json:"minProperties,omitempty"`
+	Required             []string               `json:"required,omitempty"`
+	Items                *SchemaOrArray         `json:"items,omitempty"`
+	AllOf                []*Schema              `json:"allOf,omitempty"`
+	OneOf                []*Schema              `json:"oneOf,omitempty"`
+	AnyOf                []*Schema              `json:"anyOf,omitempty"`
+	Not                  *Schema                `json:"not,omitempty"`
+	Properties           map[string]*Schema     `json:"properties,omitempty"`
+	AdditionalProperties *SchemaOrBool          `json:"additionalProperties,omitempty"`
+	PatternProperties    map[string]*Schema     `json:"patternProperties,omitempty"`
+	Dependencies         Dependencies           `json:"dependencies,omitempty"`
+	AdditionalItems      *SchemaOrBool          `json:"additionalItems,omitempty"`
+	Definitions          map[string]*Schema     `json:"definitions,omitempty"`
+	Discriminator        string                 `json:"discriminator,omitempty"` //swagger extension
+	ReadOnly             bool                   `json:"readOnly,omitempty"`      //swagger extension
+	XML                  *XMLObject             `json:"xml,omitempty"`           //swagger extension
+	ExternalDocs         *ExternalDocumentation `json:"externalDocs,omitempty"`  //swagger extension
+	Example              interface{}            `json:"example,omitempty"`       //swagger extension
 }
 
 type Responses struct {
-	Extensions map[string]interface{} `json:"-"`
+	Extensions          map[string]interface{} `json:"-"`
 	Default             *Response
 	StatusCodeResponses map[int]Response
 }
 
 type Response struct {
-	Extensions map[string]interface{} `json:"-"`
-	Ref                  string               `json:"$ref,omitempty"`
+	Extensions  map[string]interface{} `json:"-"`
+	Ref         string                 `json:"$ref,omitempty"`
 	Description string                 `json:"description,omitempty"`
 	Schema      *Schema                `json:"schema,omitempty"`
 	Headers     map[string]Header      `json:"headers,omitempty"`
@@ -262,7 +266,6 @@ type Header struct {
 	CommonValidations
 	SimpleSchema
 	Description string `json:"description,omitempty"`
-
 }
 
 type SimpleSchema struct {
@@ -291,7 +294,7 @@ type CommonValidations struct {
 
 type Items struct {
 	Extensions map[string]interface{} `json:"-"`
-	Ref                  string               `json:"$ref,omitempty"`
+	Ref        string                 `json:"$ref,omitempty"`
 	CommonValidations
 	SimpleSchema
 }
@@ -299,7 +302,7 @@ type Items struct {
 type SecurityScheme interface{} //fixme
 
 type Tag struct {
-	Extensions map[string]interface{} `json:"-"`
+	Extensions   map[string]interface{} `json:"-"`
 	Description  string                 `json:"description,omitempty"`
 	Name         string                 `json:"name,omitempty"`
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
@@ -321,8 +324,7 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 	fmt.Println(sadl.Pretty(v2))
 	v3 := &oas3.OpenAPI{
-		Components: &oas3.Components{
-		},
+		Components: &oas3.Components{},
 	}
 	v3.Components.Schemas = make(map[string]*oas3.Schema, 0)
 	for name, val := range v2.Definitions {
@@ -352,7 +354,7 @@ func convertPath(v2Path *PathItem) (*oas3.PathItem, error) {
 
 func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 	var err error
-//	fmt.Println("v2 type:", xname, sadl.Pretty(v2))
+	//	fmt.Println("v2 type:", xname, sadl.Pretty(v2))
 	v3 := &oas3.Schema{
 		Description: v2.Description,
 	}
@@ -400,17 +402,16 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 			panic("here")
 		}
 	}
-//	fmt.Println("--------->", sadl.Pretty(v3))
+	//	fmt.Println("--------->", sadl.Pretty(v3))
 	return v3, nil
 }
-
 
 /*
 //	v3, err := openapi2conv.ToV3Swagger(v2)
 	if err != nil {
 		return nil, err
 	}
-	
+
    for _, oasSchema := range v3.Components.Schemas {
 		fixV2SchemaRef(oasSchema)
 	}
