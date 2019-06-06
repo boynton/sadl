@@ -7,7 +7,7 @@ import(
 
 	"github.com/ghodss/yaml"
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/oas/oas3"
+	"github.com/boynton/sadl/importers/oas/oas3"
 )
 
 type OpenAPI struct {

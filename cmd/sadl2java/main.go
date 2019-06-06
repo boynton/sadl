@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/boynton/sadl/gen/java"
+	"github.com/boynton/sadl/exporters/java"
 	"github.com/boynton/sadl/parse"
 )
 

@@ -5,7 +5,7 @@ dbg: bin/sadl
 	./bin/sadl examples/crudl.sadl
 
 
-all:: bin/sadl bin/sadl2java bin/sadl2go
+all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl
 
 install:: all
 	cp -p bin/* $(HOME)/bin/

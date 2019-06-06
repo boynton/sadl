@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/boynton/sadl/gen/sadl"
 	"github.com/boynton/sadl/parse"
+	"github.com/boynton/sadl/exporters/sadl"
 )
 
 func main() {

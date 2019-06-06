@@ -1,6 +1,6 @@
-package gen
+package exporters
 
-import(
+import (
 	"bufio"
 	"bytes"
 	"fmt"
@@ -12,12 +12,12 @@ import(
 )
 
 type Generator struct {
-	Model *sadl.Model
+	Model  *sadl.Model
 	OutDir string
-	Err error
-	buf bytes.Buffer
-	file     *os.File
-	writer   *bufio.Writer
+	Err    error
+	buf    bytes.Buffer
+	file   *os.File
+	writer *bufio.Writer
 }
 
 func (gen *Generator) Emit(s string) {
@@ -61,7 +61,7 @@ func (gen *Generator) WriteFile(path string, content string) {
 
 func (gen *Generator) EmitTemplate(name string, tmplSource string, data interface{}, funcMap template.FuncMap) {
 	if gen.Err != nil {
-		fmt.Println("emitTemplate(" + name + "): already have an error, do not continue:", gen.Err)
+		fmt.Println("emitTemplate("+name+"): already have an error, do not continue:", gen.Err)
 		return
 	}
 	var b bytes.Buffer

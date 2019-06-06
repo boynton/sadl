@@ -1,25 +1,25 @@
 package sadl
 
-import(
+import (
 	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/gen"
+	"github.com/boynton/sadl/exporters"
 )
 
 const indentAmount = "   "
 
 type Generator struct {
-	gen.Generator
+	exporters.Generator
 }
 
 func NewGenerator(model *sadl.Model, outdir string) *Generator {
 	gen := &Generator{
-		Generator: gen.Generator{
-			Model: model,
+		Generator: exporters.Generator{
+			Model:  model,
 			OutDir: outdir,
 		},
 	}
@@ -36,12 +36,12 @@ func Decompile(model *sadl.Model) string {
 }
 
 func (g *Generator) Generate() string {
-   funcMap := template.FuncMap{
-      "blockComment": func(s string) string {
+	funcMap := template.FuncMap{
+		"blockComment": func(s string) string {
 			if s == "" {
 				return ""
 			}
-			return g.FormatComment("",  s, 100, true)
+			return g.FormatComment("", s, 100, true)
 		},
 		"annotations": func(annos map[string]string) string {
 			s := ""
@@ -91,7 +91,7 @@ func (g *Generator) CreateSadlSource() {
 	if g.OutDir == "" {
 		fmt.Println(sadlSource)
 	} else {
-		path := filepath.Join(g.OutDir, g.Model.Name + ".sadl")
+		path := filepath.Join(g.OutDir, g.Model.Name+".sadl")
 		g.WriteFile(path, sadlSource)
 	}
 }
@@ -160,7 +160,7 @@ func (g *Generator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string
 				bcom := ""
 				if fd.Comment != "" {
 					if len(fd.Comment) > 100 {
-						bcom = g.FormatComment("   ",  fd.Comment, 100, false)
+						bcom = g.FormatComment("   ", fd.Comment, 100, false)
 					} else {
 						com = " // " + fd.Comment
 					}
@@ -172,7 +172,7 @@ func (g *Generator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string
 				for aname, aval := range fd.Annotations {
 					fopts = append(fopts, fmt.Sprintf("%s=%q", aname, aval))
 				}
-				s += fmt.Sprintf("%s   %s %s%s\n", bcom, fd.Name, g.sadlTypeSpec(&fd.TypeSpec, fopts, indent + indentAmount), com)
+				s += fmt.Sprintf("%s   %s %s%s\n", bcom, fd.Name, g.sadlTypeSpec(&fd.TypeSpec, fopts, indent+indentAmount), com)
 			}
 			return s + "}"
 		}
@@ -191,7 +191,7 @@ func (g *Generator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string
 func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
 	var opts []string
 	if hact.Name != "" {
-		opts = append(opts, "action=" + hact.Name)
+		opts = append(opts, "action="+hact.Name)
 	}
 	opt := ""
 	if len(opts) > 0 {
@@ -208,7 +208,7 @@ func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
 		}
 	}
 	if hact.Expected.Comment != "" {
-		bcom = g.FormatComment("   ",  hact.Expected.Comment, 100, false)
+		bcom = g.FormatComment("   ", hact.Expected.Comment, 100, false)
 	}
 	s += fmt.Sprintf("\n%s   expect %d {\n", bcom, hact.Expected.Status)
 	for _, out := range hact.Expected.Outputs {
@@ -220,7 +220,7 @@ func (g *Generator) sadlHttpSpec(hact *sadl.HttpDef) string {
 		for _, exc := range hact.Exceptions {
 			bcom := ""
 			if exc.Comment != "" {
-				bcom = g.FormatComment("   ",  exc.Comment, 100, false)
+				bcom = g.FormatComment("   ", exc.Comment, 100, false)
 			}
 			s += fmt.Sprintf("%s   except %d %s\n", bcom, exc.Status, exc.Type)
 		}
@@ -235,7 +235,7 @@ func (g *Generator) sadlParamSpec(ps *sadl.HttpParamSpec) string {
 		opts = append(opts, "required")
 	}
 	if ps.Default != nil {
-		opts = append(opts, "default=" + sadl.AsString(ps.Default))
+		opts = append(opts, "default="+sadl.AsString(ps.Default))
 	}
 	if ps.Header != "" {
 		opts = append(opts, fmt.Sprintf("header=%q", ps.Header))
@@ -248,7 +248,7 @@ func (g *Generator) sadlParamSpec(ps *sadl.HttpParamSpec) string {
 	bcom := ""
 	if ps.Comment != "" {
 		if len(ps.Comment) > 100 {
-			bcom = g.FormatComment("   ",  ps.Comment, 100, false)[3:] + "   "
+			bcom = g.FormatComment("   ", ps.Comment, 100, false)[3:] + "   "
 		} else {
 			com = " // " + ps.Comment
 		}

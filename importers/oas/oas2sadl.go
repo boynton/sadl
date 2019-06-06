@@ -7,7 +7,7 @@ import(
 	"strconv"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/oas/oas3"
+	"github.com/boynton/sadl/importers/oas/oas3"
 )
 
 var examples []*sadl.ExampleDef
