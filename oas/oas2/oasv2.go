@@ -322,7 +322,7 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 }
 
 func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
-	fmt.Println(sadl.Pretty(v2))
+//	fmt.Println(sadl.Pretty(v2))
 	v3 := &oas3.OpenAPI{
 		Components: &oas3.Components{},
 	}
