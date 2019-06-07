@@ -29,12 +29,12 @@ func main() {
 	format := ""
 	if n >= 0 {
 		name = name[n+1:]
-		n = strings.LastIndex(name, ".")
-		if n >= 0 {
-			format = name[n+1:]
-			name = name[:n]
-			name = strings.Replace(name, ".", "_", -1)
-		}
+	}
+	n = strings.LastIndex(name, ".")
+	if n >= 0 {
+		format = name[n+1:]
+		name = name[:n]
+		name = strings.Replace(name, ".", "_", -1)
 	}
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
