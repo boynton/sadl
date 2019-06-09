@@ -1,4 +1,7 @@
-debug: bin/oas2sadl
+debug::
+	go test -v github.com/boynton/sadl/oas
+
+xdebug: bin/oas2sadl
 	./bin/oas2sadl -d examples/petstore.yaml
 
 dbg: bin/sadl

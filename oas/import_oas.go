@@ -142,6 +142,17 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 		}
 		schema.Annotations["x_server"] = server.URL
 	}
+	if oas.V3.Info.License != nil {
+		if schema.Annotations == nil {
+			schema.Annotations = make(map[string]string, 0)
+		}
+		if oas.V3.Info.License.Name != "" {
+			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
+		}
+		if oas.V3.Info.License.URL != "" {
+			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
+		}
+	}
 
 	schema.Examples = examples
 	return sadl.NewModel(schema)
