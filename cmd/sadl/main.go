@@ -15,9 +15,14 @@ func main() {
 	args := flag.Args()
 	if len(args) != 1 {
 		fmt.Println("usage: sadl [options] file.sadl")
+		fmt.Println("       sadl version")
 		os.Exit(1)
 	}
 	path := args[0]
+	if path == "version" {
+		fmt.Printf("SADL %s\n", sadl.Version)
+		os.Exit(0)
+	}
 	sadl.Verbose = *pVerbose
 	model, err := sadl.ParseFile(path)
 	if err != nil {
