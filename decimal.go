@@ -59,7 +59,7 @@ func NewDecimal(val float64) *Decimal {
 }
 
 func (d *Decimal) String() string {
-	return fmt.Sprint(d)
+	return d.Text('f', -1)
 }
 
 func (d *Decimal) AsInt32() int32 {
