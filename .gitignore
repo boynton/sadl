@@ -7,3 +7,4 @@ _*
 .classpath
 bin
 sadl-mode.el
+*.zip
