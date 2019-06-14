@@ -99,8 +99,8 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	switch ts.Type {
 	case "Struct":
 		gen.CreateStructPojo(ts, className, "")
-	case "Quantity":
-		gen.CreateQuantityPojo(ts, className)
+	case "UnitValue":
+		gen.CreateUnitValuePojo(ts, className)
 	case "Enum":
 		gen.CreateEnumPojo(ts, className)
 	default:
@@ -233,7 +233,7 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 	gen.Emit("}\n")
 }
 
-func (gen *Generator) CreateQuantityPojo(ts *sadl.TypeSpec, className string) {
+func (gen *Generator) CreateUnitValuePojo(ts *sadl.TypeSpec, className string) {
 	gen.AddImport("javax.validation.constraints.NotNull")
 	gen.AddImport("com.fasterxml.jackson.annotation.JsonValue")
 	gen.Emit("public class " + className + " {\n\n")

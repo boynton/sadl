@@ -164,8 +164,8 @@ type Bar Int32
 	}
 }
 
-func TestParseQuantity(test *testing.T) {
-	v, err := parseString(`type Money Quantity<Decimal,String>`, nil)
+func TestParseUnitValue(test *testing.T) {
+	v, err := parseString(`type Money UnitValue<Decimal,String>`, nil)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -218,7 +218,7 @@ type ByteArray Bytes (maxsize=4,minsize=2,x_one,x_two="Hey")
 type NonEmptyString String (minsize=1)
 type DateTime Timestamp
 type Currency String(pattern="^[A-Z][A-Z][A-Z]$")
-type Money Quantity<Decimal,Currency>
+type Money UnitValue<Decimal,Currency>
 type ID UUID
 type List Array
 type StringList Array<String>
@@ -238,7 +238,7 @@ type WeightUnits Enum {
    m
    km
 }
-type Distance Quantity<Decimal,WeightUnits>
+type Distance UnitValue<Decimal,WeightUnits>
 /*type Number Union<Int8,Int16,Int32,Int64,Float32,Float64,Decimal>*/
 `, nil)
 	if err != nil {

@@ -161,11 +161,11 @@ func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
 		}
 		//restrictions
 		return tr, nil
-	case "Quantity":
+	case "UnitValue":
 		tr := &oas3.Schema{
 			Type: "string",
-			//(not standard) Format: "quantity",
-			Description: "Quantity",
+			//(not standard) Format: "unitvalue",
+			Description: "UnitValue",
 		}
 		return tr, nil
 	case "UUID":

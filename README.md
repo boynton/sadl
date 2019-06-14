@@ -16,7 +16,7 @@ descriptions, optimized for simplicity and speed.
 - Bytes - a sequence of 8 bit bytes
 - String - A sequence of Unicode characters.
 - Timestamp - An instant in time, formatted as string per [RFC 3339](http://tools.ietf.org/html/rfc3339) in JSON (i.e. "2019-02-04T01:05:16.565Z")
-- Quantity<Decimal,String> - A tuple of numeric value and String or Enum units the value is measured in. Expressed as a string in JSON (i.e. "100.00 USD")
+- UnitValue<Decimal,String> - A tuple of numeric value and String or Enum units the value is measured in. Expressed as a string in JSON (i.e. "100.00 USD")
 - UUID - a Universally Unique Identifier [RFC 4122](http://tools.ietf.org/html/rfc4122), represented as a string in JSON (i.e. "1ce437b0-1dd2-11b2-81ef-003ee1be85f9")
 - Array<Any> - an ordered collections of values
 - Map<String,Any> - an unordered mapping of keys to values type.

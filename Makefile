@@ -1,13 +1,3 @@
-debug::
-	go test -v github.com/boynton/sadl/oas
-
-xdebug: bin/oas2sadl
-	./bin/oas2sadl -d examples/petstore.yaml
-
-dbg: bin/sadl
-	./bin/sadl examples/crudl.sadl
-
-
 all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl
 
 install:: all
@@ -21,6 +11,7 @@ lib::
 
 test::
 	go test github.com/boynton/sadl
+	go test github.com/boynton/sadl/oas
 
 bin/sadl:: lib
 	mkdir -p bin
@@ -55,6 +46,8 @@ proper::
 	go vet github.com/boynton/sadl/cmd/sadl
 	go fmt github.com/boynton/sadl/cmd/sadl2java
 	go vet github.com/boynton/sadl/cmd/sadl2java
+	go fmt github.com/boynton/sadl/cmd/sadl2go
+	go vet github.com/boynton/sadl/cmd/sadl2go
 	go fmt github.com/boynton/sadl/cmd/oas2sadl
 	go vet github.com/boynton/sadl/cmd/oas2sadl
 

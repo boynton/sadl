@@ -8,7 +8,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func xTestExport(test *testing.T) {
+func TestExport(test *testing.T) {
 	src := `
 name Test1
 version "1.2.3"
@@ -22,7 +22,7 @@ type Foo Struct {
    dub Float64
    dec Decimal
    by Bytes
-   q Quantity
+   q UnitValue
    ts Timestamp
    a Array<String>
    

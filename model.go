@@ -73,8 +73,8 @@ func (model *Model) ValidateAgainstTypeSpec(context string, td *TypeSpec, value 
 		return model.ValidateBool(context, td, value)
 	case "Enum":
 		return model.ValidateEnum(context, td, value)
-	case "Quantity":
-		return model.ValidateQuantity(context, td, value)
+	case "UnitValue":
+		return model.ValidateUnitValue(context, td, value)
 	case "UUID":
 		return model.ValidateUUID(context, td, value)
 	case "Bytes":
@@ -119,7 +119,7 @@ func (model *Model) ValidateUUID(context string, td *TypeSpec, value interface{}
 	return fmt.Errorf("%s: Not valid: %v", context, Pretty(value))
 }
 
-func (model *Model) ValidateQuantity(context string, td *TypeSpec, value interface{}) error {
+func (model *Model) ValidateUnitValue(context string, td *TypeSpec, value interface{}) error {
 	switch sp := value.(type) {
 	case *string:
 		s := *sp

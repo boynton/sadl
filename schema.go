@@ -12,7 +12,7 @@ var BaseTypes = []string{
 	"Bytes",
 	"String",
 	"Timestamp",
-	"Quantity",
+	"UnitValue",
 	"UUID",
 	"Array",
 	"Map",

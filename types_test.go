@@ -120,34 +120,34 @@ func TestLargeDecimal(test *testing.T) {
 	}
 }
 
-func TestQuantity(test *testing.T) {
+func TestUnitValue(test *testing.T) {
 	val := 100.0
 	unit := "USD"
-	q1 := NewQuantity(val, unit)
+	q1 := NewUnitValue(val, unit)
 	jsonData := Pretty(q1)
-	var q *Quantity
+	var q *UnitValue
 	err := decode(jsonData, &q)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
 		if q == nil {
-			test.Errorf("Quantity JSON round trip resulting in no object")
+			test.Errorf("UnitValue JSON round trip resulting in no object")
 		} else if q.Value == nil || q.Value.AsFloat64() != val {
-			test.Errorf("Quantity JSON round trip resulting in quantity value: %v", q.Value)
+			test.Errorf("UnitValue JSON round trip resulting in UnitValue.value: %v", q.Value)
 		} else if q.Unit != unit {
-			test.Errorf("Quantity JSON round trip resulting in quantity unit: %v", q.Unit)
+			test.Errorf("UnitValue JSON round trip resulting in UnitValue.unit: %v", q.Unit)
 		} else {
-			fmt.Println("Valid Quantity:", Pretty(q))
+			fmt.Println("Valid UnitValue:", Pretty(q))
 		}
 	}
 }
 
-func TestBadQuantity(test *testing.T) {
+func TestBadUnitValue(test *testing.T) {
 	jsonData := `100`
-	var q *Quantity
+	var q *UnitValue
 	err := decode(jsonData, &q)
 	if err == nil {
-		test.Errorf("Bad Quantity should have caused an error: %q", jsonData)
+		test.Errorf("Bad UnitValue should have caused an error: %q", jsonData)
 	} else {
 		fmt.Println(err)
 	}

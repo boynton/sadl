@@ -181,7 +181,7 @@ func (gen *GoGenerator) nativeTypeName(ts *sadl.TypeSpec, name string) string {
 			//FIXME
 			return "*" + name
 		}
-	case "Quantity":
+	case "UnitValue":
 		if gen.runtime {
 			gen.addImport("github.com/boynton/sadl")
 			return "*sadl." + name
@@ -207,8 +207,8 @@ func (gen *GoGenerator) EmitType(td *sadl.TypeDef) {
 	switch td.Type {
 	case "Struct":
 		gen.EmitStructType(td)
-	case "Quantity":
-		gen.EmitQuantityType(td)
+	case "UnitValue":
+		gen.EmitUnitValueType(td)
 	case "Enum":
 		gen.EmitEnumType(td)
 	case "String":

@@ -604,8 +604,8 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		err = p.parseTimestampDef(td)
 	case "UUID":
 		err = p.parseUUIDDef(td)
-	case "Quantity":
-		err = p.parseQuantityDef(td, params)
+	case "UnitValue":
+		err = p.parseUnitValueDef(td, params)
 	case "Array":
 		err = p.parseArrayDef(td, params)
 	case "Map":
@@ -641,8 +641,8 @@ func (p *Parser) ParseTypeSpec(comment string) (*TypeSpec, *Options, string, err
 		tsItems, err = p.arrayParams(tsParams)
 	case "Map":
 		tsKeys, tsItems, err = p.mapParams(tsParams)
-	case "Quantity":
-		tsValue, tsUnit, err = p.quantityParams(tsParams)
+	case "UnitValue":
+		tsValue, tsUnit, err = p.unitValueParams(tsParams)
 	default:
 		if len(tsParams) != 0 {
 			//unions!?
@@ -680,7 +680,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 		switch typeName {
 		case "Array":
 			expectedParams = 1
-		case "Map", "Quantity":
+		case "Map", "UnitValue":
 			expectedParams = 2
 		case "Union":
 			expectedParams = -1
@@ -828,10 +828,10 @@ func (p *Parser) parseUUIDDef(td *TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseQuantityDef(td *TypeDef, params []string) error {
+func (p *Parser) parseUnitValueDef(td *TypeDef, params []string) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
-		td.Value, td.Unit, err = p.quantityParams(params)
+		td.Value, td.Unit, err = p.unitValueParams(params)
 		if err == nil {
 			td.Comment, err = p.EndOfStatement(td.Comment)
 		}
@@ -1634,7 +1634,7 @@ func (p *Parser) mapParams(params []string) (string, string, error) {
 	return keys, items, nil
 }
 
-func (p *Parser) quantityParams(params []string) (string, string, error) {
+func (p *Parser) unitValueParams(params []string) (string, string, error) {
 	var value string
 	var unit string
 	var err error
@@ -1716,8 +1716,8 @@ func (p *Parser) Validate() (*Model, error) {
 			err = p.validateArray(td)
 		case "Map":
 			err = p.validateMap(td)
-		case "Quantity":
-			err = p.validateQuantity(td)
+		case "UnitValue":
+			err = p.validateUnitValue(td)
 		case "String":
 			err = p.validateStringDef(td)
 		case "UUID":
@@ -1856,20 +1856,20 @@ func (p *Parser) validateReference(td *TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateQuantity(td *TypeDef) error {
+func (p *Parser) validateUnitValue(td *TypeDef) error {
 	vt := p.model.FindType(td.Value)
 	if vt == nil {
-		return fmt.Errorf("Undefined type '%s' for %s quantity type", td.Value, td.Name)
+		return fmt.Errorf("Undefined value type '%s' for %s UnitValue type", td.Value, td.Name)
 	}
 	if !p.model.IsNumericType(&vt.TypeSpec) {
-		return fmt.Errorf("Quantity value type of %s is not numeric: %s", td.Name, vt.Name)
+		return fmt.Errorf("UnitValue value type of %s is not numeric: %s", td.Name, vt.Name)
 	}
 	ut := p.model.FindType(td.Unit)
 	if ut == nil {
-		return fmt.Errorf("Undefined type '%s' for %s quantity unit", td.Unit, td.Name)
+		return fmt.Errorf("Undefined unit type '%s' for %s UnitValue unit", td.Unit, td.Name)
 	}
 	if ut.Type != "String" && ut.Type != "Enum" {
-		return fmt.Errorf("Quantity value type of %s is not String or Enum: %s", td.Name, vt.Name)
+		return fmt.Errorf("UnitValue value type of %s is not String or Enum: %s", td.Name, vt.Name)
 	}
 	return nil
 }
