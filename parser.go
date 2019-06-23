@@ -1768,7 +1768,44 @@ func (p *Parser) validateExample(ex *ExampleDef) error {
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, &t.TypeSpec, ex.Example)
 }
 
+func (p *Parser) validateHttpPathTemplate(path string) error {
+	i := strings.Index(path, "?")
+	if i >= 0 {
+		q := path[i+1:]
+		path = path[:i]
+		fmt.Printf("TODO: validate queryparams: %q from path template %q\n", q, path)
+	}
+	//check pathparams
+	inParam := false
+	for i, ch := range path {
+		switch ch {
+		case '{':
+			if inParam {
+				return fmt.Errorf("Bad http path template syntax (unexpected '{' at %d): %q", i, path)
+			}
+			inParam = true
+		case '}':
+			if !inParam {
+				return fmt.Errorf("Bad http path template syntax (unexpected '}' at %d): %q", i, path)
+			}
+			inParam = false
+		case '/':
+			if inParam {
+				return fmt.Errorf("Bad http path template syntax (variable cannot span elements at %d): %q", i, path)
+			}
+		}
+	}
+	if inParam {
+		return fmt.Errorf("Bad http path template syntax (missing '}'): %q", path)
+	}
+	return nil
+}
+
 func (p *Parser) validateHttp(hact *HttpDef) error {
+	err := p.validateHttpPathTemplate(hact.Path)
+	if err != nil {
+		return err
+	}
 	needsBody := hact.Method == "POST" || hact.Method == "PUT"
 	bodyParam := ""
 	for _, in := range hact.Inputs {

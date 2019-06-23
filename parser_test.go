@@ -305,3 +305,26 @@ type GenericError Struct {
 	testParse(test, false, header+"action Bar(BarResponse\n")
 	testParse(test, false, header+"action Bar(BarResponse) BarResponse BadRequestError\n")
 }
+
+func TestPathTemplateSyntax(test *testing.T) {
+	v, err := parseString(`http GET "/one/{two}" { }`, nil)
+	if err != nil {
+		test.Errorf("Good path template caused an error (%v): %v", err, Pretty(v))
+	}
+	v, err = parseString(`http GET "/one/{two" { }`, nil)
+	if err == nil {
+		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+	}
+	v, err = parseString(`http GET "/one/{two}}" { }`, nil)
+	if err == nil {
+		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+	}
+	v, err = parseString(`http GET "/one{/two}" { }`, nil)
+	if err == nil {
+		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+	}
+	v, err = parseString(`http GET "/one/{{two}" { }`, nil)
+	if err == nil {
+		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+	}
+}
