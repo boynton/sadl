@@ -189,8 +189,7 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			for _, val := range oasSchema.Enum {
 				if s, ok := val.(string); ok {
 					values = append(values, s)
-					//if !isIdentifier(s) {
-					if !IsSymbol(s) {
+					if !sadl.IsSymbol(s) {
 						isEnum = false
 					}
 				} else {
@@ -298,23 +297,6 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 		panic("oas type not handled")
 	}
 	return ts, err
-}
-
-func isIdentifier(s string) bool {
-	for _, c := range s {
-		if isWhitespace(c) || isDelimiter(c) {
-			return false
-		}
-	}
-	return true
-}
-
-func isWhitespace(b rune) bool {
-	return b == ' ' || b == '\n' || b == '\t' || b == '\r' || b == ','
-}
-
-func isDelimiter(b rune) bool {
-	return b == '(' || b == ')' || b == '[' || b == ']' || b == '{' || b == '}' || b == '"' || b == '\'' || b == ';' || b == ':'
 }
 
 func containsString(lst []string, val string) bool {

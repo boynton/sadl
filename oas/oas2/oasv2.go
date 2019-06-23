@@ -348,21 +348,20 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 
 func convertInfo(v2Info *Info) oas3.Info {
 	info := oas3.Info{
-		Title: v2Info.Title,
+		Title:       v2Info.Title,
 		Description: v2Info.Description,
-		Version: v2Info.Version,
-		Extensions: v2Info.Extensions,
+		Version:     v2Info.Version,
+		Extensions:  v2Info.Extensions,
 	}
 	if v2Info.Contact != nil {
-		info.Contact = &oas3.Contact {
+		info.Contact = &oas3.Contact{
 			Email: v2Info.Contact.Email,
-			Name: v2Info.Contact.Name,
-			URL: v2Info.Contact.URL,
+			Name:  v2Info.Contact.Name,
+			URL:   v2Info.Contact.URL,
 		}
 	}
 	return info
 }
-
 
 func convertPath(v2Path *PathItem) (*oas3.PathItem, error) {
 	v3Path := &oas3.PathItem{}

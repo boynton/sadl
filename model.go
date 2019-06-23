@@ -355,7 +355,6 @@ func IsSymbol(s string) bool {
 	return true
 }
 
-
 func (model *Model) IsNumericType(td *TypeSpec) bool {
 	switch td.Type {
 	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
