@@ -325,6 +325,7 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 	v3 := &oas3.OpenAPI{
 		Components: &oas3.Components{},
 	}
+	v3.Info = convertInfo(v2.Info)
 	v3.Components.Schemas = make(map[string]*oas3.Schema, 0)
 	for name, val := range v2.Definitions {
 		val3, err := convertSchema(name, val)
@@ -344,6 +345,24 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 	//to do: the actions
 	return v3, nil
 }
+
+func convertInfo(v2Info *Info) oas3.Info {
+	info := oas3.Info{
+		Title: v2Info.Title,
+		Description: v2Info.Description,
+		Version: v2Info.Version,
+		Extensions: v2Info.Extensions,
+	}
+	if v2Info.Contact != nil {
+		info.Contact = &oas3.Contact {
+			Email: v2Info.Contact.Email,
+			Name: v2Info.Contact.Name,
+			URL: v2Info.Contact.URL,
+		}
+	}
+	return info
+}
+
 
 func convertPath(v2Path *PathItem) (*oas3.PathItem, error) {
 	v3Path := &oas3.PathItem{}
