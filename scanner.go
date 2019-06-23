@@ -224,6 +224,16 @@ func (s *Scanner) Scan() Token {
 	}
 }
 
+func IsSymbolChar(ch rune, first bool) bool {
+	if isLetter(ch) {
+		return true
+	}
+	if first {
+		return false
+	}
+	return isDigit(ch) || ch == '_'
+}
+
 func (s *Scanner) scanSymbol(firstChar rune) Token {
 	var buf bytes.Buffer
 	buf.WriteRune(firstChar)
@@ -233,7 +243,7 @@ func (s *Scanner) scanSymbol(firstChar rune) Token {
 		ch := s.read()
 		if ch == eof {
 			break
-		} else if !isLetter(ch) && !isDigit(ch) && ch != '_' {
+		} else if !IsSymbolChar(ch, false) {
 			s.unread(ch)
 			break
 		} else {

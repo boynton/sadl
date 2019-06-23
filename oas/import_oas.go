@@ -73,6 +73,9 @@ var methods = []string{"GET", "PUT", "POST", "DELETE", "DELETE", "HEAD"} //to do
 
 func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	comment := oas.V3.Info.Title
+	if sadl.IsSymbol(comment) {
+		name = comment
+	}
 	if oas.V3.Info.Description != "" {
 		comment = comment + " - " + oas.V3.Info.Description
 	}
@@ -180,13 +183,14 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			//so we look for the case where all values look like identifiers, and call that an enum. Else a strings with accepted "values"
 			//perhaps the spirit of JSON Schema enums are just values, not what I think of as "enums", i.e. "a set of named values", per wikipedia.
 			//still, with symbolic values, perhaps the intent is to use proper enums, if only JSON Schema had them.
-			wantEnums := false //set to true to opportunistically try to make then real enums. If false, everything is a "value" of a string instead
+			wantEnums := true //set to true to opportunistically try to make then real enums. If false, everything is a "value" of a string instead
 			isEnum := wantEnums
 			var values []string
 			for _, val := range oasSchema.Enum {
 				if s, ok := val.(string); ok {
 					values = append(values, s)
-					if !isIdentifier(s) {
+					//if !isIdentifier(s) {
+					if !IsSymbol(s) {
 						isEnum = false
 					}
 				} else {

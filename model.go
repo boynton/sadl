@@ -296,7 +296,6 @@ func (model *Model) ValidateString(context string, td *TypeSpec, val interface{}
 	} else {
 		return model.fail(td, val, context)
 	}
-	fmt.Printf("validate string: %q\n", s)
 	if td.MinSize != nil {
 		if len(s) < int(*td.MinSize) {
 			return model.fail(td, val, fmt.Sprintf("'minsize=%d' constraint failed", *td.MinSize))
@@ -340,6 +339,22 @@ func (model *Model) ValidateTimestamp(tname string, td *TypeSpec, val interface{
 	}
 	return model.fail(td, val, "format invalid")
 }
+
+func IsSymbol(s string) bool {
+	if s == "" {
+		return false
+	}
+	if !IsSymbolChar(rune(s[0]), true) { //fixme
+		return false
+	}
+	for _, ch := range s[1:] {
+		if !IsSymbolChar(rune(ch), false) { //FIXME
+			return false
+		}
+	}
+	return true
+}
+
 
 func (model *Model) IsNumericType(td *TypeSpec) bool {
 	switch td.Type {
