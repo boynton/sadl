@@ -566,6 +566,28 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 			Status:  int32(code),
 			Comment: eparam.Description,
 		}
+		for header, def := range eparam.Headers {
+			param := &sadl.HttpParamSpec{}
+			param.Header = header
+			param.Comment = def.Description
+			s := param.Header
+			//most app-defined headers start with "x-" or "X-". Strip that off for a more reasonable variable name.
+			if strings.HasPrefix(param.Header, "x-") || strings.HasPrefix(param.Header, "X-") {
+				s = s[2:]
+			}
+			param.Name = makeIdentifier(s)
+			schref := def.Schema
+			if schref == nil {
+				if schref.Ref != "" {
+					param.Type = oasTypeRef(schref)
+				} else {
+					param.TypeSpec, err = convertOasType(hact.Name+".Expected."+param.Name, schref)
+				}
+				ex.Outputs = append(ex.Outputs, param)
+			} else {
+				fmt.Println("HTTP Action has no expected header type:", sadl.Pretty(eparam))
+			}
+		}
 		for contentType, mediadef := range eparam.Content {
 			if contentType == "application/json" { //hack
 				result := &sadl.HttpParamSpec{}
@@ -602,6 +624,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 				Status:  int32(code),
 				Comment: param.Description,
 			}
+			//FIXME: sadl should allow response headers for exceptions, also.
 			for contentType, mediadef := range param.Content {
 				if contentType == "application/json" { //hack
 					schref := mediadef.Schema
