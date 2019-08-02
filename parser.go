@@ -418,20 +418,16 @@ func (p *Parser) parseHttpSpec(op *HttpDef, comment string, top bool) error {
 	if options.Default != "" {
 		spec.Default = options.Default
 	}
-	if options.Header != "" {
-		spec.Header = options.Header
-	} else {
-		if top {
-			paramType, paramName := p.parameterSource(pathTemplate, ename)
-			switch paramType {
-			case "path":
-				spec.Path = true
-			case "query":
-				spec.Query = paramName
-			case "body":
-			default:
-			}
-		}
+
+	paramType, paramName := p.parameterSource(pathTemplate, ename, options)
+	switch paramType {
+	case "path":
+		spec.Path = true
+	case "query":
+		spec.Query = paramName
+	case "header":
+		spec.Header = paramName
+	case "body":
 	}
 	if top {
 		op.Inputs = append(op.Inputs, spec)
@@ -475,6 +471,16 @@ func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 				return err
 			}
 		}
+	} else if tok.Type == SYMBOL {
+		output := &HttpParamSpec{
+			StructFieldDef: StructFieldDef{
+				Name: "body",
+				TypeSpec: TypeSpec{
+					Type: tok.Text,
+				},
+			},
+		}
+		op.Expected.Outputs = append(op.Expected.Outputs, output)
 	} else {
 		p.UngetToken()
 	}
@@ -509,7 +515,10 @@ func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
 
 }
 
-func (p *Parser) parameterSource(pathTemplate, name string) (string, string) {
+func (p *Parser) parameterSource(pathTemplate, name string, options *Options) (string, string) {
+	if options.Header != "" {
+		return "header", options.Header
+	}
 	path := pathTemplate
 	query := ""
 	n := strings.Index(path, "?")
@@ -527,7 +536,7 @@ func (p *Parser) parameterSource(pathTemplate, name string) (string, string) {
 			return "query", kv[0]
 		}
 	}
-	return "", ""
+	return "body", ""
 }
 
 func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
@@ -1819,6 +1828,26 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 			} else {
 				return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", in.Name, Pretty(hact), hact.Method+" "+hact.Path)
 			}
+		}
+	}
+	needsBody = false
+	if hact.Expected == nil {
+		return nil
+	}
+	needsBody = hact.Expected.Status != 204 && hact.Expected.Status != 304
+	bodyParam = ""
+	for _, out := range hact.Expected.Outputs {
+		if out.Header == "" {
+			if needsBody {
+				if bodyParam != "" {
+					return fmt.Errorf("HTTP action cannot have more than one body parameter in expected output (%q is already that parameter): %s", bodyParam, Pretty(hact))
+				}
+				bodyParam = out.Name
+			} else {
+				return fmt.Errorf("HTTP action can have a body in expected output for status codes 204 or 304: %s", Pretty(hact))
+			}
+		} else {
+			return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", out.Name, Pretty(hact), hact.Method+" "+hact.Path)
 		}
 	}
 	return nil

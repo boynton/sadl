@@ -328,3 +328,28 @@ func TestPathTemplateSyntax(test *testing.T) {
 		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
 	}
 }
+
+func TestSimpleExpect(test *testing.T) {
+	v, err := parseString(`type Foo Struct {
+  x String
+}
+http GET "/foo" {
+  expect 200 {
+    body Foo
+  }
+}
+`, nil)
+	if err != nil {
+		test.Errorf("standard expect caused an error (%v): %v", err, Pretty(v))
+	}
+	v, err = parseString(`type Foo Struct {
+  x String
+}
+http GET "/foo" {
+  expect 200 Foo
+}
+`, nil)
+	if err != nil {
+		test.Errorf("simple expect caused an error (%v): %v", err, Pretty(v))
+	}
+}
