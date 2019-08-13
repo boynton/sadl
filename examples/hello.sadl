@@ -1,4 +1,4 @@
-http GET "/hello?caller={caller}" (operation=Hello) {
+http GET "/hello?caller={caller}" (action=Hello) {
    caller String (default="Mystery Person")
 
    expect 200 {
