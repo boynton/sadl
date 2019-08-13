@@ -1782,7 +1782,7 @@ func (p *Parser) validateExample(ex *ExampleDef) error {
 		return fmt.Errorf("Undefined type '%s' in example: %s", theType, Pretty(ex))
 	}
 	if len(lst) > 1 {
-		fmt.Println("warning: validation against arbitrary example target NYI:", ex.Example)
+		//fmt.Println("warning: validation against arbitrary example target NYI:", ex.Example)
 		return nil
 	}
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, &t.TypeSpec, ex.Example)

@@ -263,7 +263,6 @@ func (model *Model) ValidateMap(context string, td *TypeSpec, value interface{})
 			if tdi == nil {
 				return fmt.Errorf("%s: Undefined type: %s", context, td.Items)
 			}
-			fmt.Println("map items:", td.Items, Pretty(tdi))
 			for k, item := range a {
 				err := model.ValidateAgainstTypeSpec(fmt.Sprintf("%s[%q]", context, k), &tdi.TypeSpec, item)
 				if err != nil {
