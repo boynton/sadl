@@ -29,6 +29,10 @@ bin/oas2sadl::
 	mkdir -p bin
 	go build -o bin/oas2sadl github.com/boynton/sadl/cmd/oas2sadl
 
+bin/sadl2oas::
+	mkdir -p bin
+	go build -o bin/sadl2oas github.com/boynton/sadl/cmd/sadl2oas
+
 proper::
 	go fmt github.com/boynton/sadl
 	go vet github.com/boynton/sadl

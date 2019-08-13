@@ -9,15 +9,18 @@ x_server "http://petstore.swagger.io/v1"
 x_license_name "MIT"
 
 
+//
+// hey this is a typedef comment for Error
+//
 type Error Struct {
-   code Int32 (required)
+   code Int32 (required) // hey this is a field level comment for Error
    message String (required)
 }
 
 type Pet Struct {
-   id Int64 (required)
    name String (required)
    tag String
+   id Int64 (required)
 }
 
 type Pets Array<Pet>
@@ -26,35 +29,36 @@ type Pets Array<Pet>
 //
 // List all pets
 //
-http GET "/pets?limit={limit}" (action=listPets) {
+http GET "/pets?limit={limit}" (action=listPets, x_tags="pets") {
    limit Int32 // How many items to return at one time (max 100)
 
    // A paged array of pets
    expect 200 {
+      next String (header="x-next") // A link to the next page of responses
       body Pets
    }
 
    // unexpected error
-   except 500 Error
+   except Error
 }
 
 //
 // Create a pet
 //
-http POST "/pets" (action=createPets) {
+http POST "/pets" (action=createPets, x_tags="pets") {
 
    // Null response
    expect 201 {
    }
 
    // unexpected error
-   except 500 Error
+   except Error
 }
 
 //
 // Info for a specific pet
 //
-http GET "/pets/{petId}" (action=showPetById) {
+http GET "/pets/{petId}" (action=showPetById, x_tags="pets") {
    petId String (required) // The id of the pet to retrieve
 
    // Expected response to a valid request
@@ -63,6 +67,6 @@ http GET "/pets/{petId}" (action=showPetById) {
    }
 
    // unexpected error
-   except 500 Error
+   except Error
 }
 

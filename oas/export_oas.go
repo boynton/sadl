@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/oas/oas3"
@@ -32,13 +33,11 @@ func NewGenerator(model *sadl.Model, outdir string) *Generator {
 
 func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 	model := gen.Model
-	fmt.Println("schema to export:", sadl.Pretty(model))
 	oas := &oas3.OpenAPI{
 		OpenAPI: "3.0.0",
 	}
-	oas.Info.Title = model.Name
+	oas.Info.Title = model.Comment //how we import it.
 	oas.Info.Version = model.Version
-	oas.Info.Description = model.Comment
 	if model.Annotations != nil {
 		if url, ok := model.Annotations["x_server"]; ok {
 			oas.Servers = append(oas.Servers, &oas3.Server{URL: url})
@@ -62,6 +61,133 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			return nil, err
 		}
 		oas.Components.Schemas[td.Name] = otd
+	}
+	//Paths
+	oas.Paths = make(map[string]*oas3.PathItem, 0)
+	for _, hdef := range model.Http {
+		var pi *oas3.PathItem
+		p := hdef.Path
+		i := strings.Index(p, "?")
+		if i >= 0 {
+			p = p[:i]
+		}
+		if prev, ok := oas.Paths[p]; ok {
+			pi = prev
+		} else {
+			pi = &oas3.PathItem{
+				//Extensions
+				//Summary
+				//Description
+				//Servers
+				//Parameters
+			}
+			oas.Paths[p] = pi
+		}
+		op := &oas3.Operation{
+			OperationID: hdef.Name,
+			Summary: hdef.Comment,
+				//Parameters
+				//Body
+				//Responses
+				//Callbacks
+				//Security
+		}
+		if len(hdef.Annotations) > 0 {
+			for k, v := range hdef.Annotations {
+				if k == "x_tags" {
+					op.Tags = strings.Split(v, ",")
+				}
+			}
+		}
+		switch hdef.Method {
+		case "GET":
+			if pi.Get != nil {
+				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
+			}
+			pi.Get = op
+		case "POST":
+			if pi.Post != nil {
+				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
+			}
+			pi.Post = op
+		}
+		for _, in := range hdef.Inputs {
+			param := &oas3.Parameter{
+				Name: in.Name,
+				Description: in.Comment,
+			}
+			r := in.Required
+			if in.Path {
+				param.In = "path"
+				r = true
+			} else if in.Query != "" {
+				param.In = "query"
+			}
+			param.Required = r
+			tr, err := gen.oasTypeRef(&in.TypeSpec)
+			if err != nil {
+				return nil, err
+			}
+			param.Schema = tr
+			op.Parameters = append(op.Parameters, param)
+		}
+		responses := make(map[string]*oas3.Response, 0)
+		op.Responses = responses
+		content := make(map[string]*oas3.MediaType)
+		resp := &oas3.Response{
+			Description: hdef.Expected.Comment,
+			Content: content,
+		}
+		var headers map[string]*oas3.Header
+		for _, param := range hdef.Expected.Outputs {
+			if param.Name == "body" {
+				tr, err := gen.oasTypeRef(&param.TypeSpec)
+				if err != nil {
+					return nil, err
+				}
+				mt := &oas3.MediaType{
+					Schema: tr,
+				}
+				content["application/json"] = mt
+			} else if param.Header != "" {
+				pschema, err := gen.oasTypeRef(&param.TypeSpec)
+				if err != nil {
+					return nil, err
+				}
+				header := &oas3.Header{
+					Description: param.Comment,
+					Schema: pschema,
+				}
+				if headers == nil {
+					headers = make(map[string]*oas3.Header, 0)
+				}
+				headers[param.Header] = header
+			}
+		}
+		if len(headers) > 0 {
+			resp.Headers = headers
+		}
+		key := fmt.Sprint(hdef.Expected.Status)
+		responses[key] = resp
+		for _, out := range hdef.Exceptions {
+			content := make(map[string]*oas3.MediaType)
+			resp := &oas3.Response{
+				Description: out.Comment,
+				Content: content,
+			}
+			tr := &oas3.Schema{
+				Ref: "#/components/schemas/" + out.Type,
+			}
+			mt := &oas3.MediaType{
+				Schema: tr,
+			}
+			content["application/json"] = mt
+			key := "default"
+			if out.Status != 0 {
+				key = fmt.Sprint(out.Status)
+			}
+			responses[key] = resp
+		}
 	}
 	return oas, nil
 }
@@ -176,14 +302,11 @@ func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
 		}
 		return tr, nil
 	case "Array":
-		itd := gen.Model.FindType(td.Items)
-		ischema, err := gen.oasTypeRef(&itd.TypeSpec)
-		if err != nil {
-			return nil, err
-		}
 		tr := &oas3.Schema{
 			Type:  "array",
-			Items: ischema,
+			Items: &oas3.Schema{
+				Ref: "#/components/schemas/" + td.Items,
+			},
 		}
 		return tr, nil
 	default:
