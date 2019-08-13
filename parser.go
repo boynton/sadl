@@ -489,9 +489,20 @@ func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 }
 
 func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
-	estatus, err := p.expectInt32()
-	if err != nil {
-		return err
+	var estatus int32
+	tok := p.GetToken()
+	if tok == nil {
+		return p.EndOfFileError()
+	}
+	if tok.IsNumeric() {
+		p.UngetToken()
+		estatus2, err := p.expectInt32()
+		if err != nil {
+			return err
+		}
+		estatus = estatus2
+	} else {
+		p.UngetToken()
 	}
 	etype, err := p.ExpectIdentifier()
 	if err != nil {
@@ -1780,9 +1791,7 @@ func (p *Parser) validateExample(ex *ExampleDef) error {
 func (p *Parser) validateHttpPathTemplate(path string) error {
 	i := strings.Index(path, "?")
 	if i >= 0 {
-		q := path[i+1:]
 		path = path[:i]
-		fmt.Printf("TODO: validate queryparams: %q from path template %q\n", q, path)
 	}
 	//check pathparams
 	inParam := false
@@ -1846,8 +1855,6 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 			} else {
 				return fmt.Errorf("HTTP action can have a body in expected output for status codes 204 or 304: %s", Pretty(hact))
 			}
-		} else {
-			return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", out.Name, Pretty(hact), hact.Method+" "+hact.Path)
 		}
 	}
 	return nil

@@ -112,7 +112,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 		schema.Types = append(schema.Types, td)
 	}
 
-	httpBindings := true //For "review" purposes, the http part is not as interesting.
+	httpBindings := true
 	actions := false
 	for tmpl, path := range oas.V3.Paths {
 		for _, method := range methods {
@@ -430,7 +430,6 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 		schema.Types = append(schema.Types, td)
 	}
 	act.Output = resTypeName
-
 	excepts := make(map[string][]int32, 0)
 	for status, param := range op.Responses {
 		if status != expectedStatus {
@@ -455,6 +454,20 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 		Method:  method,
 		Comment: op.Summary,
 	}
+	if len(op.Tags) > 0 {
+		hact.Annotations = make(map[string]string, 0)
+		
+		tmp := ""
+		for _, tag := range op.Tags {
+			if tmp == "" {
+				tmp = tag
+			} else {
+				tmp = tmp + "," + tag
+			}
+		}
+		hact.Annotations["x_tags"] = tmp
+	}
+
 	var queries []string
 	for _, param := range op.Parameters {
 		name := makeIdentifier(param.Name)
@@ -577,15 +590,13 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 			}
 			param.Name = makeIdentifier(s)
 			schref := def.Schema
-			if schref == nil {
+			if schref != nil {
 				if schref.Ref != "" {
 					param.Type = oasTypeRef(schref)
 				} else {
 					param.TypeSpec, err = convertOasType(hact.Name+".Expected."+param.Name, schref)
 				}
 				ex.Outputs = append(ex.Outputs, param)
-			} else {
-				fmt.Println("HTTP Action has no expected header type:", sadl.Pretty(eparam))
 			}
 		}
 		for contentType, mediadef := range eparam.Content {
@@ -612,7 +623,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 			//the status can be "default", or "4XX" (where 'X' is a wildcard) or "404". If the latter, it takes precedence.
 			//for SADL, not specifying the response is a bug. So "default" will be turned into "500". The wildcards
 			if status == "default" {
-				status = "500" //because you should do better when you speficy your API!!!
+				status = "0"
 			} else if strings.Index(status, "X") >= 0 {
 				panic("wildcard response codes not supported")
 			}

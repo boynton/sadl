@@ -182,6 +182,11 @@ func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 	if hact.Name != "" {
 		opts = append(opts, "action="+hact.Name)
 	}
+	if len(hact.Annotations) > 0 {
+		for k, v := range hact.Annotations {
+			opts = append(opts, fmt.Sprintf("%s=%q", k, v))
+		}
+	}
 	opt := ""
 	if len(opts) > 0 {
 		opt = " (" + strings.Join(opts, ", ") + ")"
@@ -211,7 +216,12 @@ func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 			if exc.Comment != "" {
 				bcom = g.FormatComment("   ", exc.Comment, 100, false)
 			}
-			s += fmt.Sprintf("%s   except %d %s\n", bcom, exc.Status, exc.Type)
+			if exc.Status == 0 {
+				s += fmt.Sprintf("%s   except %s\n", bcom, exc.Type)
+			} else {
+				//todo: header outputs
+				s += fmt.Sprintf("%s   except %d %s\n", bcom, exc.Status, exc.Type)
+			}
 		}
 	}
 	s += "}\n"
