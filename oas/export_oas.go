@@ -85,12 +85,12 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		}
 		op := &oas3.Operation{
 			OperationID: hdef.Name,
-			Summary: hdef.Comment,
-				//Parameters
-				//Body
-				//Responses
-				//Callbacks
-				//Security
+			Summary:     hdef.Comment,
+			//Parameters
+			//Body
+			//Responses
+			//Callbacks
+			//Security
 		}
 		if len(hdef.Annotations) > 0 {
 			for k, v := range hdef.Annotations {
@@ -113,7 +113,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		}
 		for _, in := range hdef.Inputs {
 			param := &oas3.Parameter{
-				Name: in.Name,
+				Name:        in.Name,
 				Description: in.Comment,
 			}
 			r := in.Required
@@ -136,7 +136,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		content := make(map[string]*oas3.MediaType)
 		resp := &oas3.Response{
 			Description: hdef.Expected.Comment,
-			Content: content,
+			Content:     content,
 		}
 		var headers map[string]*oas3.Header
 		for _, param := range hdef.Expected.Outputs {
@@ -156,7 +156,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 				}
 				header := &oas3.Header{
 					Description: param.Comment,
-					Schema: pschema,
+					Schema:      pschema,
 				}
 				if headers == nil {
 					headers = make(map[string]*oas3.Header, 0)
@@ -173,7 +173,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			content := make(map[string]*oas3.MediaType)
 			resp := &oas3.Response{
 				Description: out.Comment,
-				Content: content,
+				Content:     content,
 			}
 			tr := &oas3.Schema{
 				Ref: "#/components/schemas/" + out.Type,
@@ -303,7 +303,7 @@ func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
 		return tr, nil
 	case "Array":
 		tr := &oas3.Schema{
-			Type:  "array",
+			Type: "array",
 			Items: &oas3.Schema{
 				Ref: "#/components/schemas/" + td.Items,
 			},

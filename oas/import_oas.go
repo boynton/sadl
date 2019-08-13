@@ -456,7 +456,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 	}
 	if len(op.Tags) > 0 {
 		hact.Annotations = make(map[string]string, 0)
-		
+
 		tmp := ""
 		for _, tag := range op.Tags {
 			if tmp == "" {
