@@ -119,12 +119,32 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			r := in.Required
 			if in.Path {
 				param.In = "path"
+				param.Name = in.Name
 				r = true
 			} else if in.Query != "" {
 				param.In = "query"
+				param.Name = in.Query
+			} else if in.Header != "" {
+				param.In = "header"
+				param.Name = in.Header
+			} else { //body
+				body := &oas3.RequestBody{
+					Description: in.Comment,
+					Required:    true,
+					Content:     make(map[string]*oas3.MediaType, 0),
+				}
+				tr, err := gen.oasTypeRef(&in.TypeSpec, "")
+				if err != nil {
+					return nil, err
+				}
+				body.Content["application/json"] = &oas3.MediaType{
+					Schema: tr,
+				}
+				op.RequestBody = body
+				continue
 			}
 			param.Required = r
-			tr, err := gen.oasTypeRef(&in.TypeSpec)
+			tr, err := gen.oasTypeRef(&in.TypeSpec, "")
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +161,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		var headers map[string]*oas3.Header
 		for _, param := range hdef.Expected.Outputs {
 			if param.Name == "body" {
-				tr, err := gen.oasTypeRef(&param.TypeSpec)
+				tr, err := gen.oasTypeRef(&param.TypeSpec, "")
 				if err != nil {
 					return nil, err
 				}
@@ -150,7 +170,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 				}
 				content["application/json"] = mt
 			} else if param.Header != "" {
-				pschema, err := gen.oasTypeRef(&param.TypeSpec)
+				pschema, err := gen.oasTypeRef(&param.TypeSpec, "")
 				if err != nil {
 					return nil, err
 				}
@@ -198,6 +218,29 @@ func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
 		return gen.exportStructTypeDef(td)
 	case "Array":
 		return gen.exportArrayTypeDef(td)
+	case "String":
+		return gen.exportStringTypeDef(td)
+	case "Enum":
+		return gen.exportEnumTypeDef(td)
+	case "Map":
+		return gen.exportMapTypeDef(td)
+	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
+		stype, sformat, scomment := oasNumericEquivalent(td.Type)
+		otd := &oas3.Schema{
+			Description: scomment,
+			Type:        stype,
+			Format:      sformat,
+		}
+
+		if td.Min != nil {
+			v := td.Min.AsFloat64()
+			otd.Min = &v
+		}
+		if td.Max != nil {
+			v := td.Max.AsFloat64()
+			otd.Max = &v
+		}
+		return otd, nil
 	}
 	return nil, fmt.Errorf("Implement export of this type: %q", td.Type)
 }
@@ -212,7 +255,7 @@ func (gen *Generator) exportStructTypeDef(td *sadl.TypeDef) (*oas3.Schema, error
 		if fd.Required {
 			required = append(required, fd.Name)
 		}
-		tr, err := gen.oasTypeRef(&fd.TypeSpec)
+		tr, err := gen.oasTypeRef(&fd.TypeSpec, "")
 		if err != nil {
 			return nil, err
 		}
@@ -225,11 +268,51 @@ func (gen *Generator) exportStructTypeDef(td *sadl.TypeDef) (*oas3.Schema, error
 }
 
 func (gen *Generator) exportArrayTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
-	otd, err := gen.oasTypeRef(&td.TypeSpec)
+	otd, err := gen.oasTypeRef(&td.TypeSpec, td.Name)
 	if err != nil {
 		return nil, err
 	}
 	otd.Description = td.Comment
+	return otd, nil
+}
+
+func (gen *Generator) exportMapTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
+	return &oas3.Schema{
+		Type:        "object",
+		Description: td.Comment,
+		AdditionalProperties: &oas3.Schema{
+			Type: td.Items,
+		},
+	}, nil
+}
+
+func (gen *Generator) exportStringTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
+	otd, err := gen.oasTypeRef(&td.TypeSpec, td.Name)
+	if err != nil {
+		return nil, err
+	}
+	otd.Description = td.Comment
+	if len(td.Values) > 0 {
+		e := make([]interface{}, 0)
+		for _, s := range td.Values {
+			e = append(e, s)
+		}
+		otd.Enum = e
+	}
+	//pattern, min/max length
+	return otd, nil
+}
+
+func (gen *Generator) exportEnumTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
+	otd := &oas3.Schema{
+		Type:        "string",
+		Description: td.Comment,
+	}
+	e := make([]interface{}, 0)
+	for _, el := range td.Elements {
+		e = append(e, el.Symbol)
+	}
+	otd.Enum = e
 	return otd, nil
 }
 
@@ -258,15 +341,32 @@ func oasNumericEquivalent(sadlTypeName string) (string, string, string) {
 	}
 }
 
-func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
+func (gen *Generator) oasTypeRef(td *sadl.TypeSpec, name string) (*oas3.Schema, error) {
+	//	if name != "" {
+	//		return &oas3.Schema{
+	//			Ref: "#/components/schemas/" + name,
+	//		}, nil
+	//	}
 	switch td.Type {
 	case "Int32", "Int16", "Int8", "Int64", "Float32", "Float64", "Decimal":
+		if td.Type == "Float64" && name != "" {
+			panic("here? " + name + " -> " + sadl.Pretty(td))
+		}
 		stype, sformat, scomment := oasNumericEquivalent(td.Type)
-		return &oas3.Schema{
+		sch := &oas3.Schema{
 			Type:        stype,
 			Format:      sformat,
 			Description: scomment,
-		}, nil
+		}
+		if td.Min != nil {
+			v := td.Min.AsFloat64()
+			sch.Min = &v
+		}
+		if td.Max != nil {
+			v := td.Max.AsFloat64()
+			sch.Max = &v
+		}
+		return sch, nil
 	case "Bytes":
 		tr := &oas3.Schema{
 			Type:   "string",
@@ -278,7 +378,9 @@ func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
 		tr := &oas3.Schema{
 			Type: "string",
 		}
-		//restrictions
+		if td.Pattern != "" {
+			tr.Pattern = td.Pattern
+		}
 		return tr, nil
 	case "Timestamp":
 		tr := &oas3.Schema{
@@ -301,14 +403,37 @@ func (gen *Generator) oasTypeRef(td *sadl.TypeSpec) (*oas3.Schema, error) {
 			Description: "UUID",
 		}
 		return tr, nil
+	case "Enum":
+		return &oas3.Schema{
+			Ref: "#/components/schemas/" + name,
+		}, nil
 	case "Array":
+		itd := gen.Model.FindType(td.Items)
+		itemSchema, err := gen.oasTypeRef(&itd.TypeSpec, "")
+		if err != nil {
+			return nil, err
+		}
 		tr := &oas3.Schema{
-			Type: "array",
-			Items: &oas3.Schema{
-				Ref: "#/components/schemas/" + td.Items,
-			},
+			Type:  "array",
+			Items: itemSchema,
 		}
 		return tr, nil
+	case "Map":
+		//note: keys are always strings
+		itd := gen.Model.FindType(td.Items)
+		itemSchema, err := gen.oasTypeRef(&itd.TypeSpec, "")
+		if err != nil {
+			return nil, err
+		}
+		otd := &oas3.Schema{
+			Type:                 "object",
+			AdditionalProperties: itemSchema,
+		}
+		return otd, nil
+	case "Struct":
+		return &oas3.Schema{
+			Ref: "#/components/schemas/" + name,
+		}, nil
 	default:
 		return &oas3.Schema{
 			Ref: "#/components/schemas/" + td.Type,

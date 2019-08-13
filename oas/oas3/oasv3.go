@@ -188,8 +188,6 @@ type Schema struct {
 	Example      interface{}   `json:"example,omitempty"`
 	ExternalDocs interface{}   `json:"externalDocs,omitempty"`
 
-	// Object-related, here for struct compactness
-	AdditionalPropertiesAllowed *bool `json:"-" multijson:"additionalProperties,omitempty"`
 	// Array-related, here for struct compactness
 	UniqueItems bool `json:"uniqueItems,omitempty"`
 	// Number-related, here for struct compactness
@@ -217,12 +215,13 @@ type Schema struct {
 	Items    *Schema `json:"items,omitempty"`
 
 	// Object
-	Required             []string           `json:"required,omitempty"`
-	Properties           map[string]*Schema `json:"properties,omitempty"`
-	MinProps             uint64             `json:"minProperties,omitempty"`
-	MaxProps             *uint64            `json:"maxProperties,omitempty"`
-	AdditionalProperties *Schema            `json:"-" multijson:"additionalProperties,omitempty"`
-	Discriminator        *Discriminator     `json:"discriminator,omitempty"`
+	Required   []string           `json:"required,omitempty"`
+	Properties map[string]*Schema `json:"properties,omitempty"`
+	MinProps   uint64             `json:"minProperties,omitempty"`
+	MaxProps   *uint64            `json:"maxProperties,omitempty"`
+	//broken: AdditionalPropertiesAllowed *bool `json:"additionalProperties,omitEmpty"`
+	AdditionalProperties *Schema        `json:"additionalProperties,omitempty"`
+	Discriminator        *Discriminator `json:"discriminator,omitempty"`
 
 	PatternProperties string `json:"patternProperties,omitempty"`
 }

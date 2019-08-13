@@ -67,7 +67,10 @@ http GET "/items/{id}" (action=GetItem) {
       modified Timestamp (header="Modified") // Just an example of output headers
    }
 
+	//no content if the modified time has not changed
    except 304 NotModified
+
+	//not found
    except 404 NotFound
 }
 
@@ -110,6 +113,7 @@ http GET "/items?limit={limit}&skip={skip}" (action=ListItems) {
    limit Int32 (default=10)
    skip UUID
 
+	//return a list
    expect 200 {
       items ItemList
    }
