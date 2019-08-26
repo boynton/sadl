@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/oas/oas3"
 	"github.com/ghodss/yaml"
 )
@@ -415,8 +414,7 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 			v3.Type = "number"
 			v3.Format = "int32"
 		default:
-			fmt.Println("FIX THIS:", sadl.Pretty(v2))
-			panic("here")
+			return nil, fmt.Errorf("Unrecognized OAS type: %q", stype)
 		}
 	}
 	//	fmt.Println("--------->", sadl.Pretty(v3))
