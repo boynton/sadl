@@ -1,4 +1,4 @@
-all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas
+all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy
 
 install:: all
 	cp -p bin/* $(HOME)/bin/
@@ -33,6 +33,10 @@ bin/sadl2oas:: lib
 	mkdir -p bin
 	go build -o bin/sadl2oas github.com/boynton/sadl/cmd/sadl2oas
 
+bin/sadl2smithy:: lib
+	mkdir -p bin
+	go build -o bin/sadl2smithy github.com/boynton/sadl/cmd/sadl2smithy
+
 proper::
 	go fmt github.com/boynton/sadl
 	go vet github.com/boynton/sadl
@@ -46,6 +50,7 @@ proper::
 	go vet github.com/boynton/sadl/oas/oas2
 	go fmt github.com/boynton/sadl/oas/oas3
 	go vet github.com/boynton/sadl/oas/oas3
+	go vet github.com/boynton/sadl/smithy
 	go fmt github.com/boynton/sadl/cmd/sadl
 	go vet github.com/boynton/sadl/cmd/sadl
 	go fmt github.com/boynton/sadl/cmd/sadl2java
@@ -56,6 +61,7 @@ proper::
 	go vet github.com/boynton/sadl/cmd/oas2sadl
 	go fmt github.com/boynton/sadl/cmd/sadl2oas
 	go vet github.com/boynton/sadl/cmd/sadl2oas
+	go vet github.com/boynton/sadl/cmd/sadl2smithy
 
 clean::
 	rm -rf bin

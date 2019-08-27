@@ -62,6 +62,11 @@ type Protocol struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
+type Http struct {
+	Uri string `json:"uri,omitempty"`
+	Method string `json:"method,omitempty"`
+}
+
 type Shape struct {
 	Traitable
 	Type string `json:"type"`
@@ -87,6 +92,7 @@ type Shape struct {
 	Errors []string `json:"errors,omitempty"`
 	Idempotent bool `json:"idempotent,omitempty"`
 	ReadOnly bool `json:"readonly,omitempty"`
+	Http *Http `json:"http,omitempty"`
 }
 
 type Namespace struct {

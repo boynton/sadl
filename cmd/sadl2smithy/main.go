@@ -69,7 +69,5 @@ func main() {
 	fmt.Println(sadl.Pretty(model))
 
 	//IDL
-	fmt.Println("//----------------------", name + ".smithy")
 	fmt.Print(model.IDL())
-	fmt.Println("//----------------------")
 }
