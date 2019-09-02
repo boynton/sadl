@@ -1954,6 +1954,29 @@ func (p *Parser) validateStruct(td *TypeDef) error {
 		if ftd == nil {
 			return fmt.Errorf("Undefined type '%s' in struct field '%s.%s'", field.Type, td.Name, field.Name)
 		}
+		switch field.Type {
+		case "Array":
+			if field.Items != "" && field.Items != "Any" {
+				fitd := model.FindType(field.Items)
+				if fitd == nil {
+					return fmt.Errorf("Undefined array item type '%s' in struct field '%s.%s'", field.Items, td.Name, field.Name)
+				}
+			}
+		case "Map":
+			if field.Keys != "" && field.Keys != "Any" {
+				fitd := model.FindType(field.Keys)
+				if fitd == nil {
+					return fmt.Errorf("Undefined map key type '%s' in struct field '%s.%s'", field.Keys, td.Name, field.Name)
+				}
+				//TODO: ensure the key type is stringable.
+			}
+			if field.Items != "" && field.Items != "Any" {
+				fitd := model.FindType(field.Items)
+				if fitd == nil {
+					return fmt.Errorf("Undefined map value '%s' in struct field '%s.%s'", field.Items, td.Name, field.Name)
+				}
+			}
+		}
 		if field.Default != nil {
 			if field.Required {
 				return fmt.Errorf("Cannot have a default value for required field: '%s.%s'", td.Name, field.Name)
