@@ -103,6 +103,8 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 		gen.CreateUnitValuePojo(ts, className)
 	case "Enum":
 		gen.CreateEnumPojo(ts, className)
+	case "Union":
+		gen.CreateUnionPojo(ts, className)
 	default:
 		//do nothing, i.e. a String subclass
 		return
@@ -230,6 +232,74 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 	gen.Emit("        }\n")
 	gen.Emit("        throw new IllegalArgumentException(\"Invalid string representation for " + className + ": \" + repr);\n")
 	gen.Emit("    }\n\n")
+	gen.Emit("}\n")
+}
+
+func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
+	indent := ""
+	//firstFieldName := td.Name + "Variant"
+	//other fields names: td.Variants
+	//constructors: one for each type. Is the empty constructor needed for Jackson? Probably.
+	optional := false
+	for _, fd := range td.Fields {
+		if !fd.Required {
+			optional = true
+		}
+	}
+	if optional {
+		gen.AddImport("com.fasterxml.jackson.annotation.JsonInclude")
+		//		gen.emit("@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
+	} else {
+		gen.AddImport("javax.validation.constraints.NotNull")
+	}
+	extends := ""
+	if indent == "" {
+		if gen.UseLombok {
+			gen.Emit(indent + "@Data\n")
+			gen.AddImport("lombok.Data")
+			gen.Emit(indent + "@AllArgsConstructor\n")
+			gen.AddImport("lombok.AllArgsConstructor")
+			gen.Emit(indent + "@Builder\n")
+			gen.AddImport("lombok.Builder")
+			gen.Emit(indent + "@NoArgsConstructor\n")
+			gen.AddImport("lombok.NoArgsConstructor")
+		}
+		gen.Emit(indent + "public class " + className + extends + " {\n")
+	} else {
+		gen.Emit(indent + "public static class " + className + extends + " {\n")
+	}
+	variantType := className + "Variant"
+	nindent := indent + "    "
+	gen.Emit(nindent + variantType + " {\n")
+
+	max := len(td.Variants)
+	delim := ","
+	for i := 0; i < max; i++ {
+		v := td.Variants[i]
+		if i == max-1 {
+			delim = ""
+		}
+		gen.Emit(nindent + "    " + v + delim + "\n")
+	}
+	gen.Emit(nindent + "}\n\n")
+	gen.Emit(nindent + "@com.fasterxml.jackson.annotation.JsonIgnore\n")
+	gen.Emit(nindent + "public " + variantType + " variant;\n\n")
+	for _, v := range td.Variants {
+		gen.Emit(nindent + "@JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
+		gen.Emit(nindent + "public " + v + " " + v + ";\n")
+	}
+	//create each constructor. Do I need the empty constructor?
+	for _, v := range td.Variants {
+		gen.Emit(nindent + "\n" + nindent + "public " + className + "(" + v + " v) {\n")
+		gen.Emit(nindent + "    this.variant = " + v + ";\n")
+		gen.Emit(nindent + "    this." + v + " = v;\n" + nindent + "}\n")
+	}
+	gen.Emit("\n")
+	gen.Emit(`    @Override
+    public String toString() {
+        return Json.pretty(this);
+    }
+`)
 	gen.Emit("}\n")
 }
 
