@@ -16,6 +16,7 @@ var verbose bool = false
 func main() {
 	pVerbose := flag.Bool("v", false, "set to true to enable verbose output")
 	pDebug := flag.Bool("d", false, "set to true to dump data structure instead of decompile")
+	pRefactorEnums := flag.Bool("e", false, "set to refactor inline string enum defs into separate types")
 	flag.Parse()
 	args := flag.Args()
 	if len(args) != 1 {
@@ -50,6 +51,13 @@ func main() {
 	if err != nil {
 		fmt.Printf("oas2sadl: Cannot convert to SADL: %v\n", err)
 		os.Exit(1)
+	}
+	if *pRefactorEnums {
+		err = model.ConvertInlineEnums()
+		if err != nil {
+			fmt.Printf("oas2sadl: Cannot refactor enums: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	if *pDebug {
 		fmt.Println(sadl.Pretty(model)) //debug

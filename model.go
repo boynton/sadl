@@ -41,6 +41,104 @@ func (model *Model) FindType(name string) *TypeDef {
 	return nil
 }
 
+func (model *Model) EquivalentTypesByName(tname1, tname2 string) bool {
+	if tname1 == tname2 {
+		return true
+	}
+	td1 := model.FindType(tname1)
+	td2 := model.FindType(tname2)
+	return model.EquivalentTypes(&td1.TypeSpec, &td2.TypeSpec)
+}
+
+func (model *Model) EquivalentTypes(ts1, ts2 *TypeSpec) bool {
+	if ts1.Type != ts2.Type {
+		return false
+	}
+	//TODO: check annotations
+	switch ts1.Type {
+	case "String":
+		if ts1.Pattern != ts2.Pattern || ts1.MinSize != ts2.MinSize || ts1.MaxSize != ts1.MaxSize || len(ts1.Values) != len(ts2.Values) {
+			return false
+		}
+		if ts1.Reference != ts2.Reference {
+			return false
+		}
+		if len(ts1.Values) > 0 {
+			m := make(map[string]bool, 0)
+			for _, v := range ts1.Values {
+				m[v] = true
+			}
+			for _, v := range ts2.Values {
+				if _, ok := m[v]; !ok {
+					return false
+				}
+			}
+		}
+	case "UUID":
+		if ts1.Reference != ts2.Reference {
+			return false
+		}
+	case "Struct":
+		if len(ts1.Fields) != len(ts2.Fields) {
+			return false
+		}
+	case "Bytes":
+		if ts1.MinSize != ts2.MinSize || ts1.MaxSize != ts1.MaxSize {
+			return false
+		}
+	case "UnitValue":
+		if !model.EquivalentTypesByName(ts1.Unit, ts2.Unit) {
+			return false
+		}
+		if !model.EquivalentTypesByName(ts1.Value, ts2.Value) {
+			return false
+		}
+	case "Array", "Map":
+		if ts1.MinSize != ts2.MinSize || ts1.MaxSize != ts1.MaxSize {
+			return false
+		}
+		if !model.EquivalentTypesByName(ts1.Items, ts2.Items) {
+			return false
+		}
+		if !model.EquivalentTypesByName(ts1.Keys, ts2.Keys) {
+			return false
+		}
+	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
+		if ts1.Min != ts2.Min || ts1.Max != ts2.Max {
+			return false
+		}
+	case "Enum":
+		if len(ts1.Elements) != len(ts2.Elements) {
+			return false
+		}
+		//order doesn't matter for enums
+		m := make(map[string]bool, 0)
+		for _, v := range ts1.Elements {
+			//TODO: check annotations
+			m[v.Symbol] = true
+		}
+		for _, v := range ts2.Elements {
+			if _, ok := m[v.Symbol]; !ok {
+				return false
+			}
+		}
+	case "Union":
+		if len(ts1.Variants) != len(ts2.Variants) {
+			return false
+		}
+		m := make(map[string]bool, 0)
+		for _, v := range ts1.Variants {
+			m[v] = true
+		}
+		for _, v := range ts2.Variants {
+			if _, ok := m[v]; !ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (model *Model) Validate(context string, typename string, value interface{}) error {
 	td := model.FindType(typename)
 	if td == nil {
