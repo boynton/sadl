@@ -203,9 +203,23 @@ func (model *Model) ValidateNumber(context string, td *TypeSpec, value interface
 	return nil
 }
 
+func (model *Model) IsStructField(ts *TypeSpec, name string) bool {
+	for _, field := range ts.Fields {
+		if name == field.Name {
+			return true
+		}
+	}
+	return false
+}
+
 func (model *Model) ValidateStruct(context string, td *TypeSpec, value interface{}) error {
 	switch m := value.(type) {
 	case map[string]interface{}:
+		for k, _ := range m {
+			if !model.IsStructField(td, k) {
+				return fmt.Errorf("Undefined field in %s: '%s'", context, k)
+			}
+		}
 		for _, field := range td.Fields {
 			if v, ok := m[field.Name]; ok {
 				err := model.ValidateAgainstTypeSpec(context+"."+field.Name, &field.TypeSpec, v)
