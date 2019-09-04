@@ -1540,15 +1540,17 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == CLOSE_BRACKET {
-			return ary, nil
-		}
-		if tok.Type != COMMA {
-			obj, err := p.parseLiteral(tok)
-			if err != nil {
-				return nil, err
+		if tok.Type != NEWLINE {
+			if tok.Type == CLOSE_BRACKET {
+				return ary, nil
 			}
-			ary = append(ary, obj)
+			if tok.Type != COMMA {
+				obj, err := p.parseLiteral(tok)
+				if err != nil {
+					return nil, err
+				}
+				ary = append(ary, obj)
+			}
 		}
 	}
 }
