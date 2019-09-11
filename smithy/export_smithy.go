@@ -2,8 +2,6 @@ package smithy
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/boynton/sadl"
@@ -51,13 +49,13 @@ func FromSADL(schema *sadl.Model, ns string) (*Model, error) {
 		shape.Http = &Http{
 			Uri: path,
 			Method: hd.Method,
+			Code: expectedCode,
 		}
 		switch hd.Method {
 		case "GET", "PUT", "DELETE":
-			shape.Idempotent = true
+//			shape.Idempotent = true
 		}
 
-		fmt.Println("what to do with the expectedCode: ", expectedCode)
 		//if we have any inputs, define this
 		shape.Input = name + "Input"
 
@@ -278,35 +276,4 @@ func length(min int64, max int64) *Length {
 		l.Max = &max
 	}
 	return l
-}
-
-type Generator struct {
-	sadl.Generator
-}
-
-func NewGenerator(model *sadl.Model, outdir string) *Generator {
-	gen := &Generator{
-		Generator: sadl.Generator{
-			Model:  model,
-			OutDir: outdir,
-		},
-	}
-	pdir := filepath.Join(outdir)
-	err := os.MkdirAll(pdir, 0755)
-	if err != nil {
-		gen.Err = err
-	}
-	return gen
-}
-
-func (gen *Generator) Export() (*Model, error) {
-//	sadlModel := gen.Model
-	smithyModel := &Model{
-		Version: "0.4.0",
-	}
-	fmt.Println("build the model here")
-	//build the model
-//	oas.Info.Title = model.Comment //how we import it.
-//	oas.Info.Version = model.Version
-	return smithyModel, nil
 }

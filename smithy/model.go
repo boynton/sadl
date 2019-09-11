@@ -65,6 +65,7 @@ type Protocol struct {
 type Http struct {
 	Uri string `json:"uri,omitempty"`
 	Method string `json:"method,omitempty"`
+	Code int `json:"code,omitempty"`
 }
 
 type Shape struct {

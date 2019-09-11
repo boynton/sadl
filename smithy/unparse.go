@@ -17,7 +17,14 @@ func (model *Model) IDL() string {
 	for ns, namespace := range model.Namespaces {
 		w.Emit("\nnamespace %s\n\n", ns)
 		for k, v := range namespace.Shapes {
-			w.EmitShape(k, v)
+			if v.Type == "operation" {
+				w.EmitShape(k, v)
+			}
+		}
+		for k, v := range namespace.Shapes {
+			if v.Type != "operation" {
+				w.EmitShape(k, v)
+			}
 		}
 		//out of band traits here
 		for k, v := range namespace.Traits {
@@ -48,6 +55,25 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 	w.EmitBooleanTrait(shape.Trait, "trait", "")
 	w.EmitBooleanTrait(shape.ReadOnly, "readonly", "")
 	w.EmitBooleanTrait(shape.Idempotent, "idempotent", "")
+	if shape.Http != nil {
+		s := ""
+		if shape.Http.Method != "" {
+			s = fmt.Sprintf("method: %q", shape.Http.Method)
+		}
+		if shape.Http.Uri != "" {
+			if s != "" {
+				s = s + ", "
+			}
+			s = s + fmt.Sprintf("uri: %q", shape.Http.Uri)
+		}
+		if shape.Http.Code != 0 {
+			if s != "" {
+				s = s + ", "
+			}
+			s = s + fmt.Sprintf("code: %d", shape.Http.Code)
+		}
+		w.Emit("@http(%s)\n", s)
+	}
 	switch shape.Type {
 	case "boolean":
 		w.EmitBooleanShape(name, shape)
