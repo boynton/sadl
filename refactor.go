@@ -17,6 +17,9 @@ func (model *Model) ConvertInlineEnums() error {
 			for _, fdef := range td.Fields {
 				if fdef.Type == "Enum" {
 					tname := capitalize(fdef.Name)
+					if !strings.HasPrefix(tname, td.Name) {
+						tname = td.Name + tname
+					}
 					ntd := &TypeDef{
 						TypeSpec: fdef.TypeSpec,
 						Name:     tname,

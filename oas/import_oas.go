@@ -13,6 +13,8 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+var EnumTypes bool = false
+
 type Oas struct {
 	V3 *oas3.OpenAPI
 }
@@ -183,8 +185,7 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			//so we look for the case where all values look like identifiers, and call that an enum. Else a strings with accepted "values"
 			//perhaps the spirit of JSON Schema enums are just values, not what I think of as "enums", i.e. "a set of named values", per wikipedia.
 			//still, with symbolic values, perhaps the intent is to use proper enums, if only JSON Schema had them.
-			wantEnums := true //set to true to opportunistically try to make then real enums. If false, everything is a "value" of a string instead
-			isEnum := wantEnums
+			isEnum := EnumTypes
 			var values []string
 			for _, val := range oasSchema.Enum {
 				if s, ok := val.(string); ok {

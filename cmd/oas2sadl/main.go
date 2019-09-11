@@ -42,12 +42,13 @@ func main() {
 		fmt.Printf("oas2sadl: Cannot read source file: %v\n", err)
 		os.Exit(1)
 	}
-	oas, err := oas.Parse(data, format)
+	oas3, err := oas.Parse(data, format)
 	if err != nil {
 		fmt.Printf("oas2sadl: Cannot parse from %s source: %v\n", format, err)
 		os.Exit(1)
 	}
-	model, err := oas.ToSadl(name)
+	oas.EnumTypes = *pRefactorEnums
+	model, err := oas3.ToSadl(name)
 	if err != nil {
 		fmt.Printf("oas2sadl: Cannot convert to SADL: %v\n", err)
 		os.Exit(1)
