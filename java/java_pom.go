@@ -54,7 +54,7 @@ func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepe
 	*/
 }
 
-const jerseyVersion = `    <jersey.version>2.27</jersey.version>                                                                          `
+const jerseyVersion = `    <jersey.version>2.28</jersey.version>                                                                          `
 
 const jerseyDependsMgt = `  <dependencyManagement>
     <dependencies>
@@ -80,6 +80,17 @@ const jerseyDepends = `    <dependency>
     <dependency>
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-jackson</artifactId>
+    </dependency>
+<!-- the following is needed to compile with java11 -->
+    <dependency>
+      <groupId>javax.activation</groupId>
+      <artifactId>activation</artifactId>
+      <version>1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>javax.xml.bind</groupId>
+      <artifactId>jaxb-api</artifactId>
+      <version>2.3.0</version>
     </dependency>
 `
 
