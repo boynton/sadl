@@ -63,6 +63,7 @@ func FromSADL(schema *sadl.Model, ns string) (*Model, error) {
 			}
 			if in.Path {
 				mem.HttpLabel = in.Name
+				mem.Required = true
 			} else if in.Query != "" {
 				mem.HttpQuery = in.Query
 			} else if in.Header != "" {
@@ -281,6 +282,16 @@ func shapeFromString(ts *sadl.TypeSpec) Shape {
 	shape.Length = length(min, max)
 	if ts.Pattern != "" {
 		shape.Pattern = ts.Pattern
+	}
+	if len(ts.Values) > 0 {
+		e := make(map[string]*Item, 0)
+		for _, s := range ts.Values {
+			ei := &Item{
+				Name: s,
+			}
+			e[s] = ei
+		}
+		shape.Enum = e
 	}
 	return shape
 }

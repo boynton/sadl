@@ -179,7 +179,16 @@ func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
 	if shape.Pattern != "" {
 		w.Emit("@pattern(%q)\n", shape.Pattern)
 	}
-	//Enum
+	if shape.Enum != nil {
+		s := ""
+		for k, item := range shape.Enum {
+			if s != "" {
+				s = s + ", "
+			}
+			s = s + fmt.Sprintf("%s: {name: %q}", k, item.Name)
+		}
+		w.Emit("@enum(%s)\n", s)
+	}
 	w.Emit("%s %s\n", shape.Type, name)
 }
 
