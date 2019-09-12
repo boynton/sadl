@@ -66,7 +66,9 @@ func main() {
 	}
 
 	//JSON form
-	fmt.Println(sadl.Pretty(model))
+	if verbose {
+		fmt.Println(sadl.Pretty(model))
+	}
 
 	//IDL
 	fmt.Print(model.IDL())

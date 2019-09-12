@@ -14,15 +14,27 @@ func (model *Model) IDL() string {
 
 	w.Begin()
 	w.Emit("$version: %q\n", model.Version)
+	emitted := make(map[string]bool, 0)
 	for ns, namespace := range model.Namespaces {
 		w.Emit("\nnamespace %s\n\n", ns)
 		for k, v := range namespace.Shapes {
 			if v.Type == "operation" {
 				w.EmitShape(k, v)
+				emitted[k] = true
+				ki := k+"Input"
+				if vi, ok := namespace.Shapes[ki]; ok {
+					w.EmitShape(ki, vi)
+					emitted[ki] = true
+				}
+				ko := k+"Output"
+				if vo, ok := namespace.Shapes[ko]; ok {
+					w.EmitShape(ko, vo)
+					emitted[ko] = true
+				}
 			}
 		}
 		for k, v := range namespace.Shapes {
-			if v.Type != "operation" {
+			if !emitted[k] {
 				w.EmitShape(k, v)
 			}
 		}
@@ -128,9 +140,15 @@ func (w *IdlWriter) EmitDeprecated(dep *Deprecated, indent string) {
 	}
 }
 
-func (w *IdlWriter) EmitBooleanTrait(b bool, s, indent string) {
+func (w *IdlWriter) EmitBooleanTrait(b bool, tname, indent string) {
 	if b {
-		w.Emit("%s@%s\n", indent, s)
+		w.Emit("%s@%s\n", indent, tname)
+	}
+}
+
+func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
+	if v != "" {
+		w.Emit("%s@%s(%q)\n", indent, tname, v)
 	}
 }
 
@@ -212,6 +230,10 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 	for k, v := range shape.Members {
 		w.EmitBooleanTrait(v.Sensitive, "sensitive", indent)
 		w.EmitBooleanTrait(v.Required, "required", indent)
+		w.EmitStringTrait(v.HttpLabel, "httpLabel", indent)
+		w.EmitStringTrait(v.HttpQuery, "httpQuery", indent)
+		w.EmitStringTrait(v.HttpHeader, "httpHeader", indent)
+		w.EmitBooleanTrait(v.HttpPayload, "httpPayload", indent)
 		w.EmitDocumentation(v.Documentation, indent)
 		w.Emit("%s%s: %s,\n", indent, k, v.Target)
 	}

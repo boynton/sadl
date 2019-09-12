@@ -50,6 +50,10 @@ type Member struct {
 	Traitable
 	Target string `json:"target"`
 	Required bool `json:"required,omitempty"`
+	HttpLabel string `json:"httpLabel,omitempty"`
+	HttpQuery string `json:"httpQuery,omitempty"`
+	HttpPayload bool `json:"httpPayload,omitempty"`
+	HttpHeader string `json:"httpHeader,omitempty"`
 }
 
 type Identifiers struct {
