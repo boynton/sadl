@@ -14,6 +14,7 @@ func (gen *Generator) CreateJsonUtil() {
 
 var javaJsonUtil = `
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -23,7 +24,7 @@ public class Json {
     static final ObjectMapper om = initMapper();
     static ObjectMapper initMapper() {
         ObjectMapper om = new ObjectMapper();
-        om.disable(SerializationFeature.WRITE_NULL_MAP_VALUES);
+        om.setDefaultPropertyInclusion(JsonInclude.Value.construct(Include.ALWAYS, Include.NON_NULL));
         om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         return om;
     }
