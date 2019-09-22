@@ -199,8 +199,7 @@ func (tok Token) finish(text string) Token {
 
 func (tok Token) undefined(text string) Token {
 	tok.Type = UNDEFINED
-	tok.Text = text
-	return tok
+	return tok.finish(text)
 }
 
 func (s *Scanner) Scan() Token {
@@ -250,8 +249,7 @@ func (s *Scanner) scanSymbol(firstChar rune) Token {
 			buf.WriteRune(ch)
 		}
 	}
-	tok.Text = buf.String()
-	return tok
+	return tok.finish(buf.String())
 }
 
 func (s *Scanner) scanNumber(firstDigit rune) Token {
@@ -278,8 +276,7 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 			buf.WriteRune(ch)
 		}
 	}
-	tok.Text = buf.String()
-	return tok
+	return tok.finish(buf.String())
 }
 
 func (s *Scanner) scanComment() Token {
@@ -311,7 +308,6 @@ func (s *Scanner) scanComment() Token {
 				}
 				if nextToLast {
 					if ch == '/' {
-						tok.Text = buf.String()
 						return tok.finish(buf.String())
 					}
 					buf.WriteRune('*')
