@@ -1,12 +1,12 @@
-// Decimal is a big.Float equivalent, but marshals to JSON as strings to preserve precision.
+// Decimal is a big.Float equivalent that marshals to/from JSON.
 package sadl
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 )
 
+//we establish this "reasonable" max precision
 const DecimalPrecision = uint(250)
 
 type Decimal struct {
@@ -14,34 +14,17 @@ type Decimal struct {
 }
 
 // Encode as a JSON number. The JSON spec allows for arbitrary precision, so this is the correct thing to do.
-// Unfortunately, Go and other languages do not always decode this without loss of precision. Java handles it correctly, FWIW.
 func (d *Decimal) MarshalJSON() ([]byte, error) {
 	repr := d.Text('f', -1)
-	if false {
-		//this would preserve precision, but would not result in valid JSON numbers, which just seems wrong.
-		stringRepr := "\"" + repr + "\""
-		return []byte(stringRepr), nil
-	}
 	return []byte(repr), nil
 }
 
 func (d *Decimal) UnmarshalJSON(b []byte) error {
-	var floatRepr float64
-	err := json.Unmarshal(b, &floatRepr)
+	stringRepr := string(b)
+	num, err := ParseDecimal(stringRepr)
 	if err == nil {
-		*d = *NewDecimal(floatRepr)
+		*d = *num
 		return nil
-	}
-	//go ahead and accept string repr also for now
-	var stringRepr string
-	err = json.Unmarshal(b, &stringRepr)
-	if err == nil {
-		var num *Decimal
-		num, err = ParseDecimal(stringRepr)
-		if err == nil {
-			*d = *num
-			return nil
-		}
 	}
 	return fmt.Errorf("Bad Decimal number: %s", string(b))
 }

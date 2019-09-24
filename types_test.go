@@ -58,17 +58,6 @@ func TestBadUUID(test *testing.T) {
 	}
 }
 
-func TestDecimal(test *testing.T) {
-	jsonData := `"123.456"`
-	var d *Decimal
-	err := decode(jsonData, &d)
-	if err != nil {
-		test.Errorf("%v", err)
-	} else {
-		fmt.Println(Pretty(d))
-	}
-}
-
 func TestGood2Decimal(test *testing.T) {
 	jsonData := `123`
 	var d *Decimal
@@ -116,7 +105,8 @@ func TestLargeDecimal(test *testing.T) {
 	}
 	if pi.Cmp(d.AsBigFloat()) != 0 {
 		fmt.Printf("Decimal decoding loss of precision: decoded %s to %s\n", jsonData, d.String())
-		fmt.Println("[This is a known problem with golang's JSON decoder]")
+	} else {
+		fmt.Printf("Decimal decoding succeeded: Pi correctly decoded to %s\n", d.String())
 	}
 }
 
@@ -148,8 +138,6 @@ func TestBadUnitValue(test *testing.T) {
 	err := decode(jsonData, &q)
 	if err == nil {
 		test.Errorf("Bad UnitValue should have caused an error: %q", jsonData)
-	} else {
-		fmt.Println(err)
 	}
 
 }
