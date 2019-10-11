@@ -50,7 +50,7 @@ type Member struct {
 	Traitable
 	Target string `json:"target"`
 	Required bool `json:"required,omitempty"`
-	HttpLabel string `json:"httpLabel,omitempty"`
+	HttpLabel bool `json:"httpLabel,omitempty"`
 	HttpQuery string `json:"httpQuery,omitempty"`
 	HttpPayload bool `json:"httpPayload,omitempty"`
 	HttpHeader string `json:"httpHeader,omitempty"`
@@ -98,6 +98,7 @@ type Shape struct {
 	Idempotent bool `json:"idempotent,omitempty"`
 	ReadOnly bool `json:"readonly,omitempty"`
 	Http *Http `json:"http,omitempty"`
+	HttpError int32 `json:"httpError,omitempty"`
 }
 
 type Namespace struct {

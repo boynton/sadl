@@ -86,6 +86,10 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 		}
 		w.Emit("@http(%s)\n", s)
 	}
+	if shape.HttpError != 0 {
+		//note: @retryable
+		w.Emit("@error(\"client\")\n@httpError(%d)\n", shape.HttpError)
+	}
 	switch shape.Type {
 	case "boolean":
 		w.EmitBooleanShape(name, shape)
@@ -148,7 +152,11 @@ func (w *IdlWriter) EmitBooleanTrait(b bool, tname, indent string) {
 
 func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
 	if v != "" {
-		w.Emit("%s@%s(%q)\n", indent, tname, v)
+		if v == "-" { //hack
+			w.Emit("%s@%s\n", indent, tname)
+		} else {
+			w.Emit("%s@%s(%q)\n", indent, tname, v)
+		}
 	}
 }
 
@@ -239,7 +247,7 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 	for k, v := range shape.Members {
 		w.EmitBooleanTrait(v.Sensitive, "sensitive", indent)
 		w.EmitBooleanTrait(v.Required, "required", indent)
-		w.EmitStringTrait(v.HttpLabel, "httpLabel", indent)
+		w.EmitBooleanTrait(v.HttpLabel, "httpLabel", indent)
 		w.EmitStringTrait(v.HttpQuery, "httpQuery", indent)
 		w.EmitStringTrait(v.HttpHeader, "httpHeader", indent)
 		w.EmitBooleanTrait(v.HttpPayload, "httpPayload", indent)
