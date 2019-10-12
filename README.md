@@ -42,7 +42,7 @@ To just parse, show errors, and output the JSON representation of the resulting 
 To generate Java code:
 
     $(GOPATH)/bin/sadl2java
-    usage: sadl2pojo -dir projdir -src relative_source_dir -package java.package.name -pom -server -jsonutil -getters -lombok some_model.sadl
+    usage: sadl2java -dir projdir -src relative_source_dir -rez relative_resource_dir -package java.package.name -pom -server -getters -lombok some_model.sadl
 
 The `pom` option creates a Maven pom.xml file with dependencies to build the resulting code, and the `server` option produces example JAX-RS server code (using
 Jersey, Jackson, and Jetty), useful as a quick ready-to-build project creation tool.
