@@ -339,7 +339,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("http", []string{"action"})
+	options, err := p.ParseOptions("http", []string{"action", "resource"})
 	if err != nil {
 		return err
 	}
@@ -347,6 +347,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 		Method:      method,
 		Path:        pathTemplate,
 		Name:        options.Action,
+		Resource:    options.Resource,
 		Annotations: options.Annotations,
 	}
 	tok := p.GetToken()
@@ -1112,6 +1113,7 @@ type Options struct {
 	Min         *Decimal
 	Max         *Decimal
 	Action      string
+	Resource    string
 	Header      string
 	Reference   string
 	Annotations map[string]string
@@ -1157,6 +1159,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Default, err = p.parseEqualsLiteral()
 					case "action":
 						options.Action, err = p.expectEqualsIdentifier()
+					case "resource":
+						options.Resource, err = p.expectEqualsString()
 					case "reference":
 						options.Reference, err = p.expectEqualsIdentifier()
 					case "header":

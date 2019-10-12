@@ -93,6 +93,7 @@ type ActionDef struct {
 
 type HttpDef struct {
 	Name        string               `json:"name,omitempty"`
+	Resource    string               `json:"resource,omitempty"`
 	Comment     string               `json:"comment,omitempty"`
 	Annotations map[string]string    `json:"annotations,omitempty"`
 	Method      string               `json:"method"`

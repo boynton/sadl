@@ -36,7 +36,11 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 	oas := &oas3.OpenAPI{
 		OpenAPI: "3.0.0",
 	}
-	oas.Info.Title = model.Comment //how we import it.
+	comment := model.Comment
+	if comment == "" {
+		comment = model.Name
+	}
+	oas.Info.Title = comment
 	oas.Info.Version = model.Version
 	if model.Annotations != nil {
 		if url, ok := model.Annotations["x_server"]; ok {
@@ -66,7 +70,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 	oas.Paths = make(map[string]*oas3.PathItem, 0)
 	for _, hdef := range model.Http {
 		var pi *oas3.PathItem
-		p := hdef.Path
+		p := model.Base + hdef.Path
 		i := strings.Index(p, "?")
 		if i >= 0 {
 			p = p[:i]
@@ -83,9 +87,14 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			}
 			oas.Paths[p] = pi
 		}
+		var tags []string
+		if rez, ok := hdef.Annotations["resource"]; ok {
+			tags = append(tags, rez)
+		}
 		op := &oas3.Operation{
 			OperationID: hdef.Name,
 			Summary:     hdef.Comment,
+			Tags:        tags,
 			//Parameters
 			//Body
 			//Responses
@@ -98,6 +107,9 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 					op.Tags = strings.Split(v, ",")
 				}
 			}
+		}
+		if hdef.Resource != "" {
+			op.Tags = append(op.Tags, hdef.Resource)
 		}
 		switch hdef.Method {
 		case "GET":
@@ -154,8 +166,12 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		responses := make(map[string]*oas3.Response, 0)
 		op.Responses = responses
 		content := make(map[string]*oas3.MediaType)
+		comment := hdef.Expected.Comment
+		if comment == "" {
+			comment = "Expected response"
+		}
 		resp := &oas3.Response{
-			Description: hdef.Expected.Comment,
+			Description: comment,
 			Content:     content,
 		}
 		var headers map[string]*oas3.Header
@@ -191,8 +207,12 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		responses[key] = resp
 		for _, out := range hdef.Exceptions {
 			content := make(map[string]*oas3.MediaType)
+			comment := out.Comment
+			if comment == "" {
+				comment = "Exceptional response"
+			}
 			resp := &oas3.Response{
-				Description: out.Comment,
+				Description: comment,
 				Content:     content,
 			}
 			tr := &oas3.Schema{
