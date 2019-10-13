@@ -149,7 +149,7 @@ func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
-			case "rpc", "action":
+			case "rpc", "action", "operation":
 				err = p.parseActionDirective(comment)
 			case "http":
 				err = p.parseHttpDirective(comment)
@@ -370,9 +370,45 @@ func (p *Parser) parseHttpDirective(comment string) error {
 			}
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
+		ensureActionName(op)
 		p.schema.Http = append(p.schema.Http, op)
 	} else {
 		return p.SyntaxError()
+	}
+	return nil
+}
+
+func ensureResourceName(hact *HttpDef) error {
+	if hact.Resource == "" {
+		hact.Resource = resourceName(hact)
+		if hact.Resource == "" {
+			return fmt.Errorf("Cannot determine resource name: %s", Pretty(hact))
+		}
+	}
+	return nil
+}
+
+func resourceName(hact *HttpDef) string {
+	parts := strings.Split(hact.Path, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if strings.Index(parts[i], "{") < 0 {
+			return parts[i]
+		}
+	}
+	return ""
+}
+
+func actionName(hact *HttpDef) string {
+	return strings.ToLower(hact.Method) + capitalize(hact.Resource)
+}
+
+func ensureActionName(hact *HttpDef) error {
+	if hact.Name == "" {
+		err := ensureResourceName(hact)
+		if err != nil {
+			return err
+		}
+		hact.Name = actionName(hact)
 	}
 	return nil
 }
@@ -587,6 +623,7 @@ func (p *Parser) parseExampleDirective(comment string) error {
 		ex := &ExampleDef{
 			Target:  target,
 			Example: val,
+			Comment: comment,
 		}
 		p.schema.Examples = append(p.schema.Examples, ex)
 	}
@@ -1160,7 +1197,7 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 					case "action":
 						options.Action, err = p.expectEqualsIdentifier()
 					case "resource":
-						options.Resource, err = p.expectEqualsString()
+						options.Resource, err = p.expectEqualsIdentifier()
 					case "reference":
 						options.Reference, err = p.expectEqualsIdentifier()
 					case "header":
@@ -1781,17 +1818,15 @@ func (p *Parser) Validate() (*Model, error) {
 }
 
 func (p *Parser) validateExample(ex *ExampleDef) error {
-	lst := strings.Split(ex.Target, ".")
-	theType := lst[0]
-	t := p.model.FindType(theType)
-	if t == nil {
-		return fmt.Errorf("Undefined type '%s' in example: %s", theType, Pretty(ex))
+	//todo: be able to address action requests & responses as targets
+	ts, err := p.model.FindExampleType(ex)
+	if err != nil {
+		return err
 	}
-	if len(lst) > 1 {
-		//fmt.Println("warning: validation against arbitrary example target NYI:", ex.Example)
+	if ts == nil {
 		return nil
 	}
-	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, &t.TypeSpec, ex.Example)
+	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, ts, ex.Example)
 }
 
 func (p *Parser) validateHttpPathTemplate(path string) error {

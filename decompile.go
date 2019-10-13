@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-const indentAmount = "   "
+const indentAmount = "\t"
 
 func NewGenerator(model *Model, outdir string) *Generator {
 	gen := &Generator{
@@ -67,6 +67,9 @@ func (g *Generator) Generate() string {
 		},
 		"http": func(hact *HttpDef) string {
 			return g.sadlHttpSpec(hact)
+		},
+		"example": func(ed *ExampleDef) string {
+			return fmt.Sprintf("example %s %s\n", ed.Target, Pretty(ed.Example))
 		},
 	}
 	g.Begin()
@@ -180,7 +183,9 @@ func (g *Generator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string) str
 func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 	var opts []string
 	if hact.Name != "" {
-		opts = append(opts, "action="+hact.Name)
+		if hact.Name != actionName(hact) {
+			opts = append(opts, "action="+hact.Name)
+		}
 	}
 	if len(hact.Annotations) > 0 {
 		for k, v := range hact.Annotations {
@@ -273,4 +278,5 @@ version "{{.Version}}"{{end}}{{annotations .Annotations}}
 {{blockComment .Comment}}{{typedef .}}{{end}}{{end}}
 {{if .Actions}}{{range .Actions}}
 {{blockComment .Comment}}{{action .}}{{end}}{{end}}{{if .Http}}{{range .Http}}
-{{blockComment .Comment}}{{http .}}{{end}}{{end}}`
+{{blockComment .Comment}}{{http .}}{{end}}{{end}}{{if .Examples}}{{range .Examples}}
+{{blockComment .Comment}}{{example .}}{{end}}{{end}}`

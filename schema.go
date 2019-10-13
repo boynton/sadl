@@ -77,6 +77,7 @@ type StructFieldDef struct {
 
 type ExampleDef struct {
 	Target      string            `json:"target"`
+	Name        string            `json:"name,omitempty"`
 	Example     interface{}       `json:"example,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`

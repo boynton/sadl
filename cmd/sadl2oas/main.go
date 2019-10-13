@@ -10,17 +10,19 @@ import (
 	"github.com/boynton/sadl/oas"
 )
 
-var verbose bool = false
-
 func main() {
-	pVerbose := flag.Bool("v", false, "set to true to enable verbose output")
+	pVersion := flag.Int("v", 3, "export to the specified OAS version (default is 3)")
 	flag.Parse()
 	args := flag.Args()
 	if len(args) != 1 {
-		fmt.Println("usage: sadl2oas file")
+		fmt.Println("usage: sadl2oas [-v version] file")
 		os.Exit(1)
 	}
-	verbose = *pVerbose
+	version := *pVersion
+	if version != 2 && version != 3 {
+		fmt.Println("The 'version' to export to must be either 2 or 3:", version)
+		os.Exit(1)
+	}
 	path := args[0]
 	name := path
 	n := strings.LastIndex(name, "/")
@@ -39,10 +41,20 @@ func main() {
 	}
 
 	gen := oas.NewGenerator(schema, "/tmp") //DO: remove the outdir arg, will print to stdout
-	doc, err := gen.ExportToOAS3()
-	if err != nil {
-		fmt.Printf("sadl2oas: Cannot convert SADL to OAS: %v\n", err)
-		os.Exit(1)
+	switch version {
+	case 2:
+		doc, err := gen.ExportToOAS2()
+		if err != nil {
+			fmt.Printf("sadl2oas: Cannot convert SADL to OAS v2: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(sadl.Pretty(doc))
+	case 3:
+		doc, err := gen.ExportToOAS3()
+		if err != nil {
+			fmt.Printf("sadl2oas: Cannot convert SADL to OAS v3: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(sadl.Pretty(doc))
 	}
-	fmt.Println(sadl.Pretty(doc))
 }

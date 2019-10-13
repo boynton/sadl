@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/oas/oas2"
 	"github.com/boynton/sadl/oas/oas3"
 	//	"github.com/ghodss/yaml"
 )
@@ -35,6 +36,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 	model := gen.Model
 	oas := &oas3.OpenAPI{
 		OpenAPI: "3.0.0",
+		Info:    &oas3.Info{},
 	}
 	comment := model.Comment
 	if comment == "" {
@@ -42,6 +44,9 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 	}
 	oas.Info.Title = comment
 	oas.Info.Version = model.Version
+	if oas.Info.Version == "" {
+		oas.Info.Version = "dev"
+	}
 	if model.Annotations != nil {
 		if url, ok := model.Annotations["x_server"]; ok {
 			oas.Servers = append(oas.Servers, &oas3.Server{URL: url})
@@ -66,6 +71,20 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		}
 		oas.Components.Schemas[td.Name] = otd
 	}
+	//Examples
+	for _, ed := range model.Examples {
+		//ok, for now: just "example", not "examples", i.e. no name. And, parameter examples override the matching type example
+		//media types (the operation body) can also have examples, and also overrides the schema example
+		//SO: do not use  oas.Components.Examples just yet
+		//the simple case of an example for a type
+		if sch, ok := oas.Components.Schemas[ed.Target]; ok {
+			sch.Example = ed.Example
+		} else {
+			//todo: walk the compound name, install at the element if supported.
+			//todo: handle operation request and response parameters
+			fmt.Fprintf(os.Stderr, "[warning: example not exported for %q\n", ed.Target)
+		}
+	}
 	//Paths
 	oas.Paths = make(map[string]*oas3.PathItem, 0)
 	for _, hdef := range model.Http {
@@ -87,14 +106,11 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			}
 			oas.Paths[p] = pi
 		}
-		var tags []string
-		if rez, ok := hdef.Annotations["resource"]; ok {
-			tags = append(tags, rez)
-		}
+		//note: the first tag is always the resource name for the action
 		op := &oas3.Operation{
 			OperationID: hdef.Name,
 			Summary:     hdef.Comment,
-			Tags:        tags,
+			Tags:        []string{hdef.Resource},
 			//Parameters
 			//Body
 			//Responses
@@ -104,12 +120,11 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		if len(hdef.Annotations) > 0 {
 			for k, v := range hdef.Annotations {
 				if k == "x_tags" {
-					op.Tags = strings.Split(v, ",")
+					for _, t := range strings.Split(v, ",") {
+						op.Tags = append(op.Tags, t)
+					}
 				}
 			}
-		}
-		if hdef.Resource != "" {
-			op.Tags = append(op.Tags, hdef.Resource)
 		}
 		switch hdef.Method {
 		case "GET":
@@ -117,6 +132,16 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
 			}
 			pi.Get = op
+		case "PUT":
+			if pi.Put != nil {
+				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
+			}
+			pi.Put = op
+		case "DELETE":
+			if pi.Delete != nil {
+				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
+			}
+			pi.Delete = op
 		case "POST":
 			if pi.Post != nil {
 				return nil, fmt.Errorf("Duplicate HTTP Method spec (%s %s)", hdef.Method, p)
@@ -326,7 +351,6 @@ func (gen *Generator) exportStringTypeDef(td *sadl.TypeDef) (*oas3.Schema, error
 		}
 		otd.Enum = e
 	}
-	//pattern, min/max length
 	return otd, nil
 }
 
@@ -408,6 +432,13 @@ func (gen *Generator) oasSchema(td *sadl.TypeSpec, name string) (*oas3.Schema, e
 		if td.Pattern != "" {
 			tr.Pattern = td.Pattern
 		}
+		if td.MinSize != nil {
+			tr.MinLength = uint64(*td.MinSize)
+		}
+		if td.MaxSize != nil {
+			tmp := uint64(*td.MaxSize)
+			tr.MaxLength = &tmp
+		}
 		return tr, nil
 	case "Timestamp":
 		tr := &oas3.Schema{
@@ -482,4 +513,12 @@ func (gen *Generator) oasSchema(td *sadl.TypeSpec, name string) (*oas3.Schema, e
 			Ref: "#/components/schemas/" + td.Type,
 		}, nil
 	}
+}
+
+func (gen *Generator) ExportToOAS2() (*oas2.OpenAPI, error) {
+	v3, err := gen.ExportToOAS3()
+	if err != nil {
+		return nil, err
+	}
+	return oas2.ConvertFromV3(v3)
 }

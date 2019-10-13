@@ -2,10 +2,18 @@ package oas3
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/ghodss/yaml"
 )
 
+func OasError(format string, args ...interface{}) error {
+	return fmt.Errorf("(OAS v3) - "+format, args...)
+}
+func missingFieldError(fld, obj string) error {
+	return OasError("Missing required field '%s' in %s object", fld, obj)
+}
 func Parse(data []byte, format string) (*OpenAPI, error) {
 	var err error
 	v3 := &OpenAPI{}
@@ -17,13 +25,60 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 	if err != nil {
 		return nil, err
 	}
+	return Validate(v3)
+}
+
+func Validate(v3 *OpenAPI) (*OpenAPI, error) {
+	if v3.OpenAPI == "" {
+		return nil, missingFieldError("openapi", "OpenAPI")
+	}
+
+	if v3.Info == nil {
+		return nil, missingFieldError("info", "OpenAPI")
+	}
+	err := ValidateInfo(v3.Info)
+	if err != nil {
+		return nil, err
+	}
+	if v3.Paths == nil {
+		return nil, missingFieldError("paths", "OpenAPI")
+	}
+	err = ValidatePaths(v3.Paths)
+	if err != nil {
+		return nil, err
+	}
 	return v3, nil
+}
+
+func ValidateInfo(info *Info) error {
+	if info.Title == "" {
+		return missingFieldError("title", "Info")
+	}
+	if info.Version == "" {
+		return missingFieldError("version", "Info")
+	}
+	if info.License != nil {
+		if info.License.Name == "" {
+			return missingFieldError("name", "License")
+		}
+	}
+	return nil
+}
+
+func ValidatePaths(paths map[string]*PathItem) error {
+	for k, _ := range paths {
+		if !strings.HasPrefix(k, "/") {
+			return OasError("Key in Paths object must start with '/': ", k)
+			//validate the PathItem?
+		}
+	}
+	return nil
 }
 
 type OpenAPI struct {
 	Extensions   map[string]interface{} `json:"-"`
 	OpenAPI      string                 `json:"openapi"`           // Required
-	Info         Info                   `json:"info"`              // Required
+	Info         *Info                  `json:"info"`              // Required
 	Servers      []*Server              `json:"servers,omitempty"` //?change
 	Paths        map[string]*PathItem   `json:"paths,omitempty"`   //?change
 	Components   *Components            `json:"components,omitempty"`

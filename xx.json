@@ -1,0 +1,125 @@
+{
+  "components": {
+    "schemas": {
+      "Bar": {
+        "type": "object",
+        "properties": {
+          "foos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Foo"
+            }
+          }
+        }
+      },
+      "Foo": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "Identifier": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50,
+        "pattern": "[a-zA-Z][a-zA-Z0-9_-]*"
+      }
+    }
+  },
+  "info": {
+    "title": "This is a test",
+    "version": "dev"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/foo/{id}": {
+      "get": {
+        "tags": [
+          "foo"
+        ],
+        "operationId": "getFoo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expected response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Foo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "this is somehow allowed, but no good way to codegen it without leaking the status into the app. I should forbid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Foo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "foo",
+          "two",
+          "three"
+        ],
+        "operationId": "putFoo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Identifier"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Foo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Expected response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Foo"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

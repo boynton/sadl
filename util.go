@@ -114,3 +114,95 @@ func min(n1 int, n2 int) int {
 	}
 	return n2
 }
+
+func capitalize(s string) string {
+	return strings.ToUpper(s[0:1]) + s[1:]
+}
+
+func uncapitalize(s string) string {
+	return strings.ToLower(s[0:1]) + s[1:]
+}
+
+func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
+	lst := strings.Split(ex.Target, ".")
+	theType := lst[0]
+	lst = lst[1:]
+	var ts *TypeSpec
+	t := model.FindType(theType)
+	if t != nil {
+		ts = &t.TypeSpec
+	} else {
+		//http requests and responses are not quite like structs, although inputs and expected outputs are of type StructFieldDef
+		if strings.HasSuffix(theType, "Request") {
+			httpName := uncapitalize(theType[:len(theType)-len("Request")])
+			h := model.FindHttp(httpName)
+			if h != nil {
+				if len(lst) > 0 {
+					var tmp *TypeSpec
+					fname := lst[0]
+					for _, in := range h.Inputs {
+						if in.Name == fname {
+							lst = lst[1:]
+							tmp = &in.TypeSpec
+							break
+						}
+					}
+					if tmp == nil {
+						return nil, fmt.Errorf("Unknown http input '%s' when dereferencing example target: %s", fname, ex.Target)
+					}
+					ts = tmp
+				} else {
+					//return nil, fmt.Errorf("NYI: example target of the top level response type, which is synthesized: %s", theType)
+					//let it just not validate for now
+					return nil, nil
+				}
+			}
+		} else if strings.HasSuffix(theType, "Response") {
+			httpName := uncapitalize(theType[:len(theType)-len("Response")])
+			h := model.FindHttp(httpName)
+			if h != nil {
+				if len(lst) > 0 {
+					var tmp *TypeSpec
+					fname := lst[0]
+					for _, out := range h.Expected.Outputs {
+						if out.Name == fname {
+							lst = lst[1:]
+							tmp = &out.TypeSpec
+							break
+						}
+					}
+					if tmp == nil {
+						return nil, fmt.Errorf("Unknown http input '%s' when dereferencing example target: %s", fname, ex.Target)
+					}
+					ts = tmp
+				} else {
+					//return nil, fmt.Errorf("NYI: example target of the top level response type, which is synthesized: %s", theType)
+					//let it just not validate for now
+					return nil, nil
+				}
+			}
+		}
+	}
+	if ts == nil {
+		return nil, fmt.Errorf("Undefined type '%s' in example: %s", theType, Pretty(ex))
+	}
+	for len(lst) > 0 {
+		if ts.Type != "Struct" {
+			return nil, fmt.Errorf("Cannot dereference a non-struct in example target: %v", ex)
+		}
+		fname := lst[0]
+		lst = lst[1:]
+		var field *StructFieldDef
+		for _, fd := range ts.Fields {
+			if fd.Name == fname {
+				field = fd
+				break
+			}
+		}
+		if field == nil {
+			return nil, fmt.Errorf("Unknown field '%s' when dereferencing example target: %s", fname, ex.Target)
+		}
+		ts = &field.TypeSpec
+	}
+	return ts, nil
+}

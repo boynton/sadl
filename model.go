@@ -13,12 +13,14 @@ type Model struct {
 	Schema
 	Extensions map[string]interface{} `json:"extensions,omitempty"`
 	typeIndex  map[string]*TypeDef
+	httpIndex  map[string]*HttpDef
 }
 
 func NewModel(schema *Schema) (*Model, error) {
 	model := &Model{
 		Schema:    *schema,
 		typeIndex: make(map[string]*TypeDef, 0),
+		httpIndex: make(map[string]*HttpDef, 0),
 	}
 	for _, name := range BaseTypes {
 		model.typeIndex[name] = &TypeDef{Name: name, TypeSpec: TypeSpec{Type: name}}
@@ -29,6 +31,12 @@ func NewModel(schema *Schema) (*Model, error) {
 		}
 		model.typeIndex[td.Name] = td
 	}
+	for _, hd := range schema.Http {
+		if _, ok := model.httpIndex[hd.Name]; ok {
+			return nil, fmt.Errorf("Duplicate http action: %q", hd.Name)
+		}
+		model.httpIndex[hd.Name] = hd
+	}
 	return model, nil
 }
 
@@ -36,6 +44,15 @@ func (model *Model) FindType(name string) *TypeDef {
 	if model.typeIndex != nil {
 		if t, ok := model.typeIndex[name]; ok {
 			return t
+		}
+	}
+	return nil
+}
+
+func (model *Model) FindHttp(name string) *HttpDef {
+	if model.httpIndex != nil {
+		if h, ok := model.httpIndex[name]; ok {
+			return h
 		}
 	}
 	return nil

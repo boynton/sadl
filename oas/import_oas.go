@@ -58,7 +58,7 @@ func Parse(data []byte, format string) (*Oas, error) {
 	oas := &Oas{}
 	if strings.HasPrefix(version, "3.") {
 		oas.V3, err = oas3.Parse(data, format)
-		return oas, nil
+		return oas, err
 	} else if strings.HasPrefix(version, "2.") {
 		v2, err := oas2.Parse(data, format)
 		if err == nil {
@@ -74,6 +74,7 @@ var examples []*sadl.ExampleDef
 var methods = []string{"GET", "PUT", "POST", "DELETE", "DELETE", "HEAD"} //to do: "PATCH", "OPTIONS", "TRACE"
 
 func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
+	examples = nil
 	comment := oas.V3.Info.Title
 	if sadl.IsSymbol(comment) {
 		name = comment
@@ -160,6 +161,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	}
 
 	schema.Examples = examples
+
 	return sadl.NewModel(schema)
 }
 
@@ -176,6 +178,13 @@ func oasTypeRef(oasSchema *oas3.Schema) string {
 func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) {
 	var err error
 	var ts sadl.TypeSpec
+	if oasSchema.Example != nil {
+		ex := &sadl.ExampleDef{
+			Target:  name,
+			Example: oasSchema.Example,
+		}
+		examples = append(examples, ex)
+	}
 	switch oasSchema.Type {
 	case "boolean":
 		ts.Type = "Bool"
@@ -213,13 +222,6 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			ts.Type = "String"
 		}
 		if ts.Type == "String" {
-			if oasSchema.Example != nil {
-				ex := &sadl.ExampleDef{
-					Target:  name,
-					Example: oasSchema.Example,
-				}
-				examples = append(examples, ex)
-			}
 			ts.Pattern = oasSchema.Pattern
 			if oasSchema.MinLength > 0 {
 				tmpMin := int64(oasSchema.MinLength)
@@ -457,16 +459,22 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 	}
 	if len(op.Tags) > 0 {
 		hact.Annotations = make(map[string]string, 0)
-
+		//note: first tag is used as the "resource" name in SADL.
 		tmp := ""
+		rez := ""
 		for _, tag := range op.Tags {
-			if tmp == "" {
+			if rez == "" {
+				rez = tag
+			} else if tmp == "" {
 				tmp = tag
 			} else {
 				tmp = tmp + "," + tag
 			}
 		}
-		hact.Annotations["x_tags"] = tmp
+		hact.Resource = rez
+		if len(tmp) > 0 {
+			hact.Annotations["x_tags"] = tmp
+		}
 	}
 
 	var queries []string
@@ -479,8 +487,6 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 				Required: param.Required,
 			},
 		}
-		//FIXME: the p.Name is the "source name". There is no formal parameter name defined, although for pathparam, the p.Name acts like it.
-		//So, a formal param name (for codegen) must be synthesized, and must be an Indentifier
 		switch param.In {
 		case "query":
 			spec.Query = param.Name
@@ -595,7 +601,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 				if schref.Ref != "" {
 					param.Type = oasTypeRef(schref)
 				} else {
-					param.TypeSpec, err = convertOasType(hact.Name+".Expected."+param.Name, schref)
+					param.TypeSpec, err = convertOasType(hact.Name+".Expected."+param.Name, schref) //fix: example
 				}
 				ex.Outputs = append(ex.Outputs, param)
 			}
@@ -609,7 +615,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 					if schref.Ref != "" {
 						result.Type = oasTypeRef(schref)
 					} else {
-						result.TypeSpec, err = convertOasType(hact.Name+".Expected.payload", schref)
+						result.TypeSpec, err = convertOasType(hact.Name+".Expected.payload", schref) //fix: example
 					}
 					ex.Outputs = append(ex.Outputs, result)
 				} else {

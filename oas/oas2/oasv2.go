@@ -95,6 +95,20 @@ type Parameter struct {
 
 type StringOrArray []string
 
+func (s StringOrArray) MarshalJSON() ([]byte, error) {
+	str := ""
+	if len(s) == 1 {
+		str = s[0]
+	} else {
+		arr := make([]string, 0, len(s))
+		for _, i := range s {
+			arr = append(arr, i)
+		}
+		return json.Marshal(arr)
+	}
+	return json.Marshal(str)
+}
+
 func (s *StringOrArray) UnmarshalJSON(data []byte) error {
 	var first byte
 	if len(data) > 1 {
@@ -129,6 +143,13 @@ func (s *StringOrArray) UnmarshalJSON(data []byte) error {
 type SchemaOrArray struct {
 	Schema  *Schema
 	Schemas []Schema
+}
+
+func (s *SchemaOrArray) MarshalJSON() ([]byte, error) {
+	if s.Schemas != nil {
+		return json.Marshal(s.Schemas)
+	}
+	return json.Marshal(s.Schema)
 }
 
 func (s *SchemaOrArray) UnmarshalJSON(data []byte) error {
@@ -320,9 +341,16 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 	return v2, err
 }
 
+func OasError(format string, args ...interface{}) error {
+	return fmt.Errorf("(OAS v2) - "+format, args...)
+}
+
 func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 	v3 := &oas3.OpenAPI{
 		Components: &oas3.Components{},
+	}
+	if v2.Info == nil {
+		return nil, OasError("Missing required field 'info' in Swaggger object")
 	}
 	v3.Info = convertInfo(v2.Info)
 	v3.Components.Schemas = make(map[string]*oas3.Schema, 0)
@@ -345,8 +373,8 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 	return v3, nil
 }
 
-func convertInfo(v2Info *Info) oas3.Info {
-	info := oas3.Info{
+func convertInfo(v2Info *Info) *oas3.Info {
+	info := &oas3.Info{
 		Title:       v2Info.Title,
 		Description: v2Info.Description,
 		Version:     v2Info.Version,
@@ -385,6 +413,17 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 		switch stype {
 		case "string":
 			v3.Type = "string"
+			if v2.Enum != nil {
+				v3.Enum = v2.Enum
+			}
+			v3.Pattern = v2.Pattern
+			if v2.MinLength != nil {
+				v3.MinLength = uint64(*v2.MinLength)
+			}
+			if v2.MaxLength != nil {
+				tmp := uint64(*v2.MaxLength)
+				v3.MaxLength = &tmp
+			}
 			//todo restrictions
 		case "array":
 			v3.Type = "array"
@@ -404,6 +443,7 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 					schemas[fname] = v3schema
 				}
 				v3.Properties = schemas
+				v3.Required = v2.Required
 			}
 		case "boolean":
 			v3.Type = "boolean"
@@ -496,3 +536,92 @@ func fixV2SchemaRef(sref *openapi3.SchemaRef) {
 
 }
 */
+
+func ConvertFromV3(v3 *oas3.OpenAPI) (*OpenAPI, error) {
+	v2 := &OpenAPI{
+		Swagger: "2.0",
+		Info: &Info{
+			Title:          v3.Info.Title,
+			Version:        v3.Info.Version,
+			Description:    v3.Info.Description,
+			TermsOfService: v3.Info.TermsOfService,
+		},
+	}
+	if v3.Info.Contact != nil {
+		v2.Info.Contact = &ContactInfo{
+			Name:  v3.Info.Contact.Name,
+			URL:   v3.Info.Contact.URL,
+			Email: v3.Info.Contact.Email,
+		}
+	}
+	if v3.Info.License != nil {
+		v2.Info.License = &License{
+			Name: v3.Info.License.Name,
+			URL:  v3.Info.License.URL,
+		}
+	}
+	v2.Definitions = make(map[string]*Schema, 0)
+	for tname, schema := range v3.Components.Schemas {
+		schema2, err := schemaFromV3(schema)
+		if err != nil {
+			return nil, err
+		}
+		v2.Definitions[tname] = schema2
+	}
+	return v2, nil
+}
+
+func refFromV3(ref string) (string, error) {
+	prefix := "#/components/schemas/"
+	if strings.HasPrefix(ref, prefix) {
+		tname := ref[len(prefix):]
+		return "#/definitions/" + tname, nil
+	}
+	return "", fmt.Errorf("Cannot convert reference to v2: %q", ref)
+}
+
+func schemaFromV3(schema3 *oas3.Schema) (*Schema, error) {
+	var err error
+	schema2 := &Schema{}
+	if schema3.Ref != "" {
+		schema2.Ref, err = refFromV3(schema3.Ref)
+		if err != nil {
+			return nil, err
+		}
+		return schema2, nil
+	}
+	schema2.Type = append(schema2.Type, schema3.Type) //?
+	switch schema3.Type {
+	case "string":
+		schema2.Pattern = schema3.Pattern
+		if schema3.MinLength > 0 {
+			tmp := int64(schema3.MinLength)
+			schema2.MinLength = &tmp
+		}
+		if schema3.MaxLength != nil {
+			tmp := int64(*schema3.MaxLength)
+			schema2.MaxLength = &tmp
+		}
+	case "array":
+		itemType, err := schemaFromV3(schema3.Items)
+		if err != nil {
+			return nil, err
+		}
+		schema2.Items = &SchemaOrArray{
+			Schema: itemType,
+		}
+	case "object":
+		schema2.Required = schema3.Required
+		schema2.Properties = make(map[string]*Schema, 0)
+		for k, v := range schema3.Properties {
+			schema2.Properties[k], err = schemaFromV3(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+	default:
+		panic("fix me")
+		//		return nil, fmt.Errorf("NYI")
+	}
+	return schema2, nil
+}

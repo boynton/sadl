@@ -44,7 +44,7 @@ func main() {
 	}
 	oas3, err := oas.Parse(data, format)
 	if err != nil {
-		fmt.Printf("oas2sadl: Cannot parse from %s source: %v\n", format, err)
+		fmt.Printf("oas2sadl: Cannot import OpenAPI document: %v\n", err)
 		os.Exit(1)
 	}
 	oas.EnumTypes = *pRefactorEnums

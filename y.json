@@ -1,0 +1,34 @@
+{
+  "name": "test2",
+  "version": "v1",
+  "comment": "test2 - originally in oasv3",
+  "types": [
+    {
+      "name": "CarrierInfo",
+      "type": "Struct",
+      "fields": [
+        {
+          "name": "shipmentType",
+          "type": "String",
+          "values": [
+            "SPD",
+            "LTL"
+          ]
+        },
+        {
+          "name": "carrierId",
+          "type": "String"
+        },
+        {
+          "name": "scac",
+          "type": "String"
+        },
+        {
+          "name": "carrierName",
+          "type": "String"
+        }
+      ]
+    }
+  ]
+}
+
