@@ -545,6 +545,12 @@ func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
 	if err != nil {
 		return err
 	}
+	//check for dups.
+	for _, exc := range op.Exceptions {
+		if exc.Type == etype {
+			return p.Error("Duplicate HTTP action exception type: " + exc.Type)
+		}
+	}
 	options, err := p.ParseOptions("HttpResponse", []string{})
 	if err != nil {
 		return err
@@ -1868,6 +1874,10 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	needsBody := hact.Method == "POST" || hact.Method == "PUT"
 	bodyParam := ""
 	for _, in := range hact.Inputs {
+		t := p.model.FindType(in.Type)
+		if t == nil {
+			return fmt.Errorf("Action '%s' input type '%s' is not defined", hact.Name, in.Type)
+		}
 		//paramType, paramName := p.parameterSource(hact.Path, in.Name)
 		if !in.Path && in.Query == "" && in.Header == "" {
 			if needsBody {
@@ -1887,15 +1897,25 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	needsBody = hact.Expected.Status != 204 && hact.Expected.Status != 304
 	bodyParam = ""
 	for _, out := range hact.Expected.Outputs {
+		t := p.model.FindType(out.Type)
+		if t == nil {
+			return fmt.Errorf("Action '%s' expected type '%s' is not defined", hact.Name, out.Type)
+		}
 		if out.Header == "" {
 			if needsBody {
 				if bodyParam != "" {
-					return fmt.Errorf("HTTP action cannot have more than one body parameter in expected output (%q is already that parameter): %s", bodyParam, Pretty(hact))
+					return fmt.Errorf("Action '%s' has a duplicate body parameter '%s' in its expected output ('%s' is already that parameter)", hact.Name, out.Name, bodyParam)
 				}
 				bodyParam = out.Name
 			} else {
-				return fmt.Errorf("HTTP action can have a body in expected output for status codes 204 or 304: %s", Pretty(hact))
+				return fmt.Errorf("HTTP action cannot have a body in expected output for status codes 204 or 304: %s", Pretty(hact))
 			}
+		}
+	}
+	for _, exc := range hact.Exceptions {
+		t := p.model.FindType(exc.Type)
+		if t == nil {
+			return fmt.Errorf("Action '%s' exception type '%s' is not defined", hact.Name, exc.Type)
 		}
 	}
 	return nil
