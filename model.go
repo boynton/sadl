@@ -212,7 +212,7 @@ func (model *Model) ValidateBool(context string, td *TypeSpec, value interface{}
 	case *bool, bool:
 		return nil
 	}
-	return fmt.Errorf("%s: Not valid: %v", context, Pretty(value))
+	return fmt.Errorf("%s: Not a valid Bool: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateUUID(context string, td *TypeSpec, value interface{}) error {
@@ -231,7 +231,7 @@ func (model *Model) ValidateUUID(context string, td *TypeSpec, value interface{}
 			return nil
 		}
 	}
-	return fmt.Errorf("%s: Not valid: %v", context, Pretty(value))
+	return fmt.Errorf("%s: Not a valid UUID: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateUnitValue(context string, td *TypeSpec, value interface{}) error {
@@ -252,7 +252,7 @@ func (model *Model) ValidateUnitValue(context string, td *TypeSpec, value interf
 			return err
 		}
 	}
-	return fmt.Errorf("%s: Not valid: %v", context, Pretty(value))
+	return fmt.Errorf("%s: Not a valid UnitValue: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateEnum(context string, td *TypeSpec, value interface{}) error {
@@ -270,7 +270,7 @@ func (model *Model) ValidateEnum(context string, td *TypeSpec, value interface{}
 			}
 		}
 	}
-	return fmt.Errorf("%s: Not valid: %v", context, Pretty(value))
+	return fmt.Errorf("%s: Not a valid Enum: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateNumber(context string, td *TypeSpec, value interface{}) error {

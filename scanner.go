@@ -215,6 +215,9 @@ func (s *Scanner) Scan() Token {
 			} else if ch == '"' {
 				return s.scanString()
 			} else {
+				if ch == '\r' {
+					continue //PC files
+				}
 				return s.scanPunct(ch)
 			}
 		} else if ch == '\n' {
@@ -341,12 +344,31 @@ func (s *Scanner) scanString() Token {
 			case 'n':
 				buf.WriteRune('\n')
 				ch = '\n'
+			case 'r':
+				buf.WriteRune('\r')
 			case 't':
 				buf.WriteRune('\t')
 			case '"':
 				buf.WriteRune(ch)
 			case '\\':
 				buf.WriteRune(ch)
+			case 'u':
+				c1 := s.read()
+				c2 := s.read()
+				c3 := s.read()
+				c4 := s.read()
+				if c1 == eof || c2 == eof || c3 == eof || c4 == eof {
+					return tok.undefined("unterminated string")
+				}
+				//handle unicode char
+				h1 := hexDigit(c1)
+				h2 := hexDigit(c2)
+				h3 := hexDigit(c3)
+				h4 := hexDigit(c4)
+				if h1 > 15 || h2 > 15 || h3 > 15 || h4 > 15 {
+					return tok.undefined("unicode escape must contain 4 hex digits")
+				}
+				buf.WriteRune(h1 << 24 + h2 << 16 + h3 << 8 + h4)
 			default:
 				buf.WriteRune(ch)
 				return tok.undefined("Bad escape char in string: \\" + string(ch))
@@ -364,6 +386,18 @@ func (s *Scanner) scanString() Token {
 			escape = false
 		}
 	}
+}
+
+func hexDigit(c rune) rune {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0'
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10
+	}
+	return 100
 }
 
 func (s *Scanner) scanPunct(ch rune) Token {

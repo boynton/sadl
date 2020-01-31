@@ -61,6 +61,7 @@ func Parse(data []byte, format string) (*Oas, error) {
 		return oas, err
 	} else if strings.HasPrefix(version, "2.") {
 		v2, err := oas2.Parse(data, format)
+		fmt.Println(sadl.Pretty(v2.Paths), err)
 		if err == nil {
 			oas.V3, err = oas2.ConvertToV3(v2)
 		}
@@ -71,16 +72,18 @@ func Parse(data []byte, format string) (*Oas, error) {
 
 var examples []*sadl.ExampleDef
 
-var methods = []string{"GET", "PUT", "POST", "DELETE", "DELETE", "HEAD"} //to do: "PATCH", "OPTIONS", "TRACE"
+var methods = []string{"GET", "PUT", "POST", "DELETE", "HEAD"} //to do: "PATCH", "OPTIONS", "TRACE"
 
 func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
+	annotations := make(map[string]string, 0)
 	examples = nil
-	comment := oas.V3.Info.Title
-	if sadl.IsSymbol(comment) {
-		name = comment
-	}
-	if oas.V3.Info.Description != "" {
-		comment = comment + " - " + oas.V3.Info.Description
+	comment := oas.V3.Info.Description
+	if oas.V3.Info.Title != "" {
+		if sadl.IsSymbol(oas.V3.Info.Title) {
+			name = oas.V3.Info.Title
+		} else {
+			comment = oas.V3.Info.Title + " - " + comment
+		}
 	}
 	schema := &sadl.Schema{
 		Name:    name,
@@ -118,9 +121,11 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	httpBindings := true
 	actions := false
 	for tmpl, path := range oas.V3.Paths {
+		path2 := *path
 		for _, method := range methods {
-			op := getPathOperation(path, method)
+			op := getPathOperation(&path2, method)
 			if op != nil {
+				fmt.Println("xxxxxxxxxxxxxxxx------>", method, tmpl, op.OperationId)
 				if strings.HasPrefix(tmpl, "x-") {
 					continue
 				}
@@ -132,6 +137,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 					schema.Actions = append(schema.Actions, act)
 				}
 				if httpBindings {
+//					fmt.Println("xxxxxxxxxxxxxxxx === ", method)
 					hact, err := convertOasPath(tmpl, op, method)
 					if err != nil {
 						return nil, err
@@ -143,21 +149,28 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 		}
 	}
 	for _, server := range oas.V3.Servers {
-		if schema.Annotations == nil {
-			schema.Annotations = make(map[string]string, 0)
-		}
-		schema.Annotations["x_server"] = server.URL
+		annotations["x_server"] = server.URL
 	}
 	if oas.V3.Info.License != nil {
-		if schema.Annotations == nil {
-			schema.Annotations = make(map[string]string, 0)
-		}
+//		if schema.Annotations == nil {
+//			schema.Annotations = make(map[string]string, 0)
+//		}
 		if oas.V3.Info.License.Name != "" {
-			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
+//			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
+			annotations["x_license_name"] = oas.V3.Info.License.Name
 		}
 		if oas.V3.Info.License.URL != "" {
-			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
+//			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
+			annotations["x_license_url"] = oas.V3.Info.License.URL
 		}
+	}
+
+	if len(annotations) > 0 {
+		if schema.Annotations != nil {
+			fmt.Println("ANnotations:", schema.Annotations)
+			panic("whoops")
+		}
+		schema.Annotations = annotations
 	}
 
 	schema.Examples = examples
@@ -222,17 +235,21 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			ts.Type = "String"
 		}
 		if ts.Type == "String" {
-			ts.Pattern = oasSchema.Pattern
-			if oasSchema.MinLength > 0 {
-				tmpMin := int64(oasSchema.MinLength)
-				ts.MinSize = &tmpMin
-			}
-			if oasSchema.MaxLength != nil {
-				tmpMax := int64(*oasSchema.MaxLength)
-				ts.MaxSize = &tmpMax
-			}
-			if oasSchema.Format != "" {
-				fmt.Println("NYI: String 'format':", oasSchema.Format)
+			if oasSchema.Format == "uuid" {
+				ts.Type = "UUID"
+			} else {
+				ts.Pattern = oasSchema.Pattern
+				if oasSchema.MinLength > 0 {
+					tmpMin := int64(oasSchema.MinLength)
+					ts.MinSize = &tmpMin
+				}
+				if oasSchema.MaxLength != nil {
+					tmpMax := int64(*oasSchema.MaxLength)
+					ts.MaxSize = &tmpMax
+				}
+				if oasSchema.Format != "" {
+					fmt.Println("NYI: String 'format':", oasSchema.Format)
+				}
 			}
 		}
 	case "array":
@@ -325,7 +342,7 @@ func makeIdentifier(text string) string {
 }
 
 func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method string) (*sadl.ActionDef, error) {
-	name := op.OperationID
+	name := op.OperationId
 	synthesizedName := guessOperationName(op, method)
 	if name == "" {
 		if synthesizedName == "" {
@@ -337,7 +354,7 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 		Name:    name,
 		Comment: op.Summary,
 	}
-	//need a single input. Generate the op.OperationID
+	//need a single input. Generate the op.OperationId
 	reqTypeName := capitalize(name) + "Request"
 
 	td := &sadl.TypeDef{
@@ -452,7 +469,7 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 
 func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpDef, error) {
 	hact := &sadl.HttpDef{
-		Name:    op.OperationID,
+		Name:    op.OperationId,
 		Path:    path,
 		Method:  method,
 		Comment: op.Summary,
@@ -574,6 +591,11 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 	//	}
 	if expectedStatus != "" {
 		eparam := op.Responses[expectedStatus]
+		if eparam == nil {
+			fmt.Println("expectedStatus, eparam:", expectedStatus, eparam)
+			fmt.Println(sadl.Pretty(op.Responses))
+			panic("whoops")
+		}
 		var err error
 		code := 200
 		if expectedStatus != "default" && strings.Index(expectedStatus, "X") < 0 {
@@ -664,10 +686,13 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 }
 
 func getPathOperation(oasPathItem *oas3.PathItem, method string) *oas3.Operation {
+
 	switch method {
 	case "GET":
 		return oasPathItem.Get
 	case "PUT":
+//	fmt.Println("xxxxxxxxxxxxxxxx----!!!!", method, oasPathItem.OperationId)
+//		panic("here")
 		return oasPathItem.Put
 	case "POST":
 		return oasPathItem.Post

@@ -115,11 +115,17 @@ func min(n1 int, n2 int) int {
 	return n2
 }
 
-func capitalize(s string) string {
+func Capitalize(s string) string {
+	if s == "" {
+		return s
+	}
 	return strings.ToUpper(s[0:1]) + s[1:]
 }
 
-func uncapitalize(s string) string {
+func Uncapitalize(s string) string {
+	if s == "" {
+		return s
+	}
 	return strings.ToLower(s[0:1]) + s[1:]
 }
 
@@ -134,7 +140,7 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 	} else {
 		//http requests and responses are not quite like structs, although inputs and expected outputs are of type StructFieldDef
 		if strings.HasSuffix(theType, "Request") {
-			httpName := uncapitalize(theType[:len(theType)-len("Request")])
+			httpName := Uncapitalize(theType[:len(theType)-len("Request")])
 			h := model.FindHttp(httpName)
 			if h != nil {
 				if len(lst) > 0 {
@@ -158,7 +164,7 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 				}
 			}
 		} else if strings.HasSuffix(theType, "Response") {
-			httpName := uncapitalize(theType[:len(theType)-len("Response")])
+			httpName := Uncapitalize(theType[:len(theType)-len("Response")])
 			h := model.FindHttp(httpName)
 			if h != nil {
 				if len(lst) > 0 {

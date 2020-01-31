@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/boynton/sadl"
 )
 
 func OasError(format string, args ...interface{}) error {
@@ -25,6 +26,7 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(sadl.Pretty(v3))
 	return Validate(v3)
 }
 
@@ -152,7 +154,7 @@ type Operation struct {
 	Tags        []string               `json:"tags,omitempty"`
 	Summary     string                 `json:"summary,omitempty"`
 	Description string                 `json:"description,omitempty"`
-	OperationID string                 `json:"operationId,omitempty"`
+	OperationId string                 `json:"operationId,omitempty"`
 	Parameters  []*Parameter           `json:"parameters,omitempty"`
 	RequestBody *RequestBody           `json:"requestBody,omitempty"`
 	Responses   map[string]*Response   `json:"responses,omitempty"`
@@ -191,7 +193,7 @@ type Link struct {
 	Extensions  map[string]interface{} `json:"-"`
 	Description string                 `json:"description,omitempty"`
 	Href        string                 `json:"href,omitempty"`
-	OperationID string                 `json:"operationId,omitempty"`
+	OperationId string                 `json:"operationId,omitempty"`
 	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 	Headers     map[string]*Schema     `json:"headers,omitempty"`
 }

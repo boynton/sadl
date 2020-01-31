@@ -371,6 +371,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 		}
 		op.Comment, err = p.EndOfStatement(op.Comment)
 		ensureActionName(op)
+		ensureRequiredParams(op)
 		p.schema.Http = append(p.schema.Http, op)
 	} else {
 		return p.SyntaxError()
@@ -388,6 +389,25 @@ func ensureResourceName(hact *HttpDef) error {
 	return nil
 }
 
+func ensureRequiredParams(hact *HttpDef) {
+	for _, in := range hact.Inputs {
+		if in.Query == "" && in.Header != "" { //body or pathparam
+			in.Required = true
+		}
+	}
+	needsBody := false
+	if hact.Expected != nil {
+		needsBody = hact.Expected.Status != 204 && hact.Expected.Status != 304
+	}
+	if needsBody {
+		for _, out := range hact.Expected.Outputs {
+			if out.Header == "" { //body
+				out.Required = true
+			}
+		}
+	}
+}
+
 func resourceName(hact *HttpDef) string {
 	parts := strings.Split(hact.Path, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
@@ -399,7 +419,7 @@ func resourceName(hact *HttpDef) string {
 }
 
 func actionName(hact *HttpDef) string {
-	return strings.ToLower(hact.Method) + capitalize(hact.Resource)
+	return strings.ToLower(hact.Method) + Capitalize(hact.Resource)
 }
 
 func ensureActionName(hact *HttpDef) error {
@@ -624,12 +644,19 @@ func (p *Parser) parseExampleDirective(comment string) error {
 	if err != nil {
 		return err
 	}
+	options, err := p.ParseOptions("Example", []string{"name"})
+	if err != nil {
+		return err
+	}
 	val, err := p.parseLiteralValue()
 	if err == nil {
 		ex := &ExampleDef{
 			Target:  target,
 			Example: val,
 			Comment: comment,
+		}
+		if options.Name != "" {
+			ex.Name = options.Name
 		}
 		p.schema.Examples = append(p.schema.Examples, ex)
 	}
@@ -1159,6 +1186,7 @@ type Options struct {
 	Resource    string
 	Header      string
 	Reference   string
+	Name string
 	Annotations map[string]string
 }
 
@@ -1208,6 +1236,8 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Reference, err = p.expectEqualsIdentifier()
 					case "header":
 						options.Header, err = p.expectEqualsString()
+					case "name":
+						options.Name, err = p.expectEqualsIdentifier()
 					default:
 						err = p.Error("Unrecognized option: " + tok.Text)
 					}
@@ -1825,14 +1855,103 @@ func (p *Parser) Validate() (*Model, error) {
 
 func (p *Parser) validateExample(ex *ExampleDef) error {
 	//todo: be able to address action requests & responses as targets
-	ts, err := p.model.FindExampleType(ex)
-	if err != nil {
+	//	ts, err := p.model.FindExampleType(ex)
+	var err error
+	td := p.model.FindType(ex.Target)
+	var ts *TypeSpec
+	if td != nil {
+		ts = &td.TypeSpec
+	}
+	if ts == nil {
+		if strings.HasSuffix(ex.Target, "Request") {
+			hname := Uncapitalize(ex.Target[:len(ex.Target)-7])
+			hact := p.model.FindHttp(hname)
+			if hact == nil {
+				err = fmt.Errorf("Example target not found for '%s' (no http action named '%s' found)", ex.Target, hname)
+			} else {
+				return p.validateExampleAgainstHttpRequest(hact, ex)
+			}
+		} else if strings.HasSuffix(ex.Target, "Response") {
+			hname := Uncapitalize(ex.Target[:len(ex.Target)-8])
+			hact := p.model.FindHttp(hname)
+			if hact == nil {
+				err = fmt.Errorf("Example target not found for '%s' (no http action named '%s' found)", ex.Target, hname)
+			} else {
+				return p.validateExampleAgainstHttpResponse(hact, ex)
+			}
+		} else {
+			//for exceptions, use synthetic names for each exception type (sin e they are currently unique)
+			//i.e. "GetFooExceptNotFound".
+			err = fmt.Errorf("Cannot find example target: %q", ex.Target)
+		}
 		return err
 	}
 	if ts == nil {
 		return nil
 	}
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, ts, ex.Example)
+}
+
+func (p *Parser) validateExampleAgainstHttpRequest(hact *HttpDef, ex *ExampleDef) error {
+	present := make(map[string]bool, 0)
+	m, ok := ex.Example.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("Example for an HTTP request must be a JSON object")
+	}
+	for k, v := range m {
+		for _, in := range hact.Inputs {
+			if in.Name == k {
+				td := p.model.FindType(in.Type)
+				if td == nil {
+					return fmt.Errorf("Type not found in example: %s", in.Type)
+				}
+				err := p.model.ValidateAgainstTypeSpec("example for "+ex.Target+"."+k, &td.TypeSpec, v)
+				if err != nil {
+					return err
+				}
+				present[k] = true
+			}
+		}
+	}
+	for _, in := range hact.Inputs {
+		if in.Required {
+			if _, ok := present[in.Name]; !ok {
+				return fmt.Errorf("Required input '%s' missing in example for %s", in.Name, ex.Target)
+			}
+		}
+	}
+	return nil
+}
+
+func (p *Parser) validateExampleAgainstHttpResponse(hact *HttpDef, ex *ExampleDef) error {
+	present := make(map[string]bool, 0)
+	m, ok := ex.Example.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("Example for an HTTP response must be a JSON object")
+	}
+	for k, v := range m {
+		for _, out := range hact.Expected.Outputs {
+			if out.Name == k {
+				td := p.model.FindType(out.Type)
+				if td == nil {
+					return fmt.Errorf("Type not found in HTTP response example: %s", out.Type)
+				}
+				err := p.model.ValidateAgainstTypeSpec("HTTP response example for "+ex.Target+"."+k, &td.TypeSpec, v)
+				if err != nil {
+					return err
+				}
+				present[k] = true
+			}
+		}
+	}
+	for _, out := range hact.Expected.Outputs {
+		if out.Required {
+			if _, ok := present[out.Name]; !ok {
+				return fmt.Errorf("Required input '%s' missing in example for %s", out.Name, ex.Target)
+			}
+		}
+	}
+	return nil
 }
 
 func (p *Parser) validateHttpPathTemplate(path string) error {

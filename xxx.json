@@ -35,8 +35,9 @@
     }
   },
   "info": {
-    "title": "An example service to test html generation with",
-    "version": "dev"
+    "title": "HTTPExample",
+    "description": "An example service to test html generation with",
+    "version": "v0"
   },
   "openapi": "3.0.0",
   "paths": {

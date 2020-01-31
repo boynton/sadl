@@ -1,0 +1,39 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "HTTPExample",
+    "description": "An example service to test html generation with",
+    "version": "v0"
+  },
+  "definitions": {
+    "NotFound": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "Person": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/definitions/PersonId"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "PersonId": {
+      "type": "string"
+    }
+  }
+}
+

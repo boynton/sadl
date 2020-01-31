@@ -21,8 +21,6 @@ type OpenAPI struct {
 	BasePath            string                     `json:"basePath,omitempty"`
 	Paths               map[string]*PathItem       `json:"paths,omitempty"`
 	Definitions         map[string]*Schema         `json:"definitions,omitempty"`
-	Parameters          map[string]*Parameter      `json:"parameters,omitempty"`
-	Responses           map[string]*Response       `json:"responses,omitempty"`
 	SecurityDefinitions map[string]*SecurityScheme `json:"securityDefinitions,omitempty"`
 	Security            []map[string][]string      `json:"security,omitempty"`
 	Tags                []Tag                      `json:"tags,omitempty"`
@@ -64,6 +62,7 @@ type PathItem struct {
 
 type Operation struct {
 	Extensions   map[string]interface{} `json:"-"`
+	OperationId string                 `json:"operationId,omitempty"`
 	Description  string                 `json:"description,omitempty"`
 	Consumes     []string               `json:"consumes,omitempty"`
 	Produces     []string               `json:"produces,omitempty"`
@@ -71,11 +70,10 @@ type Operation struct {
 	Tags         []string               `json:"tags,omitempty"`
 	Summary      string                 `json:"summary,omitempty"`
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
-	ID           string                 `json:"operationId,omitempty"`
 	Deprecated   bool                   `json:"deprecated,omitempty"`
 	Security     []map[string][]string  `json:"security,omitempty"`
-	Parameters   []Parameter            `json:"parameters,omitempty"`
-	Responses    *Responses             `json:"responses,omitempty"`
+	Parameters   []*Parameter            `json:"parameters,omitempty"`
+	Responses           map[string]*Response       `json:"responses,omitempty"`
 }
 
 type ExternalDocumentation struct {
@@ -89,8 +87,8 @@ type Parameter struct {
 	Name            string                 `json:"name,omitempty"`
 	In              string                 `json:"in,omitempty"`
 	Required        bool                   `json:"required,omitempty"`
-	Schema          *Schema                `json:"schema,omitempty"`
 	AllowEmptyValue bool                   `json:"allowEmptyValue,omitempty"`
+	Schema
 }
 
 type StringOrArray []string
@@ -267,12 +265,6 @@ type Schema struct {
 	Example              interface{}            `json:"example,omitempty"`       //swagger extension
 }
 
-type Responses struct {
-	Extensions          map[string]interface{} `json:"-"`
-	Default             *Response
-	StatusCodeResponses map[int]Response
-}
-
 type Response struct {
 	Extensions  map[string]interface{} `json:"-"`
 	Ref         string                 `json:"$ref,omitempty"`
@@ -283,8 +275,9 @@ type Response struct {
 }
 
 type Header struct {
-	CommonValidations
-	SimpleSchema
+//	CommonValidations
+	//	SimpleSchema
+	Schema
 	Description string `json:"description,omitempty"`
 }
 
@@ -369,7 +362,6 @@ func ConvertToV3(v2 *OpenAPI) (*oas3.OpenAPI, error) {
 		}
 		v3.Paths[tmpl] = path
 	}
-	//to do: the actions
 	return v3, nil
 }
 
@@ -390,15 +382,111 @@ func convertInfo(v2Info *Info) *oas3.Info {
 	return info
 }
 
+func convertOperation(op2 *Operation) (*oas3.Operation, error) {
+	op3 := &oas3.Operation{
+		Extensions: op2.Extensions,
+		OperationId: op2.OperationId,
+		Description: op2.Description,
+		Tags: op2.Tags,
+	}
+	var params []*oas3.Parameter
+	for _, param2 := range op2.Parameters {
+		param3, err := convertParam(param2)
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, param3)
+	}
+	op3.Parameters = params
+
+	responses := make(map[string]*oas3.Response, 0)
+	for scode, resp2 := range op2.Responses {
+		resp3 := &oas3.Response {
+			Description: resp2.Description,
+		}
+		if len(resp2.Headers) > 0 {
+			headers := make(map[string]*oas3.Header, 0)
+			for k, v2 := range resp2.Headers {
+				v3 := &oas3.Header{
+					Description: v2.Description,
+				}
+				tmp, err := convertSchema("", &v2.Schema)
+				if err != nil {
+					return nil, err
+				}
+				v3.Schema = tmp
+				headers[k] = v3
+			}
+			resp3.Headers = headers
+		}
+		tmp, err := convertSchema("", resp2.Schema)
+		if err != nil {
+			return nil, err
+		}
+		resp3.Content = make(oas3.Content, 0)
+		resp3.Content["application/json"] = &oas3.MediaType{
+			Schema: tmp,
+		}
+		responses[scode] = resp3
+	}
+	if len(responses) > 0 {
+		op3.Responses = responses
+	}
+	return op3, nil
+}
+
+
+func convertParam(p2 *Parameter) (*oas3.Parameter, error) {
+	schema, err := convertSchema(p2.Name, &p2.Schema)
+	if err != nil {
+		return nil, err
+	}
+	p3 := &oas3.Parameter{
+		Extensions: p2.Extensions,
+		Description: p2.Description,
+		Name: p2.Name,
+		In: p2.In,
+		Required: p2.Required,
+		Schema: schema,
+		AllowEmptyValue: p2.AllowEmptyValue,
+	}
+	//p3.Style
+	//p3.Explode
+	//p3.AllowReserved
+	//p3.Deprecated
+	//p3.Example
+	//p3.Examples
+	//p3.Content
+	return p3, nil
+}
+
 func convertPath(v2Path *PathItem) (*oas3.PathItem, error) {
-	v3Path := &oas3.PathItem{}
-	v3Path.Extensions = v2Path.Extensions
-	return v3Path, nil
+	v3Path := &oas3.PathItem{
+		Extensions: v2Path.Extensions,
+	}
+	var err error
+	if v2Path.Get != nil {
+		v3Path.Get, err = convertOperation(v2Path.Get)
+	} else if v2Path.Put != nil {
+		v3Path.Put, err = convertOperation(v2Path.Put)
+	} else if v2Path.Post != nil {
+		v3Path.Post, err = convertOperation(v2Path.Post)
+	} else if v2Path.Put != nil {
+		v3Path.Put, err = convertOperation(v2Path.Put)
+	} else if v2Path.Delete != nil {
+		v3Path.Delete, err = convertOperation(v2Path.Delete)
+	} else if v2Path.Options != nil {
+		v3Path.Options, err = convertOperation(v2Path.Options)
+	} else if v2Path.Head != nil {
+		v3Path.Head, err = convertOperation(v2Path.Head)
+	} else if v2Path.Patch != nil {
+		v3Path.Patch, err = convertOperation(v2Path.Patch)
+	}
+	return v3Path, err
 }
 
 func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 	var err error
-	//	fmt.Println("v2 type:", xname, sadl.Pretty(v2))
 	v3 := &oas3.Schema{
 		Description: v2.Description,
 	}
@@ -457,85 +545,8 @@ func convertSchema(xname string, v2 *Schema) (*oas3.Schema, error) {
 			return nil, fmt.Errorf("Unrecognized OAS type: %q", stype)
 		}
 	}
-	//	fmt.Println("--------->", sadl.Pretty(v3))
 	return v3, nil
 }
-
-/*
-//	v3, err := openapi2conv.ToV3Swagger(v2)
-	if err != nil {
-		return nil, err
-	}
-
-   for _, oasSchema := range v3.Components.Schemas {
-		fixV2SchemaRef(oasSchema)
-	}
-	for _, item := range v3.Paths {
-		for _, param := range item.Parameters {
-			fixV2ParamRef(param)
-		}
-		fixV2Operation(item.Delete)
-		fixV2Operation(item.Get)
-		fixV2Operation(item.Head)
-		fixV2Operation(item.Options)
-		fixV2Operation(item.Patch)
-		fixV2Operation(item.Post)
-		fixV2Operation(item.Put)
-		fixV2Operation(item.Trace)
-	}
-	return &Oas{v3: v3}, nil
-}
-
-func fixV2Operation(op *openapi3.Operation) {
-	if op != nil {
-		if op.RequestBody != nil {
-			body := op.RequestBody
-			body.Ref = strings.Replace(body.Ref, "#/definitions/", "#/components/schemas/", -1)
-			if body.Value != nil {
-				for _, tmp := range body.Value.Content {
-					fixV2SchemaRef(tmp.Schema)
-				}
-			}
-		}
-		for _, resp := range op.Responses {
-			if resp.Ref != "" {
-				resp.Ref = strings.Replace(resp.Ref, "#/definitions/", "#/components/schemas/", -1)
-			} else {
-				for _, tmp := range resp.Value.Content {
-					fixV2SchemaRef(tmp.Schema)
-				}
-			}
-		}
-	}
-}
-
-func fixV2ParamRef(sref *openapi3.ParameterRef) {
-	if sref.Ref != "" {
-		sref.Ref = strings.Replace(sref.Ref, "#/definitions/", "#/components/schemas/", -1)
-	} else if sref.Value != nil {
-		fixV2SchemaRef(sref.Value.Schema)
-	}
-}
-
-func fixV2Schema(sch *openapi3.Schema) {
-	if sch.Properties != nil {
-		for _, prop := range sch.Properties {
-			fixV2SchemaRef(prop)
-		}
-	} else if sch.Items != nil {
-		fixV2SchemaRef(sch.Items)
-	}
-}
-
-func fixV2SchemaRef(sref *openapi3.SchemaRef) {
-	if sref.Ref != "" {
-		sref.Ref = strings.Replace(sref.Ref, "#/definitions/", "#/components/schemas/", -1)
-	} else if sref.Value != nil {
-		fixV2Schema(sref.Value)
-	}
-
-}
-*/
 
 func ConvertFromV3(v3 *oas3.OpenAPI) (*OpenAPI, error) {
 	v2 := &OpenAPI{

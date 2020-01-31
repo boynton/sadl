@@ -1,3 +1,12 @@
+imp:: bin/oas2sadl
+#	./bin/oas2sadl $(HOME)/api/AMDSAPISwaggerModels/swagger-models/listings.json
+#	./bin/oas2sadl $(HOME)/src/golang.a2z.com/GoAmzn-FbaApiTools/gen2.json
+	./bin/oas2sadl $(HOME)/src/golang.a2z.com/GoAmzn-FbaApiTools/examples/beer-openapi-v3.json
+
+doc:: bin/sadl2html
+	./bin/sadl2html _httpexample.sadl > index2.html
+#	./bin/sadl2html _httpexample.sadl
+
 all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy
 
 install:: all
@@ -36,6 +45,10 @@ bin/sadl2oas:: lib
 bin/sadl2smithy:: lib
 	mkdir -p bin
 	go build -o bin/sadl2smithy github.com/boynton/sadl/cmd/sadl2smithy
+
+bin/sadl2html:: lib cmd/sadl2html/main.go
+	mkdir -p bin
+	go build -o bin/sadl2html github.com/boynton/sadl/cmd/sadl2html
 
 proper::
 	go fmt github.com/boynton/sadl

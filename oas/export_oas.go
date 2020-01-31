@@ -39,10 +39,8 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		Info:    &oas3.Info{},
 	}
 	comment := model.Comment
-	if comment == "" {
-		comment = model.Name
-	}
-	oas.Info.Title = comment
+	oas.Info.Description = comment
+	oas.Info.Title = model.Name
 	oas.Info.Version = model.Version
 	if oas.Info.Version == "" {
 		oas.Info.Version = "dev"
@@ -71,20 +69,6 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		}
 		oas.Components.Schemas[td.Name] = otd
 	}
-	//Examples
-	for _, ed := range model.Examples {
-		//ok, for now: just "example", not "examples", i.e. no name. And, parameter examples override the matching type example
-		//media types (the operation body) can also have examples, and also overrides the schema example
-		//SO: do not use  oas.Components.Examples just yet
-		//the simple case of an example for a type
-		if sch, ok := oas.Components.Schemas[ed.Target]; ok {
-			sch.Example = ed.Example
-		} else {
-			//todo: walk the compound name, install at the element if supported.
-			//todo: handle operation request and response parameters
-			fmt.Fprintf(os.Stderr, "[warning: example not exported for %q\n", ed.Target)
-		}
-	}
 	//Paths
 	oas.Paths = make(map[string]*oas3.PathItem, 0)
 	for _, hdef := range model.Http {
@@ -108,7 +92,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 		}
 		//note: the first tag is always the resource name for the action
 		op := &oas3.Operation{
-			OperationID: hdef.Name,
+			OperationId: hdef.Name,
 			Summary:     hdef.Comment,
 			Tags:        []string{hdef.Resource},
 			//Parameters
@@ -254,7 +238,130 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 			responses[key] = resp
 		}
 	}
+	//Examples
+	for _, ed := range model.Examples {
+		//ok, for now: just "example", not "examples", i.e. no name. And, parameter examples override the matching type example
+		//media types (the operation body) can also have examples, and also overrides the schema example
+		//SO: do not use  oas.Components.Examples just yet
+		//the simple case of an example for a type
+		if sch, ok := oas.Components.Schemas[ed.Target]; ok {
+			sch.Example = ed.Example
+		} else {
+			//todo: handle operation request and response parameters
+			// -> oas allows "examples" on a MediaType (for bodies) and on Parameter (for path/query/header params)
+			// ! so, my "request" and "response" example encapsulates all of those, along with error responses.
+			// I need to unpack my object and assign the oas items that way. Interestingly, my packaged example may be hard to use?
+			// I like the idea of have a complete request object (headers, path, query, and payload) all encapsulated nicely.
+			//   -> seems like I could use it in the API somehow. It really is what you need to abstract from the transport. Like RPC.
+			//todo: walk the compound name, install at the element if supported.
+			if strings.HasSuffix(ed.Target, "Request") {
+				hdefName := sadl.Uncapitalize(ed.Target[:len(ed.Target)-7])
+				op := gen.FindOperation(oas, hdefName)
+				if op != nil {
+					for k, v := range ed.Example.(map[string]interface{}) {
+						if k == "body" {
+							tmp := op.RequestBody.Content["application/json"]
+							if ed.Name == "" {
+								tmp.Example = v
+							} else {
+								if tmp.Examples == nil {
+									tmp.Examples = make(map[string]*oas3.Example, 0)
+								}
+								tmp.Examples[ed.Name] = &oas3.Example {
+									Value: v,
+								}
+							}
+						} else {
+							for _, param := range op.Parameters {
+								if param.Name == k {
+									if ed.Name == "" {
+										param.Example = v
+									} else {
+										if param.Examples == nil {
+											param.Examples = make(map[string]*oas3.Example, 0)
+										}
+										param.Examples[ed.Name] = &oas3.Example {
+											Value: v,
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			} else if strings.HasSuffix(ed.Target, "Response") {
+				hdefName := sadl.Uncapitalize(ed.Target[:len(ed.Target)-8])
+				op := gen.FindOperation(oas, hdefName)
+				if op != nil {
+					for k, v := range ed.Example.(map[string]interface{}) {
+						if k == "body" {
+							hact := model.FindHttp(hdefName)
+							//FIXME: somehow the example name must include the status to use here
+							//FIXME: currently the parser only handles Request and Response, not Exceptxxx
+							sstatus := fmt.Sprintf("%v", hact.Expected.Status)
+							tmp := op.Responses[sstatus].Content["application/json"]
+							if ed.Name == "" {
+								tmp.Example = v
+							} else {
+								if tmp.Examples == nil {
+									tmp.Examples = make(map[string]*oas3.Example, 0)
+								}
+								tmp.Examples[ed.Name] = &oas3.Example {
+									Value: v,
+								}
+							}
+							
+						} else {
+							for _, param := range op.Parameters {
+								if param.Name == k {
+									if ed.Name == "" {
+										param.Example = v
+									} else {
+										if param.Examples == nil {
+											param.Examples = make(map[string]*oas3.Example, 0)
+										}
+										param.Examples[ed.Name] = &oas3.Example {
+											Value: v,
+										}
+									}
+								}
+							}
+						}
+					}
+				} else {
+					panic("no")
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "[warning: example not exported for %q\n", ed.Target)
+			}
+		}
+	}
 	return oas, nil
+}
+
+func (gen *Generator) FindOperation(oas *oas3.OpenAPI, opId string) *oas3.Operation {
+	for _, pathItem := range oas.Paths {
+		var op *oas3.Operation
+		if pathItem.Get != nil {
+			op = pathItem.Get
+		} else if pathItem.Put != nil {
+			op = pathItem.Put
+		} else if pathItem.Delete != nil {
+			op = pathItem.Delete
+		} else if pathItem.Post != nil {
+			op = pathItem.Post
+		} else if pathItem.Head != nil {
+			op = pathItem.Head
+		} else if pathItem.Patch != nil {
+			op = pathItem.Patch
+		} else {
+			panic("fix me")
+		}
+		if op.OperationId == opId {
+			return op
+		}
+	}
+	return nil
 }
 
 func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
@@ -267,6 +374,12 @@ func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
 		return gen.exportMapTypeDef(td)
 	case "String":
 		return gen.exportStringTypeDef(td)
+	case "Bool":
+		otd := &oas3.Schema{
+			Description: td.Comment,
+			Type:        "boolean",
+		}
+		return otd, nil
 	case "Enum":
 		return gen.exportEnumTypeDef(td)
 	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
@@ -286,6 +399,13 @@ func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
 			otd.Max = &v
 		}
 		return otd, nil
+	case "UUID":
+		tmp, err := gen.exportStringTypeDef(td)
+		if err != nil {
+			return nil, err
+		}
+		tmp.Format = "uuid"
+		return tmp, nil
 	}
 	//etc
 	return nil, fmt.Errorf("Implement export of this type: %q", td.Type)
@@ -329,12 +449,15 @@ func (gen *Generator) exportArrayTypeDef(td *sadl.TypeDef) (*oas3.Schema, error)
 }
 
 func (gen *Generator) exportMapTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
+	itd := gen.Model.FindType(td.Items)
+	itemSchema, err := gen.oasSchema(&itd.TypeSpec, "")
+	if err != nil {
+		return nil, err
+	}
 	return &oas3.Schema{
 		Type:        "object",
 		Description: td.Comment,
-		AdditionalProperties: &oas3.Schema{
-			Type: td.Items,
-		},
+		AdditionalProperties: itemSchema,
 	}, nil
 }
 
@@ -399,6 +522,11 @@ func (gen *Generator) oasSchema(td *sadl.TypeSpec, name string) (*oas3.Schema, e
 	//		}, nil
 	//	}
 	switch td.Type {
+	case "Bool":
+		sch := &oas3.Schema{
+			Type:        "boolean",
+		}
+		return sch, nil
 	case "Int32", "Int16", "Int8", "Int64", "Float32", "Float64", "Decimal":
 		if td.Type == "Float64" && name != "" {
 			panic("here? " + name + " -> " + sadl.Pretty(td))

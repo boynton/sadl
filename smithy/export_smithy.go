@@ -205,6 +205,9 @@ func listTypeReference(schema *sadl.Model, ns *Namespace, prefix string, fd *sad
 }
 
 func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
 	return strings.ToUpper(s[0:1]) + s[1:]
 }
 

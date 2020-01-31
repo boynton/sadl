@@ -16,7 +16,7 @@ func (model *Model) ConvertInlineEnums() error {
 		case "Struct":
 			for _, fdef := range td.Fields {
 				if fdef.Type == "Enum" {
-					tname := capitalize(fdef.Name)
+					tname := Capitalize(fdef.Name)
 					if !strings.HasPrefix(tname, td.Name) {
 						tname = td.Name + tname
 					}
