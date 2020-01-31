@@ -1,12 +1,3 @@
-imp:: bin/oas2sadl
-#	./bin/oas2sadl $(HOME)/api/AMDSAPISwaggerModels/swagger-models/listings.json
-#	./bin/oas2sadl $(HOME)/src/golang.a2z.com/GoAmzn-FbaApiTools/gen2.json
-	./bin/oas2sadl $(HOME)/src/golang.a2z.com/GoAmzn-FbaApiTools/examples/beer-openapi-v3.json
-
-doc:: bin/sadl2html
-	./bin/sadl2html _httpexample.sadl > index2.html
-#	./bin/sadl2html _httpexample.sadl
-
 all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy
 
 install:: all

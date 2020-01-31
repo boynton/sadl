@@ -154,7 +154,7 @@ var template = `<html>
       {
           "id": "bf938428-f04c-11e9-a280-8c8590216cf9",
           "name": "Lee Boynton",
-          "email": "lboynton@amazon.com"
+          "email": "lee@boynton.com"
       }
     </pre>
   </body>
