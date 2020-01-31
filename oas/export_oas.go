@@ -267,7 +267,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 								if tmp.Examples == nil {
 									tmp.Examples = make(map[string]*oas3.Example, 0)
 								}
-								tmp.Examples[ed.Name] = &oas3.Example {
+								tmp.Examples[ed.Name] = &oas3.Example{
 									Value: v,
 								}
 							}
@@ -280,7 +280,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 										if param.Examples == nil {
 											param.Examples = make(map[string]*oas3.Example, 0)
 										}
-										param.Examples[ed.Name] = &oas3.Example {
+										param.Examples[ed.Name] = &oas3.Example{
 											Value: v,
 										}
 									}
@@ -306,11 +306,11 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 								if tmp.Examples == nil {
 									tmp.Examples = make(map[string]*oas3.Example, 0)
 								}
-								tmp.Examples[ed.Name] = &oas3.Example {
+								tmp.Examples[ed.Name] = &oas3.Example{
 									Value: v,
 								}
 							}
-							
+
 						} else {
 							for _, param := range op.Parameters {
 								if param.Name == k {
@@ -320,7 +320,7 @@ func (gen *Generator) ExportToOAS3() (*oas3.OpenAPI, error) {
 										if param.Examples == nil {
 											param.Examples = make(map[string]*oas3.Example, 0)
 										}
-										param.Examples[ed.Name] = &oas3.Example {
+										param.Examples[ed.Name] = &oas3.Example{
 											Value: v,
 										}
 									}
@@ -455,8 +455,8 @@ func (gen *Generator) exportMapTypeDef(td *sadl.TypeDef) (*oas3.Schema, error) {
 		return nil, err
 	}
 	return &oas3.Schema{
-		Type:        "object",
-		Description: td.Comment,
+		Type:                 "object",
+		Description:          td.Comment,
 		AdditionalProperties: itemSchema,
 	}, nil
 }
@@ -524,7 +524,7 @@ func (gen *Generator) oasSchema(td *sadl.TypeSpec, name string) (*oas3.Schema, e
 	switch td.Type {
 	case "Bool":
 		sch := &oas3.Schema{
-			Type:        "boolean",
+			Type: "boolean",
 		}
 		return sch, nil
 	case "Int32", "Int16", "Int8", "Int64", "Float32", "Float64", "Decimal":

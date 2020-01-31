@@ -62,7 +62,7 @@ type PathItem struct {
 
 type Operation struct {
 	Extensions   map[string]interface{} `json:"-"`
-	OperationId string                 `json:"operationId,omitempty"`
+	OperationId  string                 `json:"operationId,omitempty"`
 	Description  string                 `json:"description,omitempty"`
 	Consumes     []string               `json:"consumes,omitempty"`
 	Produces     []string               `json:"produces,omitempty"`
@@ -72,8 +72,8 @@ type Operation struct {
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
 	Deprecated   bool                   `json:"deprecated,omitempty"`
 	Security     []map[string][]string  `json:"security,omitempty"`
-	Parameters   []*Parameter            `json:"parameters,omitempty"`
-	Responses           map[string]*Response       `json:"responses,omitempty"`
+	Parameters   []*Parameter           `json:"parameters,omitempty"`
+	Responses    map[string]*Response   `json:"responses,omitempty"`
 }
 
 type ExternalDocumentation struct {
@@ -275,7 +275,7 @@ type Response struct {
 }
 
 type Header struct {
-//	CommonValidations
+	//	CommonValidations
 	//	SimpleSchema
 	Schema
 	Description string `json:"description,omitempty"`
@@ -384,10 +384,10 @@ func convertInfo(v2Info *Info) *oas3.Info {
 
 func convertOperation(op2 *Operation) (*oas3.Operation, error) {
 	op3 := &oas3.Operation{
-		Extensions: op2.Extensions,
+		Extensions:  op2.Extensions,
 		OperationId: op2.OperationId,
 		Description: op2.Description,
-		Tags: op2.Tags,
+		Tags:        op2.Tags,
 	}
 	var params []*oas3.Parameter
 	for _, param2 := range op2.Parameters {
@@ -401,7 +401,7 @@ func convertOperation(op2 *Operation) (*oas3.Operation, error) {
 
 	responses := make(map[string]*oas3.Response, 0)
 	for scode, resp2 := range op2.Responses {
-		resp3 := &oas3.Response {
+		resp3 := &oas3.Response{
 			Description: resp2.Description,
 		}
 		if len(resp2.Headers) > 0 {
@@ -435,19 +435,18 @@ func convertOperation(op2 *Operation) (*oas3.Operation, error) {
 	return op3, nil
 }
 
-
 func convertParam(p2 *Parameter) (*oas3.Parameter, error) {
 	schema, err := convertSchema(p2.Name, &p2.Schema)
 	if err != nil {
 		return nil, err
 	}
 	p3 := &oas3.Parameter{
-		Extensions: p2.Extensions,
-		Description: p2.Description,
-		Name: p2.Name,
-		In: p2.In,
-		Required: p2.Required,
-		Schema: schema,
+		Extensions:      p2.Extensions,
+		Description:     p2.Description,
+		Name:            p2.Name,
+		In:              p2.In,
+		Required:        p2.Required,
+		Schema:          schema,
 		AllowEmptyValue: p2.AllowEmptyValue,
 	}
 	//p3.Style

@@ -1186,7 +1186,7 @@ type Options struct {
 	Resource    string
 	Header      string
 	Reference   string
-	Name string
+	Name        string
 	Annotations map[string]string
 }
 

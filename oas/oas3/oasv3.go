@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/boynton/sadl"
+	"github.com/ghodss/yaml"
 )
 
 func OasError(format string, args ...interface{}) error {

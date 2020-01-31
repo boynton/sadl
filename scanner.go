@@ -368,7 +368,7 @@ func (s *Scanner) scanString() Token {
 				if h1 > 15 || h2 > 15 || h3 > 15 || h4 > 15 {
 					return tok.undefined("unicode escape must contain 4 hex digits")
 				}
-				buf.WriteRune(h1 << 24 + h2 << 16 + h3 << 8 + h4)
+				buf.WriteRune(h1<<24 + h2<<16 + h3<<8 + h4)
 			default:
 				buf.WriteRune(ch)
 				return tok.undefined("Bad escape char in string: \\" + string(ch))

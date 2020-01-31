@@ -137,7 +137,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 					schema.Actions = append(schema.Actions, act)
 				}
 				if httpBindings {
-//					fmt.Println("xxxxxxxxxxxxxxxx === ", method)
+					//					fmt.Println("xxxxxxxxxxxxxxxx === ", method)
 					hact, err := convertOasPath(tmpl, op, method)
 					if err != nil {
 						return nil, err
@@ -152,15 +152,15 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 		annotations["x_server"] = server.URL
 	}
 	if oas.V3.Info.License != nil {
-//		if schema.Annotations == nil {
-//			schema.Annotations = make(map[string]string, 0)
-//		}
+		//		if schema.Annotations == nil {
+		//			schema.Annotations = make(map[string]string, 0)
+		//		}
 		if oas.V3.Info.License.Name != "" {
-//			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
+			//			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
 			annotations["x_license_name"] = oas.V3.Info.License.Name
 		}
 		if oas.V3.Info.License.URL != "" {
-//			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
+			//			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
 			annotations["x_license_url"] = oas.V3.Info.License.URL
 		}
 	}
@@ -691,8 +691,8 @@ func getPathOperation(oasPathItem *oas3.PathItem, method string) *oas3.Operation
 	case "GET":
 		return oasPathItem.Get
 	case "PUT":
-//	fmt.Println("xxxxxxxxxxxxxxxx----!!!!", method, oasPathItem.OperationId)
-//		panic("here")
+		//	fmt.Println("xxxxxxxxxxxxxxxx----!!!!", method, oasPathItem.OperationId)
+		//		panic("here")
 		return oasPathItem.Put
 	case "POST":
 		return oasPathItem.Post
