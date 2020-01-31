@@ -11,6 +11,8 @@ import (
 	"github.com/boynton/sadl"
 )
 
+//Generate an http protocol trace from SADL model examples. Other documentation things in html are forthcoming,
+//this is really just a test that the trace can be created.
 func main() {
 	flag.Parse()
 	args := flag.Args()
@@ -131,32 +133,3 @@ func dateHeader() string {
 	t := time.Now()
 	return t.Format("Mon, 2 Jan 2006 15:04:05 GMT")
 }
-
-var template = `<html>
-  <head><title>HTTP Trace</title></head>
-  <body>
-    <h2>Example</h2>
-    <h3>Request</h3>
-    <pre>
-      GET /people/bf938428-f04c-11e9-a280-8c8590216cf9
-      Authorization: Bearer <token>
-      Accept: application/json
-      
-    </pre>
-
-    <h3>Response</h3>
-    <pre>
-      HTTP/1.1 200 OK
-      Content-Length: 404
-      Content-Type: application/json; charset=utf-8
-      Date: Wed, 16 Oct 2019 13:46:37 GMT      
-      
-      {
-          "id": "bf938428-f04c-11e9-a280-8c8590216cf9",
-          "name": "Lee Boynton",
-          "email": "lee@boynton.com"
-      }
-    </pre>
-  </body>
-</html>
-`

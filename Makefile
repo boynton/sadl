@@ -1,4 +1,4 @@
-all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy
+all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy bin/sadl2html
 
 install:: all
 	cp -p bin/* $(HOME)/bin/
@@ -66,6 +66,7 @@ proper::
 	go fmt github.com/boynton/sadl/cmd/sadl2oas
 	go vet github.com/boynton/sadl/cmd/sadl2oas
 	go vet github.com/boynton/sadl/cmd/sadl2smithy
+	go vet github.com/boynton/sadl/cmd/sadl2html
 
 clean::
 	rm -rf bin
