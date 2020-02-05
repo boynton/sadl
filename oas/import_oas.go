@@ -179,7 +179,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 }
 
 func oasTypeRef(oasSchema *oas3.Schema) string {
-	if oasSchema.Ref != "" {
+	if oasSchema != nil && oasSchema.Ref != "" {
 		if strings.HasPrefix(oasSchema.Ref, "#/components/schemas/") {
 			return oasSchema.Ref[len("#/components/schemas/"):]
 		}
@@ -294,8 +294,8 @@ func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) 
 			ts.Max = sadl.NewDecimal(*oasSchema.Max)
 		}
 	case "", "object":
+		ts.Type = "Struct"
 		if oasSchema.Properties != nil {
-			ts.Type = "Struct"
 			req := oasSchema.Required
 			for fname, fschema := range oasSchema.Properties {
 				fd := &sadl.StructFieldDef{
@@ -521,7 +521,9 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 		}
 		spec.Type = oasTypeRef(param.Schema)
 		if spec.Type == "" {
-			spec.Type = sadlPrimitiveType(param.Schema.Type)
+			if param.Schema != nil {
+				spec.Type = sadlPrimitiveType(param.Schema.Type)
+			}
 			if spec.Type == "Array" {
 				if param.Schema.Items == nil {
 					spec.Items = "Any"
@@ -538,7 +540,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 			if spec.Type == "Struct" {
 				panic("Whoops, that can't be right")
 			}
-			if param.Schema.Enum != nil {
+			if param.Schema != nil && param.Schema.Enum != nil {
 				for _, val := range param.Schema.Enum {
 					if s, ok := val.(string); ok {
 						spec.Values = append(spec.Values, s)
