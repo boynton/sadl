@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/boynton/sadl"
 	"github.com/ghodss/yaml"
 )
 
@@ -26,7 +25,6 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(sadl.Pretty(v3))
 	return Validate(v3)
 }
 

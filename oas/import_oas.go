@@ -61,7 +61,6 @@ func Parse(data []byte, format string) (*Oas, error) {
 		return oas, err
 	} else if strings.HasPrefix(version, "2.") {
 		v2, err := oas2.Parse(data, format)
-		fmt.Println(sadl.Pretty(v2.Paths), err)
 		if err == nil {
 			oas.V3, err = oas2.ConvertToV3(v2)
 		}
@@ -125,7 +124,6 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 		for _, method := range methods {
 			op := getPathOperation(&path2, method)
 			if op != nil {
-				fmt.Println("xxxxxxxxxxxxxxxx------>", method, tmpl, op.OperationId)
 				if strings.HasPrefix(tmpl, "x-") {
 					continue
 				}
