@@ -153,6 +153,8 @@ func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 				err = p.parseActionDirective(comment)
 			case "http":
 				err = p.parseHttpDirective(comment)
+			case "include":
+				err = p.parseIncludeDirective(comment)
 			default:
 				if strings.HasPrefix(tok.Text, "x_") {
 					p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
@@ -227,6 +229,53 @@ func (p *Parser) parseBaseDirective(comment string) error {
 		p.schema.Base = base
 		if base != "" && !strings.HasPrefix(base, "/") {
 			err = p.Error("Bad base path value: " + base)
+		}
+	}
+	return err
+}
+
+func (p *Parser) extensionList() []Extension {
+	var ext []Extension
+	for _, e := range p.extensions {
+		ext = append(ext, e)
+	}
+	return ext
+}
+
+func (p *Parser) addAnnotation(annos map[string]string, name, val string) map[string]string {
+	if annos == nil {
+		annos = make(map[string]string, 0)
+	}
+	annos[name] = val
+	return annos
+}
+
+func (p *Parser) parseIncludeDirective(comment string) error {
+	p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
+	fname, err := p.ExpectString()
+	if err == nil {
+		var incmodel *Model
+		incmodel, err = ParseFile(fname, p.extensionList()...)
+		if err == nil {
+			tmpModel, err := NewModel(p.schema)
+			if err != nil {
+				return err
+			}
+			for _, td := range incmodel.Types {
+				if tmpModel.FindType(td.Name) != nil {
+					return p.Error("Duplicate Type definition in included file (" + fname + "): " + td.Name)
+				}
+				td.Annotations = p.addAnnotation(td.Annotations, "x_include", fname)
+				p.schema.Types = append(p.schema.Types, td)
+			}
+			for _, op := range incmodel.Http {
+				op.Annotations = p.addAnnotation(op.Annotations, "x_include", fname)
+				p.schema.Http = append(p.schema.Http, op)
+			}
+			for _, action := range incmodel.Actions {
+				action.Annotations = p.addAnnotation(action.Annotations, "x_include", fname)
+				p.schema.Actions = append(p.schema.Actions, action)
+			}
 		}
 	}
 	return err
@@ -2217,7 +2266,7 @@ func (p *Parser) registerExtension(handler Extension) error {
 }
 
 func (p *Parser) expectedDirectiveError() error {
-	msg := "Expected one of 'type', 'name', 'version', 'base', "
+	msg := "Expected one of 'type', 'name', 'version', 'base', include, "
 	if p.extensions != nil {
 		for k, _ := range p.extensions {
 			msg = msg + fmt.Sprintf("'%s', ", k)
