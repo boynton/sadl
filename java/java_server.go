@@ -112,6 +112,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 						param = fmt.Sprintf("@DefaultValue(%q)", *b) + " " + param
 					case *sadl.Decimal:
 						param = fmt.Sprintf("@DefaultValue(%q)", (*b).String()) + " " + param
+					case bool:
+						param = fmt.Sprintf("@DefaultValue(\"%v\")", b) + " " + param
 					default:
 						fmt.Println("Whoops:", sadl.Pretty(in.Default))
 						panic("HERE")
