@@ -47,7 +47,7 @@ type Extension interface {
 	Validate(p *Parser) error
 }
 
-func parseFile(path string, extensions []Extension) (*Model, error) {
+func parseFileNoValidate(path string, extensions []Extension) (*Parser, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,19 @@ func parseFile(path string, extensions []Extension) (*Model, error) {
 		path:    path,
 		source:  src,
 	}
-	return p.Parse(extensions)
+	err = p.ParseNoValidate(extensions)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func parseFile(path string, extensions []Extension) (*Model, error) {
+	p, err := parseFileNoValidate(path, extensions)
+	if err != nil {
+		return nil, err
+	}
+	return p.Validate()
 }
 
 func parseString(src string, extensions []Extension) (*Model, error) {
@@ -117,10 +129,18 @@ func (p *Parser) Source() string {
 }
 
 func (p *Parser) Parse(extensions []Extension) (*Model, error) {
+	err := p.ParseNoValidate(extensions)
+	if err != nil {
+		return nil, err
+	}
+	return p.Validate()
+}
+
+func (p *Parser) ParseNoValidate(extensions []Extension) error {
 	for _, ext := range extensions {
 		err := p.registerExtension(ext)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	p.schema = &Schema{
@@ -177,17 +197,17 @@ func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 		case NEWLINE:
 			/* ignore */
 		default:
-			return nil, p.expectedDirectiveError()
+			return p.expectedDirectiveError()
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	var err error
 	p.model, err = NewModel(p.schema)
 	p.schema = nil
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if extensions != nil {
 		p.model.Extensions = make(map[string]interface{})
@@ -195,7 +215,7 @@ func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 			p.model.Extensions[ext.Name()] = ext.Result()
 		}
 	}
-	return p.Validate()
+	return nil
 }
 
 func (p *Parser) parseNameDirective(comment string) error {
@@ -254,25 +274,26 @@ func (p *Parser) parseIncludeDirective(comment string) error {
 	p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
 	fname, err := p.ExpectString()
 	if err == nil {
-		var incmodel *Model
-		incmodel, err = ParseFile(fname, p.extensionList()...)
+		var incparser *Parser
+		incparser, err = parseFileNoValidate(fname, p.extensionList())
 		if err == nil {
+			inc := incparser.model
 			tmpModel, err := NewModel(p.schema)
 			if err != nil {
 				return err
 			}
-			for _, td := range incmodel.Types {
+			for _, td := range inc.Types {
 				if tmpModel.FindType(td.Name) != nil {
 					return p.Error("Duplicate Type definition in included file (" + fname + "): " + td.Name)
 				}
 				td.Annotations = p.addAnnotation(td.Annotations, "x_include", fname)
 				p.schema.Types = append(p.schema.Types, td)
 			}
-			for _, op := range incmodel.Http {
+			for _, op := range inc.Http {
 				op.Annotations = p.addAnnotation(op.Annotations, "x_include", fname)
 				p.schema.Http = append(p.schema.Http, op)
 			}
-			for _, action := range incmodel.Actions {
+			for _, action := range inc.Actions {
 				action.Annotations = p.addAnnotation(action.Annotations, "x_include", fname)
 				p.schema.Actions = append(p.schema.Actions, action)
 			}
