@@ -147,8 +147,10 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 		if gen.UseLombok {
 			gen.Emit(indent + "@Data\n")
 			gen.AddImport("lombok.Data")
-			gen.Emit(indent + "@AllArgsConstructor\n")
-			gen.AddImport("lombok.AllArgsConstructor")
+			if len(td.Fields) > 0 {
+				gen.Emit(indent + "@AllArgsConstructor\n")
+				gen.AddImport("lombok.AllArgsConstructor")
+			}
 			gen.Emit(indent + "@Builder\n")
 			gen.AddImport("lombok.Builder")
 			gen.Emit(indent + "@NoArgsConstructor\n")
