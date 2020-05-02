@@ -1,7 +1,9 @@
 package smithy
 
 import(
-	"encoding/json"
+//	"encoding/json"
+//	"fmt"
+//	"github.com/boynton/sadl"
 )
 
 //the model can be output directly as JSON.
@@ -37,27 +39,42 @@ type Item struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
-type Traitable struct {
-	Documentation string `json:"documentation,omitempty"`
-	Sensitive bool `json:"sensitive,omitempty"`
-	Deprecated *Deprecated `json:"deprecated,omitempty"`
-	Length *Length `json:"length,omitempty"`
-	Pattern string `json:"pattern,omitempty"`
-	Enum map[string]*Item `json:"enum,omitempty"`
+type Traits struct {
+	Documentation string `json:"smithy.api#documentation,omitempty"`
+	Sensitive bool `json:"smithy.api#sensitive,omitempty"`
+	Deprecated *Deprecated `json:"smithy.api#deprecated,omitempty"`
+	Length *Length `json:"smithy.api#length,omitempty"`
+	Pattern string `json:"smithy.api#pattern,omitempty"`
+	Enum map[string]*Item `json:"smithy.api#enum,omitempty"`
+	Idempotent bool `json:"smithy.api#idempotent,omitempty"`
+	ReadOnly bool `json:"smithy.api#readonly,omitempty"`
+	Required bool `json:"smithy.api#required,omitempty"`
+	Paginated *Paginated `json:"smithy.api#paginated,omitempty"`
+	References []*Ref `json:"smithy.api#references,omitempty"`
+	Error string `json:"smithy.api#error,omitempty"`
+	Http *Http `json:"smithy.api#http,omitempty"`
+	HttpLabel bool `json:"smithy.api#httpLabel,omitempty"`
+	HttpQuery string `json:"smithy.api#httpQuery,omitempty"`
+	HttpPayload bool `json:"smithy.api#httpPayload,omitempty"`
+	HttpHeader string `json:"smithy.api#httpHeader,omitempty"`
+	HttpError int32 `json:"smithy.api#httpError,omitempty"`
+	Protocols []Protocol `json:"smithy.api#protocols,omitempty"`
+}
+
+type Paginated struct {
+	Items string `json:"items,omitempty"`
+	InputToken string `json:"inputToken,omitempty"`
+	OutputToken string `json:"outputToken,omitempty"`
+	PageSize string `json:"pageSizeomitempty"`	
+}
+
+type Ref struct {
+	Resource string `json:"resource,omitempty"`
 }
 
 type Member struct {
-	Traitable
 	Target string `json:"target"`
-	Required bool `json:"required,omitempty"`
-	HttpLabel bool `json:"httpLabel,omitempty"`
-	HttpQuery string `json:"httpQuery,omitempty"`
-	HttpPayload bool `json:"httpPayload,omitempty"`
-	HttpHeader string `json:"httpHeader,omitempty"`
-}
-
-type Identifiers struct {
-	Id string `json:"id,omitempty"`
+	Traits *Traits `json:"traits,omitempty"`
 }
 
 type Protocol struct {
@@ -73,55 +90,48 @@ type Http struct {
 }
 
 type Shape struct {
-	Traitable
 	Type string `json:"type"`
 	Members map[string]*Member `json:"members,omitempty"`
 	Member *Member `json:"member,omitempty"`
 	Key *Member `json:"key,omitempty"`
 	Value *Member `json:"value,omitempty"`
-	Trait bool `json:"trait,omitempty"`
-	Identifiers map[string]string `json:"identifiers,omitempty"`
-	Create string `json:"create,omitempty"`
-	Put string `json:"put,omitempty"`
-	Read string `json:"read,omitempty"`
-	Update string `json:"update,omitempty"`
-	Delete string `json:"delete,omitempty"`
-	List string `json:"list,omitempty"`
-	Operations []string `json:"operations,omitempty"`
-	CollectionOperations []string `json:"collectionOperations,omitempty"`
+	Identifiers map[string]*Member `json:"identifiers,omitempty"`
+	Create *Member `json:"create,omitempty"`
+	Put *Member `json:"put,omitempty"`
+	Read *Member `json:"read,omitempty"`
+	Update *Member `json:"update,omitempty"`
+	Delete *Member `json:"delete,omitempty"`
+	List *Member `json:"list,omitempty"`
+	Operations []*Member `json:"operations,omitempty"`
+	CollectionOperations []*Member `json:"collectionOperations,omitempty"`
 	Version string `json:"version,omitempty"`
-	Resources []string `json:"resources,omitempty"`
-	Protocols []Protocol `json:"protocols,omitempty"`
-	Input string `json:"input,omitempty"`
-	Output string `json:"output,omitempty"`
-	Errors []string `json:"errors,omitempty"`
-	Idempotent bool `json:"idempotent,omitempty"`
-	ReadOnly bool `json:"readonly,omitempty"`
-	Http *Http `json:"http,omitempty"`
-	HttpError int32 `json:"httpError,omitempty"`
+	Resources []*Member `json:"resources,omitempty"`
+	Input *Member `json:"input,omitempty"`
+	Output *Member `json:"output,omitempty"`
+	Errors []*Member `json:"errors,omitempty"`
+	Traits *Traits `json:"traits,omitempty"`
 }
 
-type Namespace struct {
+/*type Namespace struct {
 	Shapes map[string]*Shape `json:"shapes,omitempty"`
 	Traits map[string]Node `json:"traits,omitempty"`
 }
+*/
 
 type Model struct {
-	Version      string
-	Namespaces   map[string]*Namespace
-	Metadata     map[string]Node
-//	Metadata    map[string]Node `json:"metadata,omitempty"`
+	Version      string `json:"smithy"`
+	Metadata     map[string]Node `json:"metadata,omitempty"`
+	Shapes       map[string]*Shape `json:"shapes,omitempty"`
 }
 
+/*
 func (model *Model) MarshalJSON() ([]byte, error) {
 	tmp := make(map[string]interface{}, 0)
 	tmp["smithy"] = model.Version
 	if len(model.Metadata) > 0 {
 		tmp["metadata"] = model.Metadata
 	}
-	for k, v := range model.Namespaces {
-		tmp[k] = v
-	}
+	tmp["shapes"] = model.Shapes
 	return json.Marshal(tmp)
 }
 
@@ -153,6 +163,8 @@ func (model *Model) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(sadl.Pretty(tmp))
+	panic("here")
 	var namespaces map[string]*Namespace
 	err = json.Unmarshal(b2, &namespaces)
 	if err != nil {
@@ -161,3 +173,4 @@ func (model *Model) UnmarshalJSON(b []byte) error {
 	model.Namespaces = namespaces
 	return nil
 }
+*/

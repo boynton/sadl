@@ -1,4 +1,7 @@
-all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy bin/sadl2html
+_hack:: bin/smithy2sadl
+	bin/smithy2sadl /Users/lee/rigs/smithy/build/smithyprojections/smithy/source/model/model.json
+
+all:: bin/sadl bin/sadl2java bin/sadl2go bin/oas2sadl bin/sadl2oas bin/sadl2smithy bin/sadl2html bin/smithy2sadl
 
 install:: all
 	cp -p bin/* $(HOME)/bin/
@@ -40,6 +43,10 @@ bin/sadl2smithy:: lib
 bin/sadl2html:: lib cmd/sadl2html/main.go
 	mkdir -p bin
 	go build -o bin/sadl2html github.com/boynton/sadl/cmd/sadl2html
+
+bin/smithy2sadl:: lib cmd/smithy2sadl/main.go
+	mkdir -p bin
+	go build -o bin/smithy2sadl github.com/boynton/sadl/cmd/smithy2sadl
 
 proper::
 	go fmt github.com/boynton/sadl

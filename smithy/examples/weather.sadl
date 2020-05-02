@@ -1,0 +1,50 @@
+/*
+namespace example.weather
+
+service Weather {
+  version: "2006-03-01",
+  resources: [City],
+  operations: [GetCurrentTime]
+}
+
+resource City {
+  identifiers: { cityId: CityId },
+  read: GetCity,
+  list: ListCities,
+  resources: [Forecast]
+}
+
+resource Forecast {
+  type: resource,
+  identifiers: { cityId: CityId },
+  read: GetForecast,
+}
+*/
+
+
+/* "pattern" is a trait */
+type CityId String (pattern="^A-Za-z0-9 ]+$")
+
+action GetCity(GetCityInput) GetCityOutput
+
+type GetCityInput Struct {
+	/* "cityId" provides the identifier for the resource and  has to be marked as required */
+	cityId CityId (required)
+}
+
+type GetCityOutput Struct {
+	/* "required" is used on output to indicate if the service will always provide a value for the member */
+	name String (required)
+
+
+	coordinates CityCoordinates (required)
+}
+
+type CityCoordinates Struct {
+	latitude Float32 (required)
+	longitude Float32 (required)
+}
+
+type NoSuchResource Struct {
+	resourceType String (required)
+}

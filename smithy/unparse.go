@@ -4,6 +4,8 @@ import(
 	"bytes"
 	"bufio"
 	"fmt"
+	"strings"
+//	"github.com/boynton/sadl"
 )
 
 //
@@ -15,34 +17,41 @@ func (model *Model) IDL() string {
 	w.Begin()
 	w.Emit("$version: %q\n", model.Version)
 	emitted := make(map[string]bool, 0)
-	for ns, namespace := range model.Namespaces {
-		w.Emit("\nnamespace %s\n\n", ns)
-		for k, v := range namespace.Shapes {
-			if v.Type == "operation" {
-				w.EmitShape(k, v)
-				emitted[k] = true
-				ki := k+"Input"
-				if vi, ok := namespace.Shapes[ki]; ok {
-					w.EmitShape(ki, vi)
-					emitted[ki] = true
-				}
-				ko := k+"Output"
-				if vo, ok := namespace.Shapes[ko]; ok {
-					w.EmitShape(ko, vo)
-					emitted[ko] = true
-				}
-			}
+	lastNs := ""
+	for nsk, v := range model.Shapes {
+		lst := strings.Split(nsk, "#")
+		ns := lst[0]
+		k := lst[1]
+		if ns != lastNs {
+			w.Emit("\nnamespace %s\n\n", ns)
+			lastNs = ns
 		}
-		for k, v := range namespace.Shapes {
-			if !emitted[k] {
-				w.EmitShape(k, v)
+		if v.Type == "operation" {
+			w.EmitShape(k, v)
+			emitted[k] = true
+			ki := k+"Input"
+			if vi, ok := model.Shapes[ki]; ok { //FIX ME
+				w.EmitShape(ki, vi)
+				emitted[ki] = true
 			}
-		}
-		//out of band traits here
-		for k, v := range namespace.Traits {
-			fmt.Println("FIX ME trait", k, v)
+			ko := k+"Output"
+			if vo, ok := model.Shapes[ns+"#"+ko]; ok {
+				w.EmitShape(ko, vo)
+				emitted[ko] = true
+			}
 		}
 	}
+	for nsk, v := range model.Shapes {
+		lst := strings.Split(nsk, "#")
+		k := lst[1]
+		if !emitted[k] {
+			w.EmitShape(k, v)
+		}
+	}
+	//out of band traits here
+//		for k, v := range namespace.Traits {
+//			fmt.Println("FIX ME trait", k, v)
+//		}
 	return w.End()
 }
 
@@ -60,35 +69,50 @@ func (w *IdlWriter) Emit(format string, args ...interface{}) {
 	w.writer.WriteString(fmt.Sprintf(format, args...))
 }
 
+func documentation(shape *Shape) string {
+	if shape.Traits != nil {
+		return shape.Traits.Documentation
+	}
+	return ""
+}
+
+func nonNilTraits(traits *Traits) *Traits {
+	if traits == nil {
+		return &Traits{}
+	}
+	return traits
+}
+
 func (w *IdlWriter) EmitShape(name string, shape *Shape) {
-	w.EmitDocumentation(shape.Documentation, "")	
-	w.EmitDeprecated(shape.Deprecated, "")
-	w.EmitBooleanTrait(shape.Sensitive, "sensitive", "")
-	w.EmitBooleanTrait(shape.Trait, "trait", "")
-	w.EmitBooleanTrait(shape.ReadOnly, "readonly", "")
-	w.EmitBooleanTrait(shape.Idempotent, "idempotent", "")
-	if shape.Http != nil {
+	traits := nonNilTraits(shape.Traits)
+	w.EmitDocumentation(traits.Documentation, "")	
+	w.EmitDeprecated(traits.Deprecated, "")
+	w.EmitBooleanTrait(traits.Sensitive, "sensitive", "")
+	w.EmitBooleanTrait(traits.ReadOnly, "readonly", "")
+	w.EmitBooleanTrait(traits.Idempotent, "idempotent", "")
+	
+	if traits.Http != nil {
 		s := ""
-		if shape.Http.Method != "" {
-			s = fmt.Sprintf("method: %q", shape.Http.Method)
+		if traits.Http.Method != "" {
+			s = fmt.Sprintf("method: %q", traits.Http.Method)
 		}
-		if shape.Http.Uri != "" {
+		if traits.Http.Uri != "" {
 			if s != "" {
 				s = s + ", "
 			}
-			s = s + fmt.Sprintf("uri: %q", shape.Http.Uri)
+			s = s + fmt.Sprintf("uri: %q", traits.Http.Uri)
 		}
-		if shape.Http.Code != 0 {
+		if traits.Http.Code != 0 {
 			if s != "" {
 				s = s + ", "
 			}
-			s = s + fmt.Sprintf("code: %d", shape.Http.Code)
+			s = s + fmt.Sprintf("code: %d", traits.Http.Code)
 		}
 		w.Emit("@http(%s)\n", s)
 	}
-	if shape.HttpError != 0 {
+	if traits.HttpError != 0 {
 		//note: @retryable
-		w.Emit("@error(\"client\")\n@httpError(%d)\n", shape.HttpError)
+		w.Emit("@error(\"client\")\n@httpError(%d)\n", traits.HttpError)
 	}
 	switch shape.Type {
 	case "boolean":
@@ -174,8 +198,9 @@ func (w *IdlWriter) EmitNumericShape(shapeName, name string, shape *Shape) {
 }
 
 func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
-	if shape.Length != nil {
-		l := shape.Length
+	tr := nonNilTraits(shape.Traits)
+	if tr.Length != nil {
+		l := tr.Length
 		if l.Min != nil && l.Max != nil {
 			w.Emit("@length(min: %d, max: %d)\n", *l.Min, *l.Max)
 		} else if l.Max != nil {
@@ -184,12 +209,12 @@ func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
 			w.Emit("@length(min: %d)\n", *l.Min)
 		}
 	}
-	if shape.Pattern != "" {
-		w.Emit("@pattern(%q)\n", shape.Pattern)
+	if tr.Pattern != "" {
+		w.Emit("@pattern(%q)\n", tr.Pattern)
 	}
-	if shape.Enum != nil {
+	if tr.Enum != nil {
 		s := ""
-		for k, item := range shape.Enum {
+		for k, item := range tr.Enum {
 			if s != "" {
 				s = s + ", "
 			}
@@ -226,7 +251,7 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 	count := len(shape.Members)
 	for fname, mem := range shape.Members {
 		traits := ""
-		if mem.Sensitive {
+		if nonNilTraits(mem.Traits).Sensitive {
 			traits = traits + "@sensitive "
 		}
 		//TODO other traits
@@ -245,16 +270,32 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 	w.Emit("structure %s {\n", name)
 	indent := "    "
 	for k, v := range shape.Members {
-		w.EmitBooleanTrait(v.Sensitive, "sensitive", indent)
-		w.EmitBooleanTrait(v.Required, "required", indent)
-		w.EmitBooleanTrait(v.HttpLabel, "httpLabel", indent)
-		w.EmitStringTrait(v.HttpQuery, "httpQuery", indent)
-		w.EmitStringTrait(v.HttpHeader, "httpHeader", indent)
-		w.EmitBooleanTrait(v.HttpPayload, "httpPayload", indent)
-		w.EmitDocumentation(v.Documentation, indent)
+		traits := nonNilTraits(v.Traits)
+		w.EmitBooleanTrait(traits.Sensitive, "sensitive", indent)
+		w.EmitBooleanTrait(traits.Required, "required", indent)
+		w.EmitBooleanTrait(traits.HttpLabel, "httpLabel", indent)
+		w.EmitStringTrait(traits.HttpQuery, "httpQuery", indent)
+		w.EmitStringTrait(traits.HttpHeader, "httpHeader", indent)
+		w.EmitBooleanTrait(traits.HttpPayload, "httpPayload", indent)
+		w.EmitDocumentation(traits.Documentation, indent)
 		w.Emit("%s%s: %s,\n", indent, k, v.Target)
 	}
 	w.Emit("}\n")
+}
+
+func listOfMembers(label string, format string, lst []*Member) string {
+	s := ""
+	if len(lst) > 0 {
+		s = label + ": ["
+		for n, a := range lst {
+			if n > 0 {
+				s = s + ", "
+			}
+			s = s + fmt.Sprintf(format, a.Target)
+		}
+		s = s + "]"
+	}
+	return s
 }
 
 func listOfStrings(label string, format string, lst []string) string {
@@ -273,9 +314,10 @@ func listOfStrings(label string, format string, lst []string) string {
 }
 
 func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
-	if len(shape.Protocols) > 0 {
+	traits := nonNilTraits(shape.Traits)
+	if len(traits.Protocols) > 0 {
 		s := "@protocols(["
-		for n, p := range shape.Protocols {
+		for n, p := range traits.Protocols {
 			if n > 0 {
 				s = s + ", "
 			}
@@ -287,7 +329,7 @@ func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
 	w.Emit("service %s {\n", name)
 	w.Emit("    version: %q\n", shape.Version)
 	if len(shape.Resources) > 0 {
-		w.Emit("    %s\n", listOfStrings("resources", "%s", shape.Resources))
+		w.Emit("    %s\n", listOfMembers("resources", "%s", shape.Resources))
 	}
 	w.Emit("}\n")
 }
@@ -297,32 +339,32 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 	if len(shape.Identifiers) > 0 {
 		w.Emit("    identifiers: {\n")
 		for k, v := range shape.Identifiers {
-			w.Emit("        %s: %s,\n", k, v)
+			w.Emit("        %s: %s,\n", k, v.Target) //fixme
 		}
 		w.Emit("    }\n")
-		if shape.Create != "" {
-			w.Emit("    create: %s\n", shape.Create)
+		if shape.Create != nil {
+			w.Emit("    create: %v\n", shape.Create)
 		}
-		if shape.Put != "" {
-			w.Emit("    put: %s\n", shape.Put)
+		if shape.Put != nil {
+			w.Emit("    put: %v\n", shape.Put)
 		}
-		if shape.Read != "" {
-			w.Emit("    read: %s\n", shape.Read)
+		if shape.Read != nil {
+			w.Emit("    read: %v\n", shape.Read)
 		}
-		if shape.Update != "" {
-			w.Emit("    update: %s\n", shape.Update)
+		if shape.Update != nil {
+			w.Emit("    update: %v\n", shape.Update)
 		}
-		if shape.Delete != "" {
-			w.Emit("    delete: %s\n", shape.Delete)
+		if shape.Delete != nil {
+			w.Emit("    delete: %v\n", shape.Delete)
 		}
-		if shape.List != "" {
-			w.Emit("    list: %s\n", shape.List)
+		if shape.List != nil {
+			w.Emit("    list: %v\n", shape.List)
 		}
 		if len(shape.Operations) > 0 {
-			w.Emit("    %s\n", listOfStrings("operations", "%s", shape.Operations))
+			w.Emit("    %s\n", listOfMembers("operations", "%s", shape.Operations))
 		}
 		if len(shape.CollectionOperations) > 0 {
-			w.Emit("    %s\n", listOfStrings("collectionOperations", "%s", shape.CollectionOperations))
+			w.Emit("    %s\n", listOfMembers("collectionOperations", "%s", shape.CollectionOperations))
 		}
 	}
 	w.Emit("}\n")
@@ -337,15 +379,15 @@ func (w *IdlWriter) EmitOperationShape(name string, shape *Shape) {
 			} else {
 				es = es + ", "
 			}
-			es = es + e
+			es = es + e.Target
 		}
 		es = es + "]"
 	}
 	out := ""
-	if shape.Output != "" {
-		out = " -> " + shape.Output
+	if shape.Output != nil {
+		out = " -> " + shape.Output.Target
 	}
-	w.Emit("operation %s(%s)%s%s\n", name, shape.Input, out, es)
+	w.Emit("operation %s(%s)%s%s\n", name, shape.Input.Target, out, es)
 }
 
 func (w *IdlWriter) End() string {
