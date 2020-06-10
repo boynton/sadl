@@ -1,10 +1,10 @@
 package graphql
 
-import(
+import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	
+
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/util"
 
@@ -44,7 +44,7 @@ func gqlSchema(doc *gql_ast.Document, conf map[string]interface{}) (*sadl.Schema
 	}
 	namespace := util.GetString(conf, "namespace")
 	schema := &sadl.Schema{
-		Name: name,
+		Name:      name,
 		Namespace: namespace,
 	}
 	ignore := make(map[string]bool, 0)

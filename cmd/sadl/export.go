@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/graphql"
 	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/java"
 	"github.com/boynton/sadl/openapi"
@@ -13,7 +14,7 @@ import (
 
 func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]interface{}) error {
 	switch generator {
-	case "json":
+	case "json", "sadl-ast":
 		fmt.Println(util.Pretty(model))
 		return nil
 	case "sadl":
@@ -33,6 +34,8 @@ func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]inter
 		return java.Export(model, dir, conf)
 	case "openapi":
 		return openapi.Export(model, conf)
+	case "graphql":
+		return graphql.Export(model, conf)
 	default:
 		return fmt.Errorf("Unsupported generator: %s", generator)
 	}

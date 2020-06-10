@@ -139,7 +139,6 @@ func NewGenerator(model *sadl.Model, outdir string, conf map[string]interface{})
 	gen.Server = gen.GetBool(conf, "server", false)
 	gen.UseLombok = gen.GetBool(conf, "lombok", false)
 	gen.UseGetters = gen.GetBool(conf, "getters", false)
-	gen.NeedTimestamps = gen.GetBool(conf, "timestamps", true)
 	gen.UseInstants = gen.GetBool(conf, "instants", false)
 	gen.UseMaven = gen.GetBool(conf, "maven", true)
 	gen.Model = model

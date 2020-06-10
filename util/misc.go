@@ -85,4 +85,3 @@ func BaseFileName(path string) string {
 	}
 	return fname[:n]
 }
-

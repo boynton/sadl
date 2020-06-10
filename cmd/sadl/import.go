@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/graphql"
 	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/openapi"
 	"github.com/boynton/sadl/smithy"
-	"github.com/boynton/sadl/graphql"
 )
 
 var ImportFormats = []string{
@@ -24,6 +24,7 @@ var ImportFileExtensions = map[string][]string{
 	".smithy":  []string{"smithy"},
 	".graphql": []string{"graphql"},
 	".json":    []string{"sadl", "smithy", "openapi"},
+	".yaml":    []string{"openapi"},
 }
 
 func ImportFile(path string, conf map[string]interface{}, extensions ...io.Extension) (*sadl.Model, error) {

@@ -14,7 +14,7 @@ func TestRefactorStruct(test *testing.T) {
        TWO
     }
 }
-`)
+`, nil)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {

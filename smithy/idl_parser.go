@@ -1,11 +1,11 @@
 package smithy
 
-import(
+import (
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"strconv"
-	
+	"strings"
+
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/util"
 )
@@ -22,22 +22,20 @@ func parse(path string, conf map[string]interface{}) (*AST, error) {
 		scanner: util.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
-		conf: conf,
-		
+		conf:    conf,
 	}
 	err = p.Parse()
 	if err != nil {
 		return nil, err
 	}
-//	fmt.Println(sadl.Pretty(p.ast))
+	//	fmt.Println(sadl.Pretty(p.ast))
 	return p.ast, nil
 }
-
 
 type Parser struct {
 	path           string
 	source         string
-	conf map[string]interface{}
+	conf           map[string]interface{}
 	scanner        *util.Scanner
 	ast            *AST
 	lastToken      *util.Token
@@ -381,9 +379,9 @@ func (p *Parser) parseList(traits map[string]interface{}) error {
 	}
 	if tok.Type != util.OPEN_BRACE {
 		return p.SyntaxError()
-	}	
+	}
 	shape := &Shape{
-		Type: "list",
+		Type:   "list",
 		Traits: traits,
 	}
 	var mtraits map[string]interface{}
@@ -412,7 +410,7 @@ func (p *Parser) parseList(traits map[string]interface{}) error {
 			if fname != "member" {
 				return p.SyntaxError()
 			}
-			
+
 			ftype, err := p.ExpectIdentifier()
 			if err != nil {
 				return err
@@ -441,9 +439,9 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 	}
 	if tok.Type != util.OPEN_BRACE {
 		return p.SyntaxError()
-	}	
+	}
 	shape := &Shape{
-		Type: "structure",
+		Type:   "structure",
 		Traits: traits,
 	}
 	mems := make(map[string]*Member, 0)
@@ -500,9 +498,9 @@ func (p *Parser) parseOperation(traits map[string]interface{}) error {
 	}
 	if tok.Type != util.OPEN_BRACE {
 		return p.SyntaxError()
-	}	
+	}
 	shape := &Shape{
-		Type: "operation",
+		Type:   "operation",
 		Traits: traits,
 	}
 	for {
@@ -557,7 +555,7 @@ func (p *Parser) parseService(comment string) error {
 	}
 	if tok.Type != util.OPEN_BRACE {
 		return p.SyntaxError()
-	}	
+	}
 	shape := &Shape{
 		Type: "service",
 	}
@@ -598,10 +596,10 @@ func (p *Parser) parseService(comment string) error {
 		}
 		err = p.ignore(util.COMMA)
 	}
-//Traits:
-//	Operations []*ShapeRef `json:"operations,omitempty"`
-//	Resources []*ShapeRef `json:"resources,omitempty"`
-//	Version string `json:"version,omitempty"`
+	//Traits:
+	//	Operations []*ShapeRef `json:"operations,omitempty"`
+	//	Resources []*ShapeRef `json:"resources,omitempty"`
+	//	Version string `json:"version,omitempty"`
 
 	p.addShapeDefinition(name, shape)
 	return nil
@@ -643,15 +641,15 @@ func EnsureNamespaced(ns, name string) string {
 func (p *Parser) ensureNamespaced(name string) string {
 	return EnsureNamespaced(p.namespace, name)
 }
-	
+
 func (p *Parser) expectShapeRefs() ([]*ShapeRef, error) {
 	targets, err := p.ExpectIdentifierArray()
-   if err != nil {
-      return nil, err
-   }
+	if err != nil {
+		return nil, err
+	}
 	var refs []*ShapeRef
 	for _, target := range targets {
-		ref := &ShapeRef {
+		ref := &ShapeRef{
 			Target: p.ensureNamespaced(target),
 		}
 		refs = append(refs, ref)
@@ -664,7 +662,7 @@ func (p *Parser) expectShapeRef() (*ShapeRef, error) {
 	if err != nil {
 		return nil, err
 	}
-	ref := &ShapeRef {
+	ref := &ShapeRef{
 		Target: p.ensureNamespaced(tname),
 	}
 	return ref, nil
@@ -725,7 +723,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 	}
 	switch tname {
 	case "idempotent", "required", "httpLabel", "httpPayload", "readonly":
-		return withTrait(traits, "smithy.api#" + tname, true), nil
+		return withTrait(traits, "smithy.api#"+tname, true), nil
 	case "httpQuery", "httpHeader", "error", "documentation", "pattern":
 		err := p.expect(util.OPEN_PAREN)
 		if err != nil {
@@ -739,7 +737,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		if err != nil {
 			return traits, err
 		}
-		return withTrait(traits, "smithy.api#" + tname, s), nil
+		return withTrait(traits, "smithy.api#"+tname, s), nil
 	case "httpError":
 		err := p.expect(util.OPEN_PAREN)
 		if err != nil {
@@ -753,7 +751,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		if err != nil {
 			return traits, err
 		}
-		return withTrait(traits, "smithy.api#" + tname, n), nil
+		return withTrait(traits, "smithy.api#"+tname, n), nil
 	case "http":
 		args, err := p.parseTraitArgs()
 		if err != nil {
@@ -761,8 +759,8 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		}
 		ht := &HttpTrait{
 			Method: getString(args, "method"),
-			Uri: getString(args, "uri"),
-			Code: getInt(args, "code"),
+			Uri:    getString(args, "uri"),
+			Code:   getInt(args, "code"),
 		}
 		return withTrait(traits, "smithy.api#http", ht), nil
 	case "paginated":
@@ -772,7 +770,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		}
 		//fixme: check
 		return withTrait(traits, "smithy.api#paginated", args), nil
-		
+
 	default:
 		return traits, p.Error(fmt.Sprintf("Unknown trait: @%s\n", tname))
 	}
@@ -795,7 +793,6 @@ func withCommentTrait(traits map[string]interface{}, val string) (map[string]int
 	return traits, ""
 }
 
-		
 func (p *Parser) parseLiteralValue() (interface{}, error) {
 	tok := p.GetToken()
 	if tok == nil {

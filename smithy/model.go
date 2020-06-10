@@ -70,7 +70,7 @@ type Paginated struct {
 	Items string `json:"items,omitempty"`
 	InputToken string `json:"inputToken,omitempty"`
 	OutputToken string `json:"outputToken,omitempty"`
-	PageSize string `json:"pageSizeomitempty"`	
+	PageSize string `json:"pageSizeomitempty"`
 }
 
 type Ref struct {
@@ -130,7 +130,6 @@ type Model struct {
 	Traits map[string]Node `json:"traits,omitempty"`
 }
 */
-
 
 /*
 func (model *Model) MarshalJSON() ([]byte, error) {

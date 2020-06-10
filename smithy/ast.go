@@ -1,13 +1,13 @@
 package smithy
 
-import(
+import (
 	"strings"
 )
 
 type AST struct {
-   Version      string                 `json:"smithy"`
-   Metadata     map[string]interface{} `json:"metadata,omitempty"`
-   Shapes       map[string]*Shape      `json:"shapes,omitempty"`
+	Version  string                 `json:"smithy"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Shapes   map[string]*Shape      `json:"shapes,omitempty"`
 }
 
 func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
@@ -121,61 +121,60 @@ func getStruct(m map[string]interface{}, key string) map[string]interface{} {
 }
 
 type Shape struct {
-	Type string `json:"type"`
+	Type   string                 `json:"type"`
 	Traits map[string]interface{} `json:"traits,omitempty"` //service, resource, operation, apply
 
 	//List and Set
 	Member *Member `json:"member,omitempty"`
 
 	//Map
-	Key *Member `json:"key,omitempty"`
+	Key   *Member `json:"key,omitempty"`
 	Value *Member `json:"value,omitempty"`
 
 	//Structure and Union
-	Members map[string]*Member `json:"members,omitempty"` //keys must be case-insensitively unique. For union, len(Members) > 0, 
+	Members map[string]*Member `json:"members,omitempty"` //keys must be case-insensitively unique. For union, len(Members) > 0,
 
 	//Resource
-	Identifiers map[string]*ShapeRef `json:"identifiers,omitempty"`
-	Create *ShapeRef `json:"create,omitempty"`
-	Put *ShapeRef `json:"put,omitempty"`
-	Read *ShapeRef `json:"read,omitempty"`
-	Update *ShapeRef `json:"update,omitempty"`
-	Delete *ShapeRef `json:"delete,omitempty"`
-	List *ShapeRef `json:"list,omitempty"`
-	CollectionOperations []*ShapeRef `json:"collectionOperations,omitempty"`
+	Identifiers          map[string]*ShapeRef `json:"identifiers,omitempty"`
+	Create               *ShapeRef            `json:"create,omitempty"`
+	Put                  *ShapeRef            `json:"put,omitempty"`
+	Read                 *ShapeRef            `json:"read,omitempty"`
+	Update               *ShapeRef            `json:"update,omitempty"`
+	Delete               *ShapeRef            `json:"delete,omitempty"`
+	List                 *ShapeRef            `json:"list,omitempty"`
+	CollectionOperations []*ShapeRef          `json:"collectionOperations,omitempty"`
 
 	//Resource and Service
 	Operations []*ShapeRef `json:"operations,omitempty"`
-	Resources []*ShapeRef `json:"resources,omitempty"`
-	
+	Resources  []*ShapeRef `json:"resources,omitempty"`
+
 	//Operation
-	Input *ShapeRef `json:"input,omitempty"`
+	Input  *ShapeRef `json:"input,omitempty"`
 	Output *ShapeRef `json:"output,omitempty"`
-//	Errors []*Member `json:"errors,omitempty"`
+	//	Errors []*Member `json:"errors,omitempty"`
 	Errors []*ShapeRef `json:"errors,omitempty"`
 
 	//Service
 	Version string `json:"version,omitempty"`
-
 }
 
 type ShapeRef struct {
-   Target string `json:"target"`
+	Target string `json:"target"`
 }
 
 type Member struct {
-   Target string     `json:"target"`
-   Traits map[string]interface{} `json:"traits,omitempty"`
+	Target string                 `json:"target"`
+	Traits map[string]interface{} `json:"traits,omitempty"`
 }
 
 // Constraint traits - https://awslabs.github.io/smithy/1.0/spec/core/constraint-traits.html
 //enum
 type EnumTraitItem struct {
-	Value string `json:"value"`
-	Name string `json:"name,omitempty"` //must be an Identifier, preferably upper case 
-	Documentation string `json:"documentation,omitempty"`
-	Tags []string `json:"tags,omitempty"`
-	Deprecated bool `json:"deprecated,omitempty"`
+	Value         string   `json:"value"`
+	Name          string   `json:"name,omitempty"` //must be an Identifier, preferably upper case
+	Documentation string   `json:"documentation,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	Deprecated    bool     `json:"deprecated,omitempty"`
 }
 type EnumTrait []*EnumTraitItem
 
@@ -185,6 +184,7 @@ type LengthTrait struct {
 	Min *int64 `json:"min,omitempty"`
 	Max *int64 `json:"max,omitempty"`
 }
+
 //pattern
 //private
 //range
@@ -198,7 +198,7 @@ type RequiredTrait struct { //Q: why isn't this a boolean?
 //deprecated
 type DeprecatedTrait struct {
 	Message string `json:"message,omitempty"`
-	Since string `json:"since,omitempty"`
+	Since   string `json:"since,omitempty"`
 }
 
 //documentation
@@ -251,8 +251,8 @@ type ErrorTrait int
 //-------------- HTTP protocol binding traits - https://awslabs.github.io/smithy/1.0/spec/core/http-traits.html
 type HttpTrait struct {
 	Method string `json:"method"`
-	Uri string `json:"uri"`
-	Code int `json:"code,omitempty"` //default to 200
+	Uri    string `json:"uri"`
+	Code   int    `json:"code,omitempty"` //default to 200
 }
 
 // httpError
@@ -275,4 +275,4 @@ type HttpErrorTrait int
 // endpoint
 // hostLabel
 
-//-------------- 
+//--------------

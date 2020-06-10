@@ -16,8 +16,16 @@ import (
 // model, err := sadl.ParseFile("/some/path")
 //
 func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
-	return parseFile(path, conf, extensions)
+	p, err := parseFileNoValidate(path, conf, extensions)
+	if err != nil {
+		return nil, err
+	}
+	return p.Validate()
 }
+
+//func parseFile(path string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
+//	return parseFile(path, conf, extensions)
+//}
 
 //
 // import "github.com/boynton/sadl"
@@ -25,7 +33,12 @@ func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Exten
 // model, err := sadl.ParseString("...")
 //
 func ParseSadlString(src string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
-	return parseString(src, conf, extensions)
+	p := &Parser{
+		scanner: util.NewScanner(strings.NewReader(src)),
+		source:  src,
+		conf:    conf,
+	}
+	return p.Parse(extensions)
 }
 
 //----------------
@@ -61,30 +74,13 @@ func parseFileNoValidate(path string, conf map[string]interface{}, extensions []
 		scanner: util.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
-		conf: conf,
+		conf:    conf,
 	}
 	err = p.ParseNoValidate(extensions)
 	if err != nil {
 		return nil, err
 	}
 	return p, nil
-}
-
-func parseFile(path string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
-	p, err := parseFileNoValidate(path, conf, extensions)
-	if err != nil {
-		return nil, err
-	}
-	return p.Validate()
-}
-
-func parseString(src string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
-	p := &Parser{
-		scanner: util.NewScanner(strings.NewReader(src)),
-		source:  src,
-		conf: conf,
-	}
-	return p.Parse(extensions)
 }
 
 func (p *Parser) CurrentComment() string {
@@ -94,7 +90,6 @@ func (p *Parser) CurrentComment() string {
 func (p *Parser) Model() *sadl.Model {
 	return p.model
 }
-
 
 func (p *Parser) UngetToken() {
 	util.Debug("UngetToken() -> ", p.lastToken)

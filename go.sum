@@ -1,3 +1,5 @@
+github.com/boynton/cli v0.0.0-20170122194616-c91dc790ccff h1:ZrmfQrRSCPO614Lc4DVtL143gItFDWv3NMco2Y8NJFQ=
+github.com/boynton/cli v0.0.0-20170122194616-c91dc790ccff/go.mod h1:z+pVRzwPnv1tl+u7/ahL8qroYewU6fz/6wXUEr9C6GI=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/graphql-go/graphql v0.7.9 h1:5Va/Rt4l5g3YjwDnid3vFfn43faaQBq7rMcIZ0VnV34=

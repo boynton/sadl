@@ -1,6 +1,6 @@
 package util
 
-import(
+import (
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -109,4 +109,3 @@ func GetArray(m map[string]interface{}, key string) []interface{} {
 func GetStruct(m map[string]interface{}, key string) map[string]interface{} {
 	return AsStruct(m[key])
 }
-

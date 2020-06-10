@@ -1,11 +1,11 @@
 package smithy
 
-import(
-	"bytes"
+import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"strings"
-	
+
 	"github.com/boynton/sadl/util"
 )
 
@@ -22,7 +22,7 @@ func (ast *AST) IDL(namespace string) string {
 	}
 
 	w.Begin()
-//	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
+	//	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
 	emitted := make(map[string]bool, 0)
 	for k, v := range ast.Metadata {
 		w.Emit("metadata %s = %s", k, util.Pretty(v))
@@ -48,12 +48,12 @@ func (ast *AST) IDL(namespace string) string {
 			if v.Type == "operation" {
 				w.EmitShape(k, v)
 				emitted[k] = true
-				ki := k+"Input"
+				ki := k + "Input"
 				if vi, ok := ast.Shapes[ki]; ok { //FIX ME
 					w.EmitShape(ki, vi)
 					emitted[ki] = true
 				}
-				ko := k+"Output"
+				ko := k + "Output"
 				if vo, ok := ast.Shapes[ns+"#"+ko]; ok {
 					w.EmitShape(ko, vo)
 					emitted[ko] = true
@@ -72,15 +72,15 @@ func (ast *AST) IDL(namespace string) string {
 }
 
 type IdlWriter struct {
-	buf bytes.Buffer
-	writer *bufio.Writer
-	namespace      string
-	name           string
+	buf       bytes.Buffer
+	writer    *bufio.Writer
+	namespace string
+	name      string
 }
 
 func (w *IdlWriter) Begin() {
 	w.buf.Reset()
-   w.writer = bufio.NewWriter(&w.buf)
+	w.writer = bufio.NewWriter(&w.buf)
 }
 
 func (w *IdlWriter) Emit(format string, args ...interface{}) {
@@ -163,25 +163,24 @@ func (w *IdlWriter) EmitEnumTrait(v interface{}, indent string) {
 }
 
 func (w *IdlWriter) EmitDeprecatedTrait(v interface{}, indent string) {
-			/*
-	if dep != nil {
-		s := indent + "@deprecated"
-		if dep.Message != "" {
-			s = s + fmt.Sprintf("(message: %q", dep.Message)
-		}
-		if dep.Since != "" {
-			if s == "@deprecated" {
-				s = s + fmt.Sprintf("(since: %q)", dep.Since)
-			} else {
-				s = s + fmt.Sprintf(", since: %q)", dep.Since)
+	/*
+		if dep != nil {
+			s := indent + "@deprecated"
+			if dep.Message != "" {
+				s = s + fmt.Sprintf("(message: %q", dep.Message)
 			}
+			if dep.Since != "" {
+				if s == "@deprecated" {
+					s = s + fmt.Sprintf("(since: %q)", dep.Since)
+				} else {
+					s = s + fmt.Sprintf(", since: %q)", dep.Since)
+				}
+			}
+			w.Emit(s+"\n")
 		}
-		w.Emit(s+"\n")
-	}
-*/
-			panic("fix me")
+	*/
+	panic("fix me")
 }
-
 
 func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 	var method, uri string
@@ -198,7 +197,7 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 	default:
 		panic("What?!")
 	}
-	s := fmt.Sprintf("method: %q, uri: %q", method, uri)	
+	s := fmt.Sprintf("method: %q, uri: %q", method, uri)
 	if code != 0 {
 		s = s + fmt.Sprintf(", code: %d", code)
 	}
@@ -211,13 +210,13 @@ func (w *IdlWriter) EmitHttpErrorTrait(rv interface{}, indent string) {
 	case int32:
 		status = int(v)
 	default:
-//		fmt.Printf("http error arg, expected an int32, found %s with type %s\n", rv, sadl.Kind(rv))
+		//		fmt.Printf("http error arg, expected an int32, found %s with type %s\n", rv, sadl.Kind(rv))
 	}
 	if status != 0 {
 		w.Emit("@httpError(%d)\n", status)
 	}
 }
-	
+
 func (w *IdlWriter) EmitSimpleShape(shapeName, name string) {
 	w.Emit("%s %s\n", shapeName, name)
 }
@@ -273,7 +272,7 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 			w.Emit(",\n")
 		} else {
 			w.Emit("\n")
-		}		
+		}
 	}
 	w.Emit("}\n")
 }
@@ -441,4 +440,3 @@ func (w *IdlWriter) End() string {
 	w.writer.Flush()
 	return w.buf.String()
 }
-

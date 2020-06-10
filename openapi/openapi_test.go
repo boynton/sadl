@@ -31,7 +31,7 @@ type Foo Struct {
 type Foos Array<Foo>
 
 `
-	model, err := io.ParseSadlString(src)
+	model, err := io.ParseSadlString(src, nil)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -51,7 +51,7 @@ func TestCrudl(test *testing.T) {
 }
 
 func testFile(test *testing.T, path string) {
-	model, err := io.ParseSadlFile(path)
+	model, err := io.ParseSadlFile(path, nil)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
