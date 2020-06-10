@@ -86,14 +86,3 @@ func BaseFileName(path string) string {
 	return fname[:n]
 }
 
-func AsString(obj interface{}) string {
-	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(&obj); err != nil {
-		return fmt.Sprint(obj)
-	}
-	s := buf.String()
-	s = strings.Trim(s, " \n")
-	return string(s)
-}

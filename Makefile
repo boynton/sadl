@@ -1,3 +1,7 @@
+_test:: bin/sadl
+	./bin/sadl -namespace example -gen smithy _test.graphql
+#	./bin/sadl -gen smithy _test.sadl
+
 all:: bin/sadl
 
 install:: all

@@ -10,10 +10,9 @@ import(
 	"github.com/boynton/sadl/util"
 )
 
-func Import(path string) (*sadl.Model, error) {
+func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
 	var ast *AST
 	var err error
-	ns := ""
 	name := nameFromPath(path)
 
 	if strings.HasSuffix(path, ".json") {
@@ -30,13 +29,13 @@ func Import(path string) (*sadl.Model, error) {
 			return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
 		}
 	} else {
-	//parse Smithy IDL
-		ast, err = parse(path)
+		//parse Smithy IDL
+		ast, err = parse(path, conf)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return NewModel(ast, name, ns).ToSadl()
+	return NewModel(ast, name).ToSadl()
 }
 
 func nameFromPath(path string) string {
@@ -64,29 +63,16 @@ func (model *Model) getShape(name string) *Shape {
 	return model.shapes[name]
 }
 
-func NewModel(ast *AST, name, namespace string) *Model {
+func NewModel(ast *AST, name string) *Model {
 	model := &Model{
 		ast: ast,
 	}
 	model.shapes = make(map[string]*Shape, 0)
-	model.ast.Version = ""
-	if namespace == "" {
-		for k, v := range ast.Shapes {
-			if strings.HasPrefix(k, "smithy.") || strings.HasPrefix(k, "aws.") {
-				continue
-			}
-			if v.Type == "service" {
-				model.ast.Version = v.Version
-				break
-			}
-			i := strings.Index(k, "#")
-			if i >= 0 {
-				namespace = k[:i]
-			}
-		}
-		model.namespace = namespace
+	model.namespace, model.name, model.ast.Version = ast.NamespaceAndServiceVersion()
+	if model.name == "" {
+		model.name = name
 	}
-	prefix := namespace + "#"
+	prefix := model.namespace + "#"
 	prefixLen := len(prefix)
 	for k, v := range ast.Shapes {
 		if strings.HasPrefix(k, prefix) {
@@ -115,16 +101,18 @@ func (model *Model) ToSadl() (*sadl.Model, error) {
 
 func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef *Shape) {
 	switch shapeDef.Type {
-	case "structure":
-		model.importStructureShape(schema, shapeName, shapeDef)
 	case "string":
 		model.importStringShape(schema, shapeName, shapeDef)
-	case "operation":
-		model.importOperationShape(schema, shapeName, shapeDef)
 	case "list":
 		model.importListShape(schema, shapeName, shapeDef)
+	case "structure":
+		model.importStructureShape(schema, shapeName, shapeDef)
+	case "union":
+		model.importUnionShape(schema, shapeName, shapeDef)
 	case "service":
 		schema.Name = shapeName
+	case "operation":
+		model.importOperationShape(schema, shapeName, shapeDef)
 	default:
 		fmt.Println("fix me, unhandled shape type: " + shapeDef.Type)
 		panic("whoa")
@@ -183,6 +171,22 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
       }
    }
 	return annos
+}
+
+func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef {
+		Name: shapeName,
+		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
+	}
+	td.Type = "Union"
+	for memberName, member := range shape.Members {
+		if memberName != member.Target {
+			panic("fixme: named union variants")
+		}
+		td.Variants = append(td.Variants, model.shapeRefToTypeRef(schema, member.Target))
+	}
+	schema.Types = append(schema.Types, td)
 }
 
 func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, shape *Shape) {

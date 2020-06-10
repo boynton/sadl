@@ -25,7 +25,7 @@ func Export(model *sadl.Model, out string, conf map[string]interface{}, exportAs
 	if exportAst {
 		fmt.Println(util.Pretty(ast))
 	} else {
-		fmt.Print(ast.IDL())
+		fmt.Print(ast.IDL(ns))
 	}
 	return nil
 }
@@ -301,6 +301,8 @@ func defineShapeFromTypeSpec(model *sadl.Model, ns string, shapes map[string]*Sh
 		shape = shapeFromStruct(model, ns, shapes, name, ts)
 	case "Array":
 		shape = shapeFromArray(model, ns, shapes, name, ts)
+	case "Union":
+		shape = shapeFromUnion(model, ns, shapes, name, ts)
 	default:
 		fmt.Println("So far:", util.Pretty(model))
 		panic("handle this type:" + util.Pretty(ts))
@@ -359,6 +361,24 @@ func shapeFromStruct(model *sadl.Model, ns string, shapes map[string]*Shape, tna
 		}
 		if fd.Required {
 			ensureMemberTraits(member)["smithy.api#required"] = true
+		}
+		members[fd.Name] = member
+	}
+	shape.Members = members
+	return shape
+}
+
+func shapeFromUnion(model *sadl.Model, ns string, shapes map[string]*Shape, tname string, ts *sadl.TypeSpec) Shape {
+	fmt.Println("union:", util.Pretty(ts))
+	shape := Shape{
+		Type: "union",
+	}
+	members := make(map[string]*Member, 0)
+	for _, vtype := range ts.Variants { //todo: modify SADL to make unions more like structs
+		fd := model.FindType(vtype)
+//		ftype := typeReference(&fd.TypeSpec)
+		member := &Member{
+			Target: EnsureNamespaced(ns, vtype),
 		}
 		members[fd.Name] = member
 	}

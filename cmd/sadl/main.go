@@ -28,6 +28,8 @@ $ sadl -g java-server foo.sadl -> generats
 func main() {
 	pVerbose := flag.Bool("v", false, "set to true to enable verbose output")
 	pDir := flag.String("dir", ".", "output directory for generated artifacts")
+	pName := flag.String("name", "", "name of the model read. Overrides any existing name that is present")
+	pNamespace := flag.String("namespace", "", "namespace to force input to, if the input has no namespace specified")
 	pGen := flag.String("gen", "sadl", "the generator to run on the model")
 	pConf := flag.String("conf", "", "the JSON config file to use to configure the generator")
 	flag.Parse()
@@ -43,8 +45,16 @@ func main() {
 		os.Exit(0)
 	}
 	dir := *pDir
+	importConf := make(map[string]interface{}, 0)
+	if *pNamespace != "" {
+		importConf["namespace"] = *pNamespace
+	}
+	if *pName != "" {
+		importConf["name"] = *pName
+	}
 	util.Verbose = *pVerbose
-	model, err := ImportFile(path)
+	fmt.Println(util.Pretty(importConf))
+	model, err := ImportFile(path, importConf)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)

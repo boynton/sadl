@@ -12,59 +12,52 @@ import(
 //
 // Generate Smithy IDL to describe the Smithy model
 //
-func (ast *AST) IDL() string {
-	w := &IdlWriter{}
+func (ast *AST) IDL(namespace string) string {
+	ns, _, _ := ast.NamespaceAndServiceVersion()
+	if namespace != "" {
+		ns = namespace
+	}
+	w := &IdlWriter{
+		namespace: ns,
+	}
 
 	w.Begin()
 //	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
 	emitted := make(map[string]bool, 0)
-	firstNs := ""
-	for nsk, _ := range ast.Shapes {
-		lst := strings.Split(nsk, "#")
-		firstNs = lst[0]
-		break
-	}
 	for k, v := range ast.Metadata {
 		w.Emit("metadata %s = %s", k, util.Pretty(v))
 	}
-	w.Emit("\nnamespace %s\n\n", firstNs)
-	lastNs := firstNs
+	w.Emit("\nnamespace %s\n\n", ns)
 	for nsk, shape := range ast.Shapes {
-		lst := strings.Split(nsk, "#")
-		ns := lst[0]
-		if len(lst) != 2 {
-			fmt.Println("nsk:", nsk, util.Pretty(shape))
-			panic("whoa!")
-		}
-		name := lst[1]
-		if ns != lastNs {
-			w.Emit("\nnamespace %s\n\n", ns)
-			lastNs = ns
-		}
-		if shape.Type == "service" {
-			w.EmitServiceShape(name, shape)
+		shapeAbsName := strings.Split(nsk, "#")
+		shapeNs := shapeAbsName[0]
+		shapeName := shapeAbsName[1]
+		if shapeNs == ns {
+			//only decompile stuff in the main namespace. Standard Smithy toolings seems to introduce aws.api shapes, and we
+			//can assume the smithy.api on every import/export
+			if shape.Type == "service" {
+				w.EmitServiceShape(shapeName, shape)
+				break
+			}
 		}
 	}
 	for nsk, v := range ast.Shapes {
 		lst := strings.Split(nsk, "#")
-		ns := lst[0]
-		k := lst[1]
-		if ns != lastNs {
-			w.Emit("\nnamespace %s\n\n", ns)
-			lastNs = ns
-		}
-		if v.Type == "operation" {
-			w.EmitShape(k, v)
-			emitted[k] = true
-			ki := k+"Input"
-			if vi, ok := ast.Shapes[ki]; ok { //FIX ME
-				w.EmitShape(ki, vi)
-				emitted[ki] = true
-			}
-			ko := k+"Output"
-			if vo, ok := ast.Shapes[ns+"#"+ko]; ok {
-				w.EmitShape(ko, vo)
-				emitted[ko] = true
+		if lst[0] == ns {
+			k := lst[1]
+			if v.Type == "operation" {
+				w.EmitShape(k, v)
+				emitted[k] = true
+				ki := k+"Input"
+				if vi, ok := ast.Shapes[ki]; ok { //FIX ME
+					w.EmitShape(ki, vi)
+					emitted[ki] = true
+				}
+				ko := k+"Output"
+				if vo, ok := ast.Shapes[ns+"#"+ko]; ok {
+					w.EmitShape(ko, vo)
+					emitted[ko] = true
+				}
 			}
 		}
 	}
@@ -81,6 +74,8 @@ func (ast *AST) IDL() string {
 type IdlWriter struct {
 	buf bytes.Buffer
 	writer *bufio.Writer
+	namespace      string
+	name           string
 }
 
 func (w *IdlWriter) Begin() {
@@ -289,6 +284,14 @@ func stripNamespace(trait string) string {
 		return trait
 	}
 	return trait[n+1:]
+}
+
+func (w *IdlWriter) stripLocalNamespace(name string) string {
+	prefix := w.namespace + "#"
+	if strings.HasPrefix(name, prefix) {
+		return name[len(prefix):]
+	}
+	return name
 }
 
 func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {

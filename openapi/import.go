@@ -23,7 +23,7 @@ var EnumTypes bool = false
 //	return json.Marshal(oas.V3)
 //}
 
-func Import(path string) (*sadl.Model, error) {
+func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
 	name := path
 	n := strings.LastIndex(name, "/")
 	format := ""

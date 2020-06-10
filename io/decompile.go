@@ -178,6 +178,15 @@ func (g *SadlGenerator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent st
 			return s + "}"
 		}
 		return fmt.Sprintf("Struct {\n}")
+	case "Union":
+		s := fmt.Sprintf("Union<")
+		for i, v := range ts.Variants {
+			if i != 0 {
+				s += ","
+			}
+			s += v
+		}
+		return s + ">"
 	default:
 		sopts := ""
 		if len(opts) > 0 {
@@ -246,7 +255,7 @@ func (g *SadlGenerator) sadlParamSpec(ps *sadl.HttpParamSpec) string {
 		opts = append(opts, "required")
 	}
 	if ps.Default != nil {
-		opts = append(opts, "default="+util.AsString(ps.Default))
+		opts = append(opts, "default="+util.ToString(ps.Default))
 	}
 	if ps.Header != "" {
 		opts = append(opts, fmt.Sprintf("header=%q", ps.Header))

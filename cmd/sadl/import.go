@@ -9,6 +9,7 @@ import (
 	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/openapi"
 	"github.com/boynton/sadl/smithy"
+	"github.com/boynton/sadl/graphql"
 )
 
 var ImportFormats = []string{
@@ -25,15 +26,15 @@ var ImportFileExtensions = map[string][]string{
 	".json":    []string{"sadl", "smithy", "openapi"},
 }
 
-func ImportFile(path string, extensions ...io.Extension) (*sadl.Model, error) {
+func ImportFile(path string, conf map[string]interface{}, extensions ...io.Extension) (*sadl.Model, error) {
 	ext := filepath.Ext(path)
 	if ftypes, ok := ImportFileExtensions[ext]; ok {
 		if len(ftypes) == 1 { //we are not guessing
-			return importFile(path, ftypes[0], extensions)
+			return importFile(path, ftypes[0], conf, extensions)
 		}
 		//else guess by trying each one, in order. The error reporting is more generic in this case.
 		for _, ftype := range ftypes {
-			model, err := importFile(path, ftype, extensions)
+			model, err := importFile(path, ftype, conf, extensions)
 			if err == nil {
 				return model, nil
 			}
@@ -42,17 +43,19 @@ func ImportFile(path string, extensions ...io.Extension) (*sadl.Model, error) {
 	return nil, fmt.Errorf("Cannot import file: %q\n", path)
 }
 
-func importFile(path string, ftype string, extensions []io.Extension) (*sadl.Model, error) {
+func importFile(path string, ftype string, conf map[string]interface{}, extensions []io.Extension) (*sadl.Model, error) {
 	switch ftype {
 	case "sadl":
 		if strings.HasSuffix(path, ".json") { //the primary SADL case, reports errors prettily
 			return sadl.LoadModel(path)
 		}
-		return io.ParseSadlFile(path, extensions...)
+		return io.ParseSadlFile(path, conf, extensions...)
 	case "smithy":
-		return smithy.Import(path)
+		return smithy.Import(path, conf)
 	case "openapi":
-		return openapi.Import(path)
+		return openapi.Import(path, conf)
+	case "graphql":
+		return graphql.Import(path, conf)
 	default:
 		return nil, fmt.Errorf("Cannot import file: %q (file type %q not recognized)\n", path, ftype)
 	}

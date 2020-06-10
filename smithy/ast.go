@@ -1,12 +1,32 @@
 package smithy
 
 import(
+	"strings"
 )
 
 type AST struct {
    Version      string                 `json:"smithy"`
    Metadata     map[string]interface{} `json:"metadata,omitempty"`
    Shapes       map[string]*Shape      `json:"shapes,omitempty"`
+}
+
+func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
+	var namespace, name, version string
+	for k, v := range ast.Shapes {
+		if strings.HasPrefix(k, "smithy.") || strings.HasPrefix(k, "aws.") {
+			continue
+		}
+		i := strings.Index(k, "#")
+		if i >= 0 {
+			namespace = k[:i]
+		}
+		if v.Type == "service" {
+			version = v.Version
+			name = k
+			break
+		}
+	}
+	return namespace, name, version
 }
 
 func asStruct(v interface{}) map[string]interface{} {

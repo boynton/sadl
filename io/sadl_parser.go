@@ -15,8 +15,8 @@ import (
 // ...
 // model, err := sadl.ParseFile("/some/path")
 //
-func ParseSadlFile(path string, extensions ...Extension) (*sadl.Model, error) {
-	return parseFile(path, extensions)
+func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
+	return parseFile(path, conf, extensions)
 }
 
 //
@@ -24,8 +24,8 @@ func ParseSadlFile(path string, extensions ...Extension) (*sadl.Model, error) {
 // ...
 // model, err := sadl.ParseString("...")
 //
-func ParseSadlString(src string, extensions ...Extension) (*sadl.Model, error) {
-	return parseString(src, extensions)
+func ParseSadlString(src string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
+	return parseString(src, conf, extensions)
 }
 
 //----------------
@@ -33,6 +33,7 @@ func ParseSadlString(src string, extensions ...Extension) (*sadl.Model, error) {
 type Parser struct {
 	path           string
 	source         string
+	conf           map[string]interface{}
 	scanner        *util.Scanner
 	model          *sadl.Model
 	schema         *sadl.Schema
@@ -50,7 +51,7 @@ type Extension interface {
 	Validate(p *Parser) error
 }
 
-func parseFileNoValidate(path string, extensions []Extension) (*Parser, error) {
+func parseFileNoValidate(path string, conf map[string]interface{}, extensions []Extension) (*Parser, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -60,6 +61,7 @@ func parseFileNoValidate(path string, extensions []Extension) (*Parser, error) {
 		scanner: util.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
+		conf: conf,
 	}
 	err = p.ParseNoValidate(extensions)
 	if err != nil {
@@ -68,18 +70,19 @@ func parseFileNoValidate(path string, extensions []Extension) (*Parser, error) {
 	return p, nil
 }
 
-func parseFile(path string, extensions []Extension) (*sadl.Model, error) {
-	p, err := parseFileNoValidate(path, extensions)
+func parseFile(path string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
+	p, err := parseFileNoValidate(path, conf, extensions)
 	if err != nil {
 		return nil, err
 	}
 	return p.Validate()
 }
 
-func parseString(src string, extensions []Extension) (*sadl.Model, error) {
+func parseString(src string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
 	p := &Parser{
 		scanner: util.NewScanner(strings.NewReader(src)),
 		source:  src,
+		conf: conf,
 	}
 	return p.Parse(extensions)
 }
@@ -91,6 +94,7 @@ func (p *Parser) CurrentComment() string {
 func (p *Parser) Model() *sadl.Model {
 	return p.model
 }
+
 
 func (p *Parser) UngetToken() {
 	util.Debug("UngetToken() -> ", p.lastToken)
@@ -152,6 +156,9 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 	}
 	if p.schema.Name == "" {
 		p.schema.Name = util.BaseFileName(p.path)
+	}
+	if p.schema.Namespace == "" {
+		p.schema.Namespace = util.GetString(p.conf, "ns")
 	}
 	comment := ""
 	for {
@@ -309,7 +316,7 @@ func (p *Parser) parseIncludeDirective(comment string) error {
 	fname, err := p.ExpectString()
 	if err == nil {
 		var incparser *Parser
-		incparser, err = parseFileNoValidate(fname, p.extensionList())
+		incparser, err = parseFileNoValidate(fname, p.conf, p.extensionList())
 		if err == nil {
 			inc := incparser.model
 			tmpModel, err := sadl.NewModel(p.schema)
