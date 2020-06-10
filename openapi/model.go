@@ -1,4 +1,4 @@
-package oas3
+package openapi
 
 import (
 	"encoding/json"
@@ -14,9 +14,10 @@ func OasError(format string, args ...interface{}) error {
 func missingFieldError(fld, obj string) error {
 	return OasError("Missing required field '%s' in %s object", fld, obj)
 }
-func Parse(data []byte, format string) (*OpenAPI, error) {
+
+func Parse(data []byte, format string) (*Model, error) {
 	var err error
-	v3 := &OpenAPI{}
+	v3 := &Model{}
 	if format == "yaml" {
 		err = yaml.Unmarshal(data, &v3)
 	} else {
@@ -28,11 +29,10 @@ func Parse(data []byte, format string) (*OpenAPI, error) {
 	return Validate(v3)
 }
 
-func Validate(v3 *OpenAPI) (*OpenAPI, error) {
+func Validate(v3 *Model) (*Model, error) {
 	if v3.OpenAPI == "" {
 		return nil, missingFieldError("openapi", "OpenAPI")
 	}
-
 	if v3.Info == nil {
 		return nil, missingFieldError("info", "OpenAPI")
 	}
@@ -75,7 +75,7 @@ func ValidatePaths(paths map[string]*PathItem) error {
 	return nil
 }
 
-type OpenAPI struct {
+type Model struct {
 	Extensions   map[string]interface{} `json:"-"`
 	OpenAPI      string                 `json:"openapi"`           // Required
 	Info         *Info                  `json:"info"`              // Required
@@ -393,27 +393,27 @@ func (p Paths) MarshalJSON() ([]byte, error) {
 }
 */
 
-func (doc OpenAPI) MarshalJSON() ([]byte, error) {
+func (model Model) MarshalJSON() ([]byte, error) {
 	tmp := make(map[string]interface{}, 0)
-	for k, v := range doc.Extensions {
+	for k, v := range model.Extensions {
 		tmp[k] = v
 	}
-	tmp["openapi"] = doc.OpenAPI
-	tmp["info"] = doc.Info
-	if doc.Servers != nil {
-		tmp["servers"] = doc.Servers
+	tmp["openapi"] = model.OpenAPI
+	tmp["info"] = model.Info
+	if model.Servers != nil {
+		tmp["servers"] = model.Servers
 	}
-	if doc.Paths != nil {
-		tmp["paths"] = doc.Paths
+	if model.Paths != nil {
+		tmp["paths"] = model.Paths
 	}
-	if doc.Components != nil {
-		tmp["components"] = doc.Components
+	if model.Components != nil {
+		tmp["components"] = model.Components
 	}
-	if doc.Security != nil {
-		tmp["security"] = doc.Security
+	if model.Security != nil {
+		tmp["security"] = model.Security
 	}
-	if doc.ExternalDocs != nil {
-		tmp["externalDocs"] = doc.ExternalDocs
+	if model.ExternalDocs != nil {
+		tmp["externalDocs"] = model.ExternalDocs
 	}
 	return json.Marshal(tmp)
 }

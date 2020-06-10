@@ -6,7 +6,12 @@ import (
 	"text/template"
 )
 
-func (gen *Generator) CreatePom(domain, name, dir string, lombok bool, extraDepends string) {
+func (gen *Generator) CreatePom() {
+	domain := gen.Domain
+	name := gen.Name
+	extraDepends := ""
+	dir := gen.OutDir
+	lombok := gen.UseLombok
 	path := filepath.Join(dir, "pom.xml")
 	if gen.FileExists(path) {
 		fmt.Println("[pom.xml already exists, not overwriting]")

@@ -1,28 +1,58 @@
-package oas
+package openapi
 
 import (
-	"encoding/json"
+	//	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/oas/oas2"
-	"github.com/boynton/sadl/oas/oas3"
-	"github.com/ghodss/yaml"
+	"github.com/boynton/sadl/util"
 )
 
 var EnumTypes bool = false
 
-type Oas struct {
-	V3 *oas3.OpenAPI
+//type Oas struct {
+//	V3 *oas3.OpenAPI
+//	source string
+//}
+//
+//func (oas *Oas) MarshalJSON() ([]byte, error) {
+//	return json.Marshal(oas.V3)
+//}
+
+func Import(path string) (*sadl.Model, error) {
+	name := path
+	n := strings.LastIndex(name, "/")
+	format := ""
+	if n >= 0 {
+		name = name[n+1:]
+	}
+	n = strings.LastIndex(name, ".")
+	if n >= 0 {
+		format = name[n+1:]
+		name = name[:n]
+		name = strings.Replace(name, ".", "_", -1)
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
+	}
+	oas3, err := Parse(data, format)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse OpenAPI document: %v\n", err)
+	}
+	model, err := oas3.ToSadl(name)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot convert to SADL: %v\n", err)
+	}
+	//err = model.ConvertInlineEnums()
+	return model, err
 }
 
-func (oas *Oas) MarshalJSON() ([]byte, error) {
-	return json.Marshal(oas.V3)
-}
-
+/*
 func DetermineVersion(data []byte, format string) (string, error) {
 	var raw map[string]interface{}
 	var err error
@@ -49,13 +79,17 @@ func DetermineVersion(data []byte, format string) (string, error) {
 	}
 	return "", fmt.Errorf("Cannot find an 'openapi' in the specified %s file to determine the version", format)
 }
+*/
 
-func Parse(data []byte, format string) (*Oas, error) {
+/*
+func xParse(data []byte, format string) (*Model, error) {
 	version, err := DetermineVersion(data, format)
 	if err != nil {
 		return nil, err
 	}
-	oas := &Oas{}
+	oas := &Oas{
+		source: version,
+	}
 	if strings.HasPrefix(version, "3.") {
 		oas.V3, err = oas3.Parse(data, format)
 		return oas, err
@@ -68,34 +102,37 @@ func Parse(data []byte, format string) (*Oas, error) {
 	}
 	return nil, fmt.Errorf("Unsupported version of OpenAPI Spec: %s", version)
 }
+*/
 
 var examples []*sadl.ExampleDef
 
 var methods = []string{"GET", "PUT", "POST", "DELETE", "HEAD"} //to do: "PATCH", "OPTIONS", "TRACE"
 
-func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
+func (model *Model) ToSadl(name string) (*sadl.Model, error) {
 	annotations := make(map[string]string, 0)
 	examples = nil
-	comment := oas.V3.Info.Description
-	if oas.V3.Info.Title != "" {
-		if sadl.IsSymbol(oas.V3.Info.Title) {
-			name = oas.V3.Info.Title
+	annotations["x_openapi_version"] = model.OpenAPI
+
+	comment := model.Info.Description
+	if model.Info.Title != "" {
+		if sadl.IsSymbol(model.Info.Title) {
+			name = model.Info.Title
 		} else {
-			comment = oas.V3.Info.Title + " - " + comment
+			comment = model.Info.Title + " - " + comment
 		}
 	}
 	schema := &sadl.Schema{
 		Name:    name,
 		Comment: comment,
-		Version: oas.V3.Info.Version,
+		Version: model.Info.Version,
 	}
-	for name, oasSchema := range oas.V3.Components.Schemas {
+	for name, oasSchema := range model.Components.Schemas {
 		var ts sadl.TypeSpec
 		var err error
 		comment := ""
 		tname := oasTypeRef(oasSchema)
 		if tname != "" {
-			if oasDef, ok := oas.V3.Components.Schemas[tname]; ok {
+			if oasDef, ok := model.Components.Schemas[tname]; ok {
 				ts, err = convertOasType(tname, oasDef) //doesn't handle N levels
 			} else {
 				panic("hmm")
@@ -119,7 +156,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 
 	httpBindings := true
 	actions := false
-	for tmpl, path := range oas.V3.Paths {
+	for tmpl, path := range model.Paths {
 		path2 := *path
 		for _, method := range methods {
 			op := getPathOperation(&path2, method)
@@ -141,33 +178,24 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 						return nil, err
 					}
 					schema.Http = append(schema.Http, hact)
-					//fmt.Println(tmpl, sadl.Pretty(path))
 				}
 			}
 		}
 	}
-	for _, server := range oas.V3.Servers {
+	for _, server := range model.Servers {
 		annotations["x_server"] = server.URL
 	}
-	if oas.V3.Info.License != nil {
-		//		if schema.Annotations == nil {
-		//			schema.Annotations = make(map[string]string, 0)
-		//		}
-		if oas.V3.Info.License.Name != "" {
-			//			schema.Annotations["x_license_name"] = oas.V3.Info.License.Name
-			annotations["x_license_name"] = oas.V3.Info.License.Name
+	if model.Info.License != nil {
+		if model.Info.License.Name != "" {
+			annotations["x_license_name"] = model.Info.License.Name
 		}
-		if oas.V3.Info.License.URL != "" {
+		if model.Info.License.URL != "" {
 			//			schema.Annotations["x_license_url"] = oas.V3.Info.License.URL
-			annotations["x_license_url"] = oas.V3.Info.License.URL
+			annotations["x_license_url"] = model.Info.License.URL
 		}
 	}
 
 	if len(annotations) > 0 {
-		if schema.Annotations != nil {
-			fmt.Println("ANnotations:", schema.Annotations)
-			panic("whoops")
-		}
 		schema.Annotations = annotations
 	}
 
@@ -176,7 +204,7 @@ func (oas *Oas) ToSadl(name string) (*sadl.Model, error) {
 	return sadl.NewModel(schema)
 }
 
-func oasTypeRef(oasSchema *oas3.Schema) string {
+func oasTypeRef(oasSchema *Schema) string {
 	if oasSchema != nil && oasSchema.Ref != "" {
 		if strings.HasPrefix(oasSchema.Ref, "#/components/schemas/") {
 			return oasSchema.Ref[len("#/components/schemas/"):]
@@ -186,7 +214,7 @@ func oasTypeRef(oasSchema *oas3.Schema) string {
 	return ""
 }
 
-func convertOasType(name string, oasSchema *oas3.Schema) (sadl.TypeSpec, error) {
+func convertOasType(name string, oasSchema *Schema) (sadl.TypeSpec, error) {
 	var err error
 	var ts sadl.TypeSpec
 	if oasSchema.Example != nil {
@@ -339,7 +367,7 @@ func makeIdentifier(text string) string {
 	return reg.ReplaceAllString(text, "")
 }
 
-func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method string) (*sadl.ActionDef, error) {
+func convertOasPathToAction(schema *sadl.Schema, op *Operation, method string) (*sadl.ActionDef, error) {
 	name := op.OperationId
 	synthesizedName := guessOperationName(op, method)
 	if name == "" {
@@ -376,9 +404,6 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 					if param.Schema.Items == nil {
 						fd.Items = "Any"
 					} else {
-						//fmt.Println("item type:", sadl.Pretty(param.Schema.Items))
-						//					if param.Schema.Items.Ref != "" {
-						//					} else {
 						schref := param.Schema.Items
 						switch schref.Type {
 						case "string":
@@ -386,7 +411,6 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 						default:
 							fd.Items = "Any"
 						}
-						//					}
 					}
 				}
 				if param.Schema.Enum != nil {
@@ -416,7 +440,7 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 	if td2 == nil {
 		schema.Types = append(schema.Types, td)
 	} else {
-		fmt.Println(reqTypeName, "already defined as", sadl.Pretty(td2), "Would have replaced with ", sadl.Pretty(td))
+		fmt.Println(reqTypeName, "already defined as", util.Pretty(td2), "Would have replaced with ", util.Pretty(td))
 	}
 	act.Input = reqTypeName
 
@@ -465,7 +489,7 @@ func convertOasPathToAction(schema *sadl.Schema, op *oas3.Operation, method stri
 	return act, nil
 }
 
-func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpDef, error) {
+func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, error) {
 	hact := &sadl.HttpDef{
 		Name:    op.OperationId,
 		Path:    path,
@@ -515,7 +539,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 		case "header":
 			spec.Header = param.Name
 		case "cookie":
-			return nil, fmt.Errorf("Cookie params NYI: %v", sadl.AsString(param))
+			return nil, fmt.Errorf("Cookie params NYI: %v", util.AsString(param))
 		}
 		spec.Type = oasTypeRef(param.Schema)
 		if spec.Type == "" {
@@ -593,7 +617,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 		eparam := op.Responses[expectedStatus]
 		if eparam == nil {
 			fmt.Println("expectedStatus, eparam:", expectedStatus, eparam)
-			fmt.Println(sadl.Pretty(op.Responses))
+			fmt.Println(util.Pretty(op.Responses))
 			panic("whoops")
 		}
 		var err error
@@ -641,7 +665,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 					}
 					ex.Outputs = append(ex.Outputs, result)
 				} else {
-					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(eparam))
+					fmt.Println("HTTP Action has no expected result type:", util.Pretty(eparam))
 				}
 			}
 		}
@@ -685,7 +709,7 @@ func convertOasPath(path string, op *oas3.Operation, method string) (*sadl.HttpD
 	return hact, nil
 }
 
-func getPathOperation(oasPathItem *oas3.PathItem, method string) *oas3.Operation {
+func getPathOperation(oasPathItem *PathItem, method string) *Operation {
 
 	switch method {
 	case "GET":
@@ -714,7 +738,7 @@ func getPathOperation(oasPathItem *oas3.PathItem, method string) *oas3.Operation
 	return nil
 }
 
-func guessOperationName(op *oas3.Operation, method string) string {
+func guessOperationName(op *Operation, method string) string {
 	defaultStatus := guessDefaultResponseCode(op)
 	switch method {
 	case "GET":
@@ -741,7 +765,7 @@ func guessOperationName(op *oas3.Operation, method string) string {
 						return entityType
 					}
 				} else {
-					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(resp))
+					fmt.Println("HTTP Action has no expected result type:", util.Pretty(resp))
 				}
 			}
 		}
@@ -778,7 +802,7 @@ func findTypeDef(schema *sadl.Schema, name string) *sadl.TypeDef {
 	return nil
 }
 
-func guessDefaultResponseCode(op *oas3.Operation) string {
+func guessDefaultResponseCode(op *Operation) string {
 	for status, _ := range op.Responses {
 		if strings.HasPrefix(status, "2") || strings.HasPrefix(status, "3") {
 			//kind of an arbitrary choice: the first one we encounter, and this is random order, too.
@@ -788,7 +812,7 @@ func guessDefaultResponseCode(op *oas3.Operation) string {
 	return "200" //!
 }
 
-func responseTypeName(resp *oas3.Response) string {
+func responseTypeName(resp *Response) string {
 	for contentType, mediadef := range resp.Content {
 		if contentType == "application/json" { //hack
 			schref := mediadef.Schema

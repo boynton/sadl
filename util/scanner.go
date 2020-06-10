@@ -1,10 +1,12 @@
-package sadl
+package util
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
 	"io"
+	"path"
+	"strings"
 )
 
 type TokenType int
@@ -137,18 +139,6 @@ func (tok Token) IsNumeric() bool {
 	return tok.Type == NUMBER
 }
 
-func isWhitespace(ch rune) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n'
-}
-
-func isDigit(ch rune) bool {
-	return ch >= '0' && ch <= '9'
-}
-
-func isLetter(ch rune) bool {
-	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-}
-
 var eof = rune(0)
 
 type Scanner struct {
@@ -205,10 +195,10 @@ func (tok Token) undefined(text string) Token {
 func (s *Scanner) Scan() Token {
 	for {
 		ch := s.read()
-		if !isWhitespace(ch) {
-			if isLetter(ch) {
+		if !IsWhitespace(ch) {
+			if IsLetter(ch) {
 				return s.scanSymbol(ch)
-			} else if isDigit(ch) || ch == '-' {
+			} else if IsDigit(ch) || ch == '-' {
 				return s.scanNumber(ch)
 			} else if ch == '/' {
 				return s.scanComment()
@@ -224,16 +214,6 @@ func (s *Scanner) Scan() Token {
 			return Token{Type: NEWLINE, Text: "\n", Line: s.line - 1, Start: s.prevColumn}
 		}
 	}
-}
-
-func IsSymbolChar(ch rune, first bool) bool {
-	if isLetter(ch) {
-		return true
-	}
-	if first {
-		return false
-	}
-	return isDigit(ch) || ch == '_'
 }
 
 func (s *Scanner) scanSymbol(firstChar rune) Token {
@@ -264,7 +244,7 @@ func (s *Scanner) scanNumber(firstDigit rune) Token {
 		ch := s.read()
 		if ch == eof {
 			break
-		} else if !isDigit(ch) {
+		} else if !IsDigit(ch) {
 			if ch == '.' {
 				buf.WriteRune(ch)
 				if gotDecimal {
@@ -445,20 +425,91 @@ func (s *Scanner) scanPunct(ch rune) Token {
 		tok.Type = CLOSE_ANGLE
 	case '\n':
 		tok.Type = NEWLINE
-		/*
-			case '!':
-				tok.Type = BANG
-			case '*':
-				tok.Type = STAR
-			case '&':
-				tok.Type = AMPERSAND
-			case '`':
-				tok.Type = BACKQUOTE
-			case '~':
-				tok.Type = TILDE
-			case '#':
-				tok.Type = HASH
-		*/
+	case '!':
+		tok.Type = BANG
+	case '*':
+		tok.Type = STAR
+	case '&':
+		tok.Type = AMPERSAND
+	case '`':
+		tok.Type = BACKQUOTE
+	case '~':
+		tok.Type = TILDE
+	case '#':
+		tok.Type = HASH
 	}
 	return tok
+}
+
+const BLACK = "\033[0;0m"
+const RED = "\033[0;31m"
+const YELLOW = "\033[0;33m"
+const BLUE = "\033[94m"
+const GREEN = "\033[92m"
+
+func FormattedAnnotation(filename string, source string, prefix string, msg string, tok *Token, color string, contextSize int) string {
+	return formattedAnnotation(filename, source, prefix, msg, tok, color, contextSize)
+}
+
+func formattedAnnotation(filename string, source string, prefix string, msg string, tok *Token, color string, contextSize int) string {
+	highlight := color + "\033[1m"
+	restore := BLACK + "\033[0m"
+	if source != "" && contextSize >= 0 && tok != nil {
+		lines := strings.Split(source, "\n")
+		line := tok.Line - 1
+		begin := max(0, line-contextSize)
+		end := min(len(lines), line+contextSize+1)
+		context := lines[begin:end]
+		tmp := ""
+		for i, l := range context {
+			if i+begin == line {
+				toklen := len(tok.Text)
+				if toklen > 0 {
+					if tok.Type == STRING {
+						toklen = len(fmt.Sprintf("%q", tok.Text))
+					} else if tok.Type == LINE_COMMENT {
+						toklen = toklen + 2
+					}
+					left := ""
+					mid := l
+					right := ""
+					if tok.Start > 0 && toklen > 1 {
+						left = l[:tok.Start-1]
+						mid = l[tok.Start-1 : tok.Start-1+toklen]
+						right = l[tok.Start-1+toklen:]
+					}
+					tmp += fmt.Sprintf("%3d\t%v", i+begin+1, left)
+					tmp += fmt.Sprintf("%s%v%s", highlight, mid, restore)
+					tmp += fmt.Sprintf("%v\n", right)
+				} else {
+					tmp += fmt.Sprintf("%3d\t%v\n", i+begin+1, l)
+				}
+			} else {
+				tmp += fmt.Sprintf("%3d\t%v\n", i+begin+1, l)
+			}
+		}
+		if tok != nil {
+			if filename != "" {
+				return fmt.Sprintf("%s%s:%d:%d: %s%s%s\n%s", prefix, path.Base(filename), tok.Line, tok.Start, highlight, msg, restore, tmp)
+			}
+			return fmt.Sprintf("%s%s%s%s\n%s", prefix, highlight, msg, restore, tmp)
+		} else {
+			return fmt.Sprintf("%s%d:%d: %s", prefix, tok.Line, tok.Start, msg)
+		}
+	}
+	return fmt.Sprintf("%s: %s", prefix, msg)
+}
+
+func max(n1 int, n2 int) int {
+	if n1 > n2 {
+		return n1
+	}
+	return n2
+}
+
+func min(n1 int, n2 int) int {
+	if n1 < n2 {
+		return n1
+	}
+	return n2
 }

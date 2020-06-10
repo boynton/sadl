@@ -1,5 +1,10 @@
 package smithy
 
+//type Model struct {
+//	ast *AST
+//}
+
+/*
 import(
 //	"encoding/json"
 //	"fmt"
@@ -112,17 +117,20 @@ type Shape struct {
 	Traits *Traits `json:"traits,omitempty"`
 }
 
+type Model struct {
+	Version      string `json:"smithy"`
+	Metadata     map[string]Node `json:"metadata,omitempty"`
+	Shapes       map[string]*Shape `json:"shapes,omitempty"`
+}
+
+*/
+
 /*type Namespace struct {
 	Shapes map[string]*Shape `json:"shapes,omitempty"`
 	Traits map[string]Node `json:"traits,omitempty"`
 }
 */
 
-type Model struct {
-	Version      string `json:"smithy"`
-	Metadata     map[string]Node `json:"metadata,omitempty"`
-	Shapes       map[string]*Shape `json:"shapes,omitempty"`
-}
 
 /*
 func (model *Model) MarshalJSON() ([]byte, error) {

@@ -2,6 +2,7 @@
 // A CRUDL storage service as an example HTTP Web Service defined in SADL.
 //
 name Crudl
+namespace example.crudl
 version "1"
 
 //
@@ -87,7 +88,7 @@ http PUT "/items/{id}" (action=PutItem) {
    }
 
    // The response if the item or the id is malformed in any way
-   except 400 ServiceException
+   except 400 BadRequest
 }
 
 //
@@ -101,7 +102,7 @@ http DELETE "/items/{id}" (action=DeleteItem) {
    }
 
    // The response if the id is not found in the store
-   except 404 NotFoundException
+   except 404 NotFound
 }
 
 //

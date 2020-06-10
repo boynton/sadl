@@ -23,6 +23,7 @@ var BaseTypes = []string{
 }
 
 type Schema struct {
+	Sadl        string            `json:"sadl"`
 	Name        string            `json:"name"`
 	Namespace   string            `json:"namespace,omitempty"`
 	Version     string            `json:"version,omitempty"`

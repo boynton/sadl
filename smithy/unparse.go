@@ -5,20 +5,47 @@ import(
 	"bufio"
 	"fmt"
 	"strings"
-//	"github.com/boynton/sadl"
+	
+	"github.com/boynton/sadl/util"
 )
 
 //
 // Generate Smithy IDL to describe the Smithy model
 //
-func (model *Model) IDL() string {
+func (ast *AST) IDL() string {
 	w := &IdlWriter{}
 
 	w.Begin()
-	w.Emit("$version: %q\n", model.Version)
+//	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
 	emitted := make(map[string]bool, 0)
-	lastNs := ""
-	for nsk, v := range model.Shapes {
+	firstNs := ""
+	for nsk, _ := range ast.Shapes {
+		lst := strings.Split(nsk, "#")
+		firstNs = lst[0]
+		break
+	}
+	for k, v := range ast.Metadata {
+		w.Emit("metadata %s = %s", k, util.Pretty(v))
+	}
+	w.Emit("\nnamespace %s\n\n", firstNs)
+	lastNs := firstNs
+	for nsk, shape := range ast.Shapes {
+		lst := strings.Split(nsk, "#")
+		ns := lst[0]
+		if len(lst) != 2 {
+			fmt.Println("nsk:", nsk, util.Pretty(shape))
+			panic("whoa!")
+		}
+		name := lst[1]
+		if ns != lastNs {
+			w.Emit("\nnamespace %s\n\n", ns)
+			lastNs = ns
+		}
+		if shape.Type == "service" {
+			w.EmitServiceShape(name, shape)
+		}
+	}
+	for nsk, v := range ast.Shapes {
 		lst := strings.Split(nsk, "#")
 		ns := lst[0]
 		k := lst[1]
@@ -30,28 +57,24 @@ func (model *Model) IDL() string {
 			w.EmitShape(k, v)
 			emitted[k] = true
 			ki := k+"Input"
-			if vi, ok := model.Shapes[ki]; ok { //FIX ME
+			if vi, ok := ast.Shapes[ki]; ok { //FIX ME
 				w.EmitShape(ki, vi)
 				emitted[ki] = true
 			}
 			ko := k+"Output"
-			if vo, ok := model.Shapes[ns+"#"+ko]; ok {
+			if vo, ok := ast.Shapes[ns+"#"+ko]; ok {
 				w.EmitShape(ko, vo)
 				emitted[ko] = true
 			}
 		}
 	}
-	for nsk, v := range model.Shapes {
+	for nsk, v := range ast.Shapes {
 		lst := strings.Split(nsk, "#")
 		k := lst[1]
 		if !emitted[k] {
 			w.EmitShape(k, v)
 		}
 	}
-	//out of band traits here
-//		for k, v := range namespace.Traits {
-//			fmt.Println("FIX ME trait", k, v)
-//		}
 	return w.End()
 }
 
@@ -69,51 +92,7 @@ func (w *IdlWriter) Emit(format string, args ...interface{}) {
 	w.writer.WriteString(fmt.Sprintf(format, args...))
 }
 
-func documentation(shape *Shape) string {
-	if shape.Traits != nil {
-		return shape.Traits.Documentation
-	}
-	return ""
-}
-
-func nonNilTraits(traits *Traits) *Traits {
-	if traits == nil {
-		return &Traits{}
-	}
-	return traits
-}
-
 func (w *IdlWriter) EmitShape(name string, shape *Shape) {
-	traits := nonNilTraits(shape.Traits)
-	w.EmitDocumentation(traits.Documentation, "")	
-	w.EmitDeprecated(traits.Deprecated, "")
-	w.EmitBooleanTrait(traits.Sensitive, "sensitive", "")
-	w.EmitBooleanTrait(traits.ReadOnly, "readonly", "")
-	w.EmitBooleanTrait(traits.Idempotent, "idempotent", "")
-	
-	if traits.Http != nil {
-		s := ""
-		if traits.Http.Method != "" {
-			s = fmt.Sprintf("method: %q", traits.Http.Method)
-		}
-		if traits.Http.Uri != "" {
-			if s != "" {
-				s = s + ", "
-			}
-			s = s + fmt.Sprintf("uri: %q", traits.Http.Uri)
-		}
-		if traits.Http.Code != 0 {
-			if s != "" {
-				s = s + ", "
-			}
-			s = s + fmt.Sprintf("code: %d", traits.Http.Code)
-		}
-		w.Emit("@http(%s)\n", s)
-	}
-	if traits.HttpError != 0 {
-		//note: @retryable
-		w.Emit("@error(\"client\")\n@httpError(%d)\n", traits.HttpError)
-	}
 	switch shape.Type {
 	case "boolean":
 		w.EmitBooleanShape(name, shape)
@@ -133,12 +112,12 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 		w.EmitStructureShape(name, shape)
 	case "union":
 		w.EmitUnionShape(name, shape)
-	case "service":
-		w.EmitServiceShape(name, shape)
 	case "resource":
 		w.EmitResourceShape(name, shape)
 	case "operation":
 		w.EmitOperationShape(name, shape)
+	case "service":
+		/* handled up front */
 	default:
 		panic("fix: shape of type " + shape.Type)
 	}
@@ -148,23 +127,6 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 func (w *IdlWriter) EmitDocumentation(doc, indent string) {
 	if doc != "" {
 		w.Emit("%s@documentation(%q)\n", indent, doc)
-	}
-}
-
-func (w *IdlWriter) EmitDeprecated(dep *Deprecated, indent string) {
-	if dep != nil {
-		s := indent + "@deprecated"
-		if dep.Message != "" {
-			s = s + fmt.Sprintf("(message: %q", dep.Message)
-		}
-		if dep.Since != "" {
-			if s == "@deprecated" {
-				s = s + fmt.Sprintf("(since: %q)", dep.Since)
-			} else {
-				s = s + fmt.Sprintf(", since: %q)", dep.Since)
-			}
-		}
-		w.Emit(s+"\n")
 	}
 }
 
@@ -184,56 +146,114 @@ func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
 	}
 }
 
+func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
+	l := asStruct(v)
+	min := get(l, "min")
+	max := get(l, "max")
+	if min != nil && max != nil {
+		w.Emit("@length(min: %d, max: %d)\n", asInt(min), asInt(max))
+	} else if max != nil {
+		w.Emit("@length(max: %d)\n", asInt(max))
+	} else if min != nil {
+		w.Emit("@length(min: %d)\n", asInt(min))
+	}
+}
+
+func (w *IdlWriter) EmitEnumTrait(v interface{}, indent string) {
+	en := asArray("enum")
+	if len(en) > 0 {
+		s := util.Pretty(en)
+		w.Emit("@enum(%s)\n", s)
+	}
+}
+
+func (w *IdlWriter) EmitDeprecatedTrait(v interface{}, indent string) {
+			/*
+	if dep != nil {
+		s := indent + "@deprecated"
+		if dep.Message != "" {
+			s = s + fmt.Sprintf("(message: %q", dep.Message)
+		}
+		if dep.Since != "" {
+			if s == "@deprecated" {
+				s = s + fmt.Sprintf("(since: %q)", dep.Since)
+			} else {
+				s = s + fmt.Sprintf(", since: %q)", dep.Since)
+			}
+		}
+		w.Emit(s+"\n")
+	}
+*/
+			panic("fix me")
+}
+
+
+func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
+	var method, uri string
+	code := 0
+	switch v := rv.(type) {
+	case *HttpTrait:
+		method = v.Method
+		uri = v.Uri
+		code = v.Code
+	case map[string]interface{}:
+		method = getString(v, "method")
+		uri = getString(v, "uri")
+		code = getInt(v, "code")
+	default:
+		panic("What?!")
+	}
+	s := fmt.Sprintf("method: %q, uri: %q", method, uri)	
+	if code != 0 {
+		s = s + fmt.Sprintf(", code: %d", code)
+	}
+	w.Emit("@http(%s)\n", s)
+}
+
+func (w *IdlWriter) EmitHttpErrorTrait(rv interface{}, indent string) {
+	var status int
+	switch v := rv.(type) {
+	case int32:
+		status = int(v)
+	default:
+//		fmt.Printf("http error arg, expected an int32, found %s with type %s\n", rv, sadl.Kind(rv))
+	}
+	if status != 0 {
+		w.Emit("@httpError(%d)\n", status)
+	}
+}
+	
 func (w *IdlWriter) EmitSimpleShape(shapeName, name string) {
 	w.Emit("%s %s\n", shapeName, name)
 }
 
 func (w *IdlWriter) EmitBooleanShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.EmitSimpleShape("boolean", name)
 }
 
 func (w *IdlWriter) EmitNumericShape(shapeName, name string, shape *Shape) {
-	//traits for numbers
+	w.EmitTraits(shape.Traits, "")
 	w.EmitSimpleShape(shapeName, name)
 }
 
 func (w *IdlWriter) EmitStringShape(name string, shape *Shape) {
-	tr := nonNilTraits(shape.Traits)
-	if tr.Length != nil {
-		l := tr.Length
-		if l.Min != nil && l.Max != nil {
-			w.Emit("@length(min: %d, max: %d)\n", *l.Min, *l.Max)
-		} else if l.Max != nil {
-			w.Emit("@length(max: %d)\n", *l.Max)
-		} else if l.Min != nil {
-			w.Emit("@length(min: %d)\n", *l.Min)
-		}
-	}
-	if tr.Pattern != "" {
-		w.Emit("@pattern(%q)\n", tr.Pattern)
-	}
-	if tr.Enum != nil {
-		s := ""
-		for k, item := range tr.Enum {
-			if s != "" {
-				s = s + ", "
-			}
-			s = s + fmt.Sprintf("%s: {name: %q}", k, item.Name)
-		}
-		w.Emit("@enum(%s)\n", s)
-	}
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("%s %s\n", shape.Type, name)
 }
 
 func (w *IdlWriter) EmitTimestampShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("timestamp %s\n", name)
 }
 
 func (w *IdlWriter) EmitBlobShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("blob %s\n", name)
 }
 
 func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("%s %s {\n", shapeName, name)
 	//traits for the collection
 	//traits for member
@@ -242,20 +262,17 @@ func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 }
 
 func (w *IdlWriter) EmitMapShape(name string, shape *Shape) {
-	//todo: traits
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("map %s {\n    key: %s,\n    value: %s\n}\n", name, shape.Key.Target, shape.Value.Target)
 }
 
 func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("union %s {\n", name)
 	count := len(shape.Members)
 	for fname, mem := range shape.Members {
-		traits := ""
-		if nonNilTraits(mem.Traits).Sensitive {
-			traits = traits + "@sensitive "
-		}
-		//TODO other traits
-		w.Emit("    %s%s: %s", traits, fname, mem.Target)
+		w.EmitTraits(mem.Traits, "    ")
+		w.Emit("    %s: %s", fname, mem.Target)
 		count--
 		if count > 0 {
 			w.Emit(",\n")
@@ -266,24 +283,59 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 	w.Emit("}\n")
 }
 
+func stripNamespace(trait string) string {
+	n := strings.Index(trait, "#")
+	if n < 0 {
+		return trait
+	}
+	return trait[n+1:]
+}
+
+func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
+	//note: documentation has an alternate for ("///"+comment), but then must be before other traits.
+	for k, v := range traits {
+		switch k {
+		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
+			w.EmitBooleanTrait(asBool(v), stripNamespace(k), indent)
+		case "smithy.api#documentation":
+			w.EmitDocumentation(asString(v), indent)
+		case "smithy.api#httpLabel", "smithy.api#httpPayload":
+			w.EmitBooleanTrait(asBool(v), stripNamespace(k), indent)
+		case "smithy.api#httpQuery", "smithy.api#httpHeader":
+			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
+		case "aws.protocols#restJson1":
+			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
+		case "smithy.api#deprecated":
+			w.EmitDeprecatedTrait(v, indent)
+		case "smithy.api#http":
+			w.EmitHttpTrait(v, indent)
+		case "smithy.api#httpError":
+			w.EmitHttpErrorTrait(v, indent)
+		case "smithy.api#length":
+			w.EmitLengthTrait(v, indent)
+		case "smithy.api#enum":
+			w.EmitEnumTrait(v, indent)
+		case "smithy.api#pattern", "smithy.api#error":
+			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
+		default:
+			//fixme "smithy.api#paginated"
+			panic("fix me: emit trait " + k)
+		}
+	}
+}
+
 func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("structure %s {\n", name)
 	indent := "    "
 	for k, v := range shape.Members {
-		traits := nonNilTraits(v.Traits)
-		w.EmitBooleanTrait(traits.Sensitive, "sensitive", indent)
-		w.EmitBooleanTrait(traits.Required, "required", indent)
-		w.EmitBooleanTrait(traits.HttpLabel, "httpLabel", indent)
-		w.EmitStringTrait(traits.HttpQuery, "httpQuery", indent)
-		w.EmitStringTrait(traits.HttpHeader, "httpHeader", indent)
-		w.EmitBooleanTrait(traits.HttpPayload, "httpPayload", indent)
-		w.EmitDocumentation(traits.Documentation, indent)
+		w.EmitTraits(v.Traits, indent)
 		w.Emit("%s%s: %s,\n", indent, k, v.Target)
 	}
 	w.Emit("}\n")
 }
 
-func listOfMembers(label string, format string, lst []*Member) string {
+func listOfShapeRefs(label string, format string, lst []*ShapeRef, absolute bool) string {
 	s := ""
 	if len(lst) > 0 {
 		s = label + ": ["
@@ -291,7 +343,11 @@ func listOfMembers(label string, format string, lst []*Member) string {
 			if n > 0 {
 				s = s + ", "
 			}
-			s = s + fmt.Sprintf(format, a.Target)
+			target := a.Target
+			if !absolute {
+				target = stripNamespace(target)
+			}
+			s = s + fmt.Sprintf(format, target)
 		}
 		s = s + "]"
 	}
@@ -314,27 +370,20 @@ func listOfStrings(label string, format string, lst []string) string {
 }
 
 func (w *IdlWriter) EmitServiceShape(name string, shape *Shape) {
-	traits := nonNilTraits(shape.Traits)
-	if len(traits.Protocols) > 0 {
-		s := "@protocols(["
-		for n, p := range traits.Protocols {
-			if n > 0 {
-				s = s + ", "
-			}
-			s = s + fmt.Sprintf("{name: %q%s%s}", p.Name, listOfStrings(", auth", "%q", p.Auth), listOfStrings(", tags", "%q", p.Tags))
-		}
-		s = s + "])\n"
-		w.Emit(s)
-	}
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("service %s {\n", name)
-	w.Emit("    version: %q\n", shape.Version)
-	if len(shape.Resources) > 0 {
-		w.Emit("    %s\n", listOfMembers("resources", "%s", shape.Resources))
+	w.Emit("    version: %q,\n", shape.Version)
+	if len(shape.Operations) > 0 {
+		w.Emit("    %s\n", listOfShapeRefs("operations", "%s", shape.Operations, false))
 	}
-	w.Emit("}\n")
+	if len(shape.Resources) > 0 {
+		w.Emit("    %s\n", listOfShapeRefs("resources", "%s", shape.Resources, false))
+	}
+	w.Emit("}\n\n")
 }
 
 func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
+	w.EmitTraits(shape.Traits, "")
 	w.Emit("resource %s {\n", name)
 	if len(shape.Identifiers) > 0 {
 		w.Emit("    identifiers: {\n")
@@ -361,33 +410,28 @@ func (w *IdlWriter) EmitResourceShape(name string, shape *Shape) {
 			w.Emit("    list: %v\n", shape.List)
 		}
 		if len(shape.Operations) > 0 {
-			w.Emit("    %s\n", listOfMembers("operations", "%s", shape.Operations))
+			w.Emit("    %s\n", listOfShapeRefs("operations", "%s", shape.Operations, true))
 		}
 		if len(shape.CollectionOperations) > 0 {
-			w.Emit("    %s\n", listOfMembers("collectionOperations", "%s", shape.CollectionOperations))
+			w.Emit("    %s\n", listOfShapeRefs("collectionOperations", "%s", shape.CollectionOperations, true))
 		}
 	}
 	w.Emit("}\n")
 }
 
 func (w *IdlWriter) EmitOperationShape(name string, shape *Shape) {
-	es := ""
-	if len(shape.Errors) > 0 {
-		for _, e := range shape.Errors {
-			if es == "" {
-				es = " errors ["
-			} else {
-				es = es + ", "
-			}
-			es = es + e.Target
-		}
-		es = es + "]"
+	w.EmitTraits(shape.Traits, "")
+	w.Emit("operation %s {\n", name)
+	if shape.Input != nil {
+		w.Emit("    input: %s,\n", stripNamespace(shape.Input.Target))
 	}
-	out := ""
 	if shape.Output != nil {
-		out = " -> " + shape.Output.Target
+		w.Emit("    output: %s,\n", stripNamespace(shape.Output.Target))
 	}
-	w.Emit("operation %s(%s)%s%s\n", name, shape.Input.Target, out, es)
+	if len(shape.Errors) > 0 {
+		w.Emit("    %s,\n", listOfShapeRefs("errors", "%s", shape.Errors, false))
+	}
+	w.Emit("}\n")
 }
 
 func (w *IdlWriter) End() string {

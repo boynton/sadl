@@ -1,8 +1,10 @@
-package sadl
+package io
 
 import (
 	"fmt"
 	"testing"
+
+	"github.com/boynton/sadl/util"
 )
 
 func testParse(test *testing.T, expectSuccess bool, src string) {
@@ -13,7 +15,7 @@ func testParse(test *testing.T, expectSuccess bool, src string) {
 		}
 	} else {
 		if err == nil {
-			test.Errorf("Expected failure, but this:\n%s\nparsed anyway: %v", src, Pretty(v))
+			test.Errorf("Expected failure, but this:\n%s\nparsed anyway: %v", src, util.Pretty(v))
 		}
 	}
 }
@@ -96,7 +98,7 @@ type Test Struct {
 	if err != nil {
 		test.Errorf("Cannot parse valid Decimal default value: %v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -110,7 +112,7 @@ type Test Struct {
 	if err == nil {
 		test.Errorf("expected error providing a default value for a required field")
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -130,7 +132,7 @@ type Test Struct {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -156,7 +158,7 @@ type Bar Int32
 		if v.Comment == "one two" {
 			if v.Types[0].Comment == "three" && v.Types[1].Comment == "four" {
 				// Looks ok
-				fmt.Println(Pretty(v))
+				fmt.Println(util.Pretty(v))
 				return
 			}
 		}
@@ -169,7 +171,7 @@ func TestParseUnitValue(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -178,7 +180,7 @@ func TestArray(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -187,7 +189,7 @@ func TestUnion(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -202,7 +204,7 @@ type Foo Struct {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -244,7 +246,7 @@ type Distance UnitValue<Decimal,WeightUnits>
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(Pretty(v))
+		fmt.Println(util.Pretty(v))
 	}
 }
 
@@ -255,7 +257,7 @@ type Foo Struct {
 }
 `, nil)
 	if err == nil {
-		test.Errorf("Undefined field type should have caused an error: %v", Pretty(v))
+		test.Errorf("Undefined field type should have caused an error: %v", util.Pretty(v))
 	} else {
 		fmt.Println("[Correctly detected error]", err)
 	}
@@ -269,7 +271,7 @@ type Foo Struct {
 }
 `, nil)
 	if err == nil {
-		test.Errorf("Duplicate type should have caused an error: %v", Pretty(v))
+		test.Errorf("Duplicate type should have caused an error: %v", util.Pretty(v))
 	} else {
 		fmt.Println("[Correctly detected error]", err)
 	}
@@ -309,23 +311,23 @@ type GenericError Struct {
 func TestPathTemplateSyntax(test *testing.T) {
 	v, err := parseString(`http GET "/one/{two}" { }`, nil)
 	if err != nil {
-		test.Errorf("Good path template caused an error (%v): %v", err, Pretty(v))
+		test.Errorf("Good path template caused an error (%v): %v", err, util.Pretty(v))
 	}
 	v, err = parseString(`http GET "/one/{two" { }`, nil)
 	if err == nil {
-		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+		test.Errorf("Bad path template should have caused an error: %v", util.Pretty(v))
 	}
 	v, err = parseString(`http GET "/one/{two}}" { }`, nil)
 	if err == nil {
-		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+		test.Errorf("Bad path template should have caused an error: %v", util.Pretty(v))
 	}
 	v, err = parseString(`http GET "/one{/two}" { }`, nil)
 	if err == nil {
-		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+		test.Errorf("Bad path template should have caused an error: %v", util.Pretty(v))
 	}
 	v, err = parseString(`http GET "/one/{{two}" { }`, nil)
 	if err == nil {
-		test.Errorf("Bad path template should have caused an error: %v", Pretty(v))
+		test.Errorf("Bad path template should have caused an error: %v", util.Pretty(v))
 	}
 }
 
@@ -340,7 +342,7 @@ http GET "/foo" {
 }
 `, nil)
 	if err != nil {
-		test.Errorf("standard expect caused an error (%v): %v", err, Pretty(v))
+		test.Errorf("standard expect caused an error (%v): %v", err, util.Pretty(v))
 	}
 	v, err = parseString(`type Foo Struct {
   x String
@@ -350,6 +352,6 @@ http GET "/foo" {
 }
 `, nil)
 	if err != nil {
-		test.Errorf("simple expect caused an error (%v): %v", err, Pretty(v))
+		test.Errorf("simple expect caused an error (%v): %v", err, util.Pretty(v))
 	}
 }

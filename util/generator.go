@@ -1,4 +1,4 @@
-package sadl
+package util
 
 import (
 	"bufio"
@@ -10,12 +10,44 @@ import (
 )
 
 type Generator struct {
-	Model  *Model
 	OutDir string
 	Err    error
 	buf    bytes.Buffer
 	file   *os.File
 	writer *bufio.Writer
+}
+
+func (gen *Generator) GetString(m map[string]interface{}, k string, defaultValue string) string {
+	if m != nil {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+	}
+	return defaultValue
+}
+
+func (gen *Generator) GetBool(m map[string]interface{}, k string, defaultValue bool) bool {
+	if m != nil {
+		if v, ok := m[k]; ok {
+			if b, ok := v.(bool); ok {
+				return b
+			}
+		}
+	}
+	return defaultValue
+}
+
+func (gen *Generator) GetInt(m map[string]interface{}, k string, defaultValue int) int {
+	if m != nil {
+		if v, ok := m[k]; ok {
+			if n, ok := v.(float64); ok {
+				return int(n)
+			}
+		}
+	}
+	return defaultValue
 }
 
 func (gen *Generator) Emit(s string) {

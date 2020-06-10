@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/util"
 )
 
 type ServerData struct {
@@ -115,7 +116,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 					case bool:
 						param = fmt.Sprintf("@DefaultValue(\"%v\")", b) + " " + param
 					default:
-						fmt.Println("Whoops:", sadl.Pretty(in.Default))
+						fmt.Println("Whoops:", util.Pretty(in.Default))
 						panic("HERE")
 					}
 				}
@@ -207,7 +208,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	gen.ServerData.Funcs = funcMap
 }
 
-func (gen *Generator) CreateServer(src, rez string) {
+func (gen *Generator) CreateServer() {
+	src := gen.SourceDir
+	rez := gen.ResourceDir
 	if gen.Err != nil {
 		return
 	}

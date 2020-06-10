@@ -1,10 +1,11 @@
-package oas
+package openapi
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/io"
+	"github.com/boynton/sadl/util"
 	"github.com/ghodss/yaml"
 )
 
@@ -30,17 +31,17 @@ type Foo Struct {
 type Foos Array<Foo>
 
 `
-	model, err := sadl.ParseString(src)
+	model, err := io.ParseSadlString(src)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
 		//		model.Name = "test1"
-		gen := NewGenerator(model, "./")
+		gen := NewGenerator(model, nil)
 		oas, err := gen.ExportToOAS3()
 		if err != nil {
 			test.Errorf("%v", err)
 		} else {
-			fmt.Println(sadl.Pretty(oas))
+			fmt.Println(util.Pretty(oas))
 		}
 	}
 }
@@ -50,11 +51,11 @@ func TestCrudl(test *testing.T) {
 }
 
 func testFile(test *testing.T, path string) {
-	model, err := sadl.ParseFile(path)
+	model, err := io.ParseSadlFile(path)
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		gen := NewGenerator(model, "./")
+		gen := NewGenerator(model, nil)
 		oas, err := gen.ExportToOAS3()
 		if err != nil {
 			test.Errorf("%v", err)
@@ -65,7 +66,7 @@ func testFile(test *testing.T, path string) {
 }
 
 func ToYAML(obj interface{}) string {
-	j := sadl.Pretty(obj)
+	j := util.Pretty(obj)
 	b, err := yaml.JSONToYAML([]byte(j))
 	if err != nil {
 		return j

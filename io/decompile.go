@@ -1,23 +1,30 @@
-package sadl
+package io
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/util"
 )
 
 const indentAmount = "\t"
 
-func NewGenerator(model *Model, outdir string) *Generator {
-	gen := &Generator{
-		Model:  model,
-		OutDir: outdir,
-	}
+type SadlGenerator struct {
+	util.Generator
+	Model *sadl.Model
+}
+
+func NewGenerator(model *sadl.Model, outdir string) *SadlGenerator {
+	gen := &SadlGenerator{}
+	gen.OutDir = outdir
+	gen.Model = model
 	return gen
 }
 
-func Decompile(model *Model) string {
+func DecompileSadl(model *sadl.Model) string {
 	g := NewGenerator(model, "")
 	sadlSource := g.Generate()
 	if g.Err != nil {
@@ -26,7 +33,7 @@ func Decompile(model *Model) string {
 	return sadlSource
 }
 
-func (g *Generator) Generate() string {
+func (g *SadlGenerator) Generate() string {
 	funcMap := template.FuncMap{
 		"blockComment": func(s string) string {
 			if s == "" {
@@ -48,10 +55,10 @@ func (g *Generator) Generate() string {
 			}
 			return s
 		},
-		"typedef": func(td *TypeDef) string {
+		"typedef": func(td *sadl.TypeDef) string {
 			return fmt.Sprintf("type %s %s\n", td.Name, g.sadlTypeSpec(&td.TypeSpec, nil, ""))
 		},
-		"action": func(act *ActionDef) string {
+		"action": func(act *sadl.ActionDef) string {
 			out := ""
 			exc := ""
 			if act.Output != "" {
@@ -65,11 +72,11 @@ func (g *Generator) Generate() string {
 			}
 			return fmt.Sprintf("action %s(%s)%s%s\n", act.Name, act.Input, out, exc)
 		},
-		"http": func(hact *HttpDef) string {
+		"http": func(hact *sadl.HttpDef) string {
 			return g.sadlHttpSpec(hact)
 		},
-		"example": func(ed *ExampleDef) string {
-			return fmt.Sprintf("example %s %s\n", ed.Target, Pretty(ed.Example))
+		"example": func(ed *sadl.ExampleDef) string {
+			return fmt.Sprintf("example %s %s\n", ed.Target, util.Pretty(ed.Example))
 		},
 	}
 	g.Begin()
@@ -77,7 +84,7 @@ func (g *Generator) Generate() string {
 	return g.End()
 }
 
-func (g *Generator) CreateSadlSource() {
+func (g *SadlGenerator) CreateSadlSource() {
 	sadlSource := g.Generate()
 	if g.Err != nil {
 		panic(g.Err.Error())
@@ -90,7 +97,7 @@ func (g *Generator) CreateSadlSource() {
 	}
 }
 
-func (g *Generator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string) string {
+func (g *SadlGenerator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent string) string {
 	switch ts.Type {
 	case "Enum":
 		//Q: what if this is a required field, defined inline in a struct?!
@@ -180,7 +187,7 @@ func (g *Generator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string) str
 	}
 }
 
-func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
+func (g *SadlGenerator) sadlHttpSpec(hact *sadl.HttpDef) string {
 	var opts []string
 	if hact.Name != "" {
 		if hact.Name != actionName(hact) {
@@ -202,7 +209,7 @@ func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 	}
 	bcom := ""
 	if hact.Expected == nil {
-		hact.Expected = &HttpExpectedSpec{
+		hact.Expected = &sadl.HttpExpectedSpec{
 			Status: 200,
 		}
 	}
@@ -233,13 +240,13 @@ func (g *Generator) sadlHttpSpec(hact *HttpDef) string {
 	return s
 }
 
-func (g *Generator) sadlParamSpec(ps *HttpParamSpec) string {
+func (g *SadlGenerator) sadlParamSpec(ps *sadl.HttpParamSpec) string {
 	var opts []string
 	if ps.Required {
 		opts = append(opts, "required")
 	}
 	if ps.Default != nil {
-		opts = append(opts, "default="+AsString(ps.Default))
+		opts = append(opts, "default="+util.AsString(ps.Default))
 	}
 	if ps.Header != "" {
 		opts = append(opts, fmt.Sprintf("header=%q", ps.Header))
@@ -272,7 +279,8 @@ func stringList(lst []string) string {
 	return result + "]"
 }
 
-const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Name}}name {{.Name}}{{end}}{{if .Version}}
+const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Namespace}}namespace {{.Namespace}}
+{{end}}{{if .Name}}name {{.Name}}{{end}}{{if .Version}}
 version "{{.Version}}"{{end}}{{annotations .Annotations}}
 {{if .Types}}{{range .Types}}
 {{blockComment .Comment}}{{typedef .}}{{end}}{{end}}

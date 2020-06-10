@@ -3,6 +3,8 @@ package sadl
 import (
 	"fmt"
 	"strings"
+
+	"github.com/boynton/sadl/util"
 )
 
 //for every typedef and action parameter that has an inline enum def, create a toplevel enum def and refer to it instead.
@@ -16,7 +18,7 @@ func (model *Model) ConvertInlineEnums() error {
 		case "Struct":
 			for _, fdef := range td.Fields {
 				if fdef.Type == "Enum" {
-					tname := Capitalize(fdef.Name)
+					tname := util.Capitalize(fdef.Name)
 					if !strings.HasPrefix(tname, td.Name) {
 						tname = td.Name + tname
 					}
@@ -28,7 +30,7 @@ func (model *Model) ConvertInlineEnums() error {
 					if prev != nil {
 						if !model.EquivalentTypes(&prev.TypeSpec, &fdef.TypeSpec) {
 							//Alternatively, could prefix the struct type name to the new type `td.Name + tname` to make it unique. Steill not foolproof.
-							return fmt.Errorf("cannot refactor, duplicate type names for non-equivalent types: %s and %s\n", Pretty(prev), Pretty(fdef))
+							return fmt.Errorf("cannot refactor, duplicate type names for non-equivalent types: %s and %s\n", util.Pretty(prev), util.Pretty(fdef))
 						}
 					}
 					var blank TypeSpec
