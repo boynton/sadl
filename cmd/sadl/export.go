@@ -5,6 +5,7 @@ import (
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/graphql"
+	"github.com/boynton/sadl/httptrace"
 	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/java"
 	"github.com/boynton/sadl/openapi"
@@ -36,6 +37,8 @@ func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]inter
 		return openapi.Export(model, conf)
 	case "graphql":
 		return graphql.Export(model, conf)
+	case "http-trace":
+		return httptrace.Export(model, conf)
 	default:
 		return fmt.Errorf("Unsupported generator: %s", generator)
 	}

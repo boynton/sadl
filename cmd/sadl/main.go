@@ -2,14 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	//	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 
 	"github.com/boynton/cli"
 	//	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 /*
@@ -72,38 +70,13 @@ Supported generators and options used from config if present
 	cmd.StringOption(&name, "name", "", "The name of the model, overrides any name present in the source")
 	cmd.StringOption(&ns, "ns", "", "The namespace of the model, overrides any namespace present in the source")
 	cmd.StringOption(&gen, "gen", "sadl", "The default generator for output.")
-	cmd.StringOption(&configPath, "conf", "sadl", "The JSON config file to use to configure the generator")
-	args, options := cmd.Parse()
+	cmd.StringOption(&configPath, "conf", "", "The JSON config file to use to configure the generator")
+	args, _ := cmd.Parse()
 	if len(args) == 0 {
 		fmt.Println(cmd.Usage())
-	} else {
-		fmt.Println("non-option params:", util.Pretty(options))
+		os.Exit(0)
 	}
-	os.Exit(0)
 	path := args[0]
-	//	pVerbose := flag.Bool("v", false, "set to true to enable verbose output")
-	//	pDir := flag.String("dir", ".", "output directory for generated artifacts")
-	//	pName := flag.String("name", "", "name of the model read. Overrides any existing name that is present")
-	//	pNamespace := flag.String("namespace", "", "namespace to force input to, if the input has no namespace specified")
-	//	pGen := flag.String("generate", "sadl", "the generator to run on the model")
-	//	pConf := flag.String("conf", "", "the JSON config file to use to configure the generator")
-	//	flag.Parse()
-	//	args := flag.Args()
-	//	if len(args) != 1 {
-	//		fmt.Println("usage: sadl [options]] file.[sadl,smithy,graphql,json,yaml]")
-	//		fmt.Println("  OPTIONS:")
-	//		fmt.Println("    -generate [sadl,json,smithy,smithy-ast,openapi,graphql,java,java-server,go,go-server]")
-	//		fmt.Println("       sadl version")
-	//		os.Exit(1)
-	//	}
-	/*
-		path := args[0]
-		if path == "version" {
-			fmt.Printf("SADL v%s\n", sadl.Version)
-			os.Exit(0)
-		}
-		dir := *pDir
-	*/
 	importConf := make(map[string]interface{}, 0)
 	if ns != "" {
 		importConf["namespace"] = ns
