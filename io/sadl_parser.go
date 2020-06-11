@@ -1967,6 +1967,22 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 	var ts *sadl.TypeSpec
 	if td != nil {
 		ts = &td.TypeSpec
+	} else {
+		n := strings.Index(ex.Target, ".")
+		if n > 0 {
+			tname := ex.Target[:n]
+			mname := ex.Target[n+1:]
+			td = p.model.FindType(tname)
+			if td != nil {
+				if td.Type == "Struct" {
+					for _, fdef := range td.Fields {
+						if fdef.Name == mname {
+							ts = &fdef.TypeSpec
+						}
+					}
+				}
+			}
+		}
 	}
 	if ts == nil {
 		if strings.HasSuffix(ex.Target, "Request") {
@@ -1986,7 +2002,7 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 				return p.validateExampleAgainstHttpResponse(hact, ex)
 			}
 		} else {
-			//for exceptions, use synthetic names for each exception type (sin e they are currently unique)
+			//for exceptions, use synthetic names for each exception type (since they are currently unique)
 			//i.e. "GetFooExceptNotFound".
 			err = fmt.Errorf("Cannot find example target: %q", ex.Target)
 		}

@@ -88,10 +88,10 @@ func (w *IdlWriter) Emit(format string, args ...interface{}) {
 }
 
 func (w *IdlWriter) EmitShape(name string, shape *Shape) {
-	switch shape.Type {
+	switch strings.ToLower(shape.Type) {
 	case "boolean":
 		w.EmitBooleanShape(name, shape)
-	case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal":
+	case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigdecimal":
 		w.EmitNumericShape(shape.Type, name, shape)
 	case "blob":
 		w.EmitBlobShape(name, shape)
@@ -151,6 +151,19 @@ func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
 		w.Emit("@length(max: %d)\n", asInt(max))
 	} else if min != nil {
 		w.Emit("@length(min: %d)\n", asInt(min))
+	}
+}
+
+func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
+	l := asStruct(v)
+	min := get(l, "min")
+	max := get(l, "max")
+	if min != nil && max != nil {
+		w.Emit("@range(min: %d, max: %d)\n", asInt(min), asInt(max))
+	} else if max != nil {
+		w.Emit("@range(max: %d)\n", asInt(max))
+	} else if min != nil {
+		w.Emit("@range(min: %d)\n", asInt(min))
 	}
 }
 
@@ -249,8 +262,6 @@ func (w *IdlWriter) EmitBlobShape(name string, shape *Shape) {
 func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("%s %s {\n", shapeName, name)
-	//traits for the collection
-	//traits for member
 	w.Emit("    member: %s\n", shape.Member.Target)
 	w.Emit("}\n")
 }
@@ -266,7 +277,7 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 	count := len(shape.Members)
 	for fname, mem := range shape.Members {
 		w.EmitTraits(mem.Traits, "    ")
-		w.Emit("    %s: %s", fname, mem.Target)
+		w.Emit("    %s: %s", fname, w.stripLocalNamespace(mem.Target))
 		count--
 		if count > 0 {
 			w.Emit(",\n")
@@ -305,8 +316,6 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 			w.EmitBooleanTrait(asBool(v), stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader":
 			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
-		case "aws.protocols#restJson1":
-			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
 		case "smithy.api#deprecated":
 			w.EmitDeprecatedTrait(v, indent)
 		case "smithy.api#http":
@@ -315,10 +324,14 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 			w.EmitHttpErrorTrait(v, indent)
 		case "smithy.api#length":
 			w.EmitLengthTrait(v, indent)
+		case "smithy.api#range":
+			w.EmitRangeTrait(v, indent)
 		case "smithy.api#enum":
 			w.EmitEnumTrait(v, indent)
 		case "smithy.api#pattern", "smithy.api#error":
 			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
+		case "aws.protocols#restJson1":
+			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
 		default:
 			//fixme "smithy.api#paginated"
 			panic("fix me: emit trait " + k)

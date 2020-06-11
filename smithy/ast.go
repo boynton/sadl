@@ -2,6 +2,8 @@ package smithy
 
 import (
 	"strings"
+
+	"github.com/boynton/sadl"
 )
 
 type AST struct {
@@ -74,8 +76,11 @@ func asInt(v interface{}) int {
 		return int(n)
 	case int:
 		return n
+	case int64:
+		return int(n)
+	default:
+		return 0
 	}
-	return 0
 }
 
 func asInt64(v interface{}) int64 {
@@ -90,6 +95,17 @@ func asFloat64(v interface{}) float64 {
 		return n
 	}
 	return 0
+}
+
+func asDecimal(v interface{}) *sadl.Decimal {
+	switch n := v.(type) {
+	case sadl.Decimal:
+		return &n
+	case *sadl.Decimal:
+		return n
+	default:
+		return nil
+	}
 }
 
 func get(m map[string]interface{}, key string) interface{} {
@@ -118,6 +134,9 @@ func getArray(m map[string]interface{}, key string) []interface{} {
 }
 func getStruct(m map[string]interface{}, key string) map[string]interface{} {
 	return asStruct(m[key])
+}
+func getDecimal(m map[string]interface{}, key string) *sadl.Decimal {
+	return asDecimal(m[key])
 }
 
 type Shape struct {
@@ -180,26 +199,20 @@ type EnumTrait []*EnumTraitItem
 
 //idRef
 //length
-type LengthTrait struct {
-	Min *int64 `json:"min,omitempty"`
-	Max *int64 `json:"max,omitempty"`
-}
-
 //pattern
 //private
 //range
+
 //required
-type RequiredTrait struct { //Q: why isn't this a boolean?
-}
 
 //uniqueItems
 
 //Documentation traits - https://awslabs.github.io/smithy/1.0/spec/core/documentation-traits.html
 //deprecated
-type DeprecatedTrait struct {
-	Message string `json:"message,omitempty"`
-	Since   string `json:"since,omitempty"`
-}
+//type DeprecatedTrait struct {
+//	Message string `json:"message,omitempty"`
+//	Since   string `json:"since,omitempty"`
+//}
 
 //documentation
 //examples

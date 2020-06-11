@@ -28,7 +28,6 @@ func parse(path string, conf map[string]interface{}) (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	//	fmt.Println(sadl.Pretty(p.ast))
 	return p.ast, nil
 }
 
@@ -73,6 +72,10 @@ func (p *Parser) Parse() error {
 				err = p.parseMetadata()
 			case "service":
 				err = p.parseService(comment)
+			case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal":
+				traits, comment = withCommentTrait(traits, comment)
+				err = p.parseNumber(tok.Text, traits)
+				traits = nil
 			case "string":
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseString(traits)
@@ -80,6 +83,10 @@ func (p *Parser) Parse() error {
 			case "structure":
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseStructure(traits)
+				traits = nil
+			case "union":
+				traits, comment = withCommentTrait(traits, comment)
+				err = p.parseUnion(traits)
 				traits = nil
 			case "list":
 				traits, comment = withCommentTrait(traits, comment)
@@ -198,6 +205,17 @@ func (p *Parser) assertString(tok *util.Token) (string, error) {
 	return tok.Text, p.Error(fmt.Sprintf("Expected string, found %v", tok.Type))
 }
 
+func (p *Parser) ExpectNumber() (*sadl.Decimal, error) {
+	tok := p.GetToken()
+	if tok == nil {
+		return nil, p.EndOfFileError()
+	}
+	if tok.IsNumeric() {
+		return sadl.ParseDecimal(tok.Text)
+	}
+	return nil, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
+}
+
 func (p *Parser) ExpectInt() (int, error) {
 	tok := p.GetToken()
 	if tok == nil {
@@ -207,7 +225,7 @@ func (p *Parser) ExpectInt() (int, error) {
 		l, err := strconv.ParseInt(tok.Text, 10, 32)
 		return int(l), err
 	}
-	return 0, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
+	return 0, p.Error(fmt.Sprintf("Expected integer, found %v", tok.Type))
 }
 
 func (p *Parser) ExpectString() (string, error) {
@@ -295,7 +313,6 @@ func (p *Parser) EndOfFileError() error {
 
 func (p *Parser) parseMetadata() error {
 	key, err := p.ExpectIdentifier()
-	fmt.Println("key:", key)
 	if err != nil {
 		return err
 	}
@@ -304,7 +321,6 @@ func (p *Parser) parseMetadata() error {
 		return err
 	}
 	val, err := p.parseLiteralValue()
-	fmt.Println("val:", val)
 	if err != nil {
 		return err
 	}
@@ -315,17 +331,33 @@ func (p *Parser) parseMetadata() error {
 	return nil
 }
 
-func (p *Parser) parseNamespace(comment string) error {
-	//	p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
-	if p.namespace != "" {
-		return p.Error("Only one namespace per file allowed")
+func (p *Parser) expectTarget() (string, error) {
+	ident, err := p.expectNamespacedIdentifier()
+	if err != nil {
+		return "", err
 	}
-	ns := ""
+	tok := p.GetToken()
+	if tok == nil {
+		return ident, nil
+	}
+	if tok.Type != util.HASH {
+		p.UngetToken()
+		return ident, nil
+	}
+	ident = ident + "#"
 	txt, err := p.expectText()
 	if err != nil {
-		return err
+		return "", err
 	}
-	ns = txt
+	return ident + txt, nil
+}
+
+func (p *Parser) expectNamespacedIdentifier() (string, error) {
+	txt, err := p.expectText()
+	if err != nil {
+		return "", err
+	}
+	ident := txt
 	for {
 		tok := p.GetToken()
 		if tok == nil {
@@ -335,13 +367,22 @@ func (p *Parser) parseNamespace(comment string) error {
 			p.UngetToken()
 			break
 		}
-		ns = ns + "."
+		ident = ident + "."
 		txt, err = p.expectText()
 		if err != nil {
-			return err
+			return "", err
 		}
-		ns = ns + txt
+		ident = ident + txt
 	}
+	return ident, nil
+}
+
+func (p *Parser) parseNamespace(comment string) error {
+	//	p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
+	if p.namespace != "" {
+		return p.Error("Only one namespace per file allowed")
+	}
+	ns, err := p.expectNamespacedIdentifier()
 	p.namespace = ns
 	return err
 }
@@ -351,6 +392,19 @@ func (p *Parser) addShapeDefinition(name string, shape *Shape) {
 		p.ast.Shapes = make(map[string]*Shape, 0)
 	}
 	p.ast.Shapes[p.ensureNamespaced(name)] = shape
+}
+
+func (p *Parser) parseNumber(typeName string, traits map[string]interface{}) error {
+	tname, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	shape := &Shape{
+		Type:   typeName,
+		Traits: traits,
+	}
+	p.addShapeDefinition(tname, shape)
+	return nil
 }
 
 func (p *Parser) parseString(traits map[string]interface{}) error {
@@ -469,6 +523,66 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 				return err
 			}
 			ftype, err := p.ExpectIdentifier()
+			if err != nil {
+				return err
+			}
+			err = p.ignore(util.COMMA)
+			mems[fname] = &Member{
+				Target: p.ensureNamespaced(ftype),
+				Traits: mtraits,
+			}
+			mtraits = nil
+		} else {
+			return p.SyntaxError()
+		}
+	}
+	shape.Members = mems
+	p.addShapeDefinition(name, shape)
+	return nil
+}
+
+func (p *Parser) parseUnion(traits map[string]interface{}) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	tok := p.GetToken()
+	if tok == nil {
+		return p.EndOfFileError()
+	}
+	if tok.Type != util.OPEN_BRACE {
+		return p.SyntaxError()
+	}
+	shape := &Shape{
+		Type:   "union",
+		Traits: traits,
+	}
+	mems := make(map[string]*Member, 0)
+	var mtraits map[string]interface{}
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return p.EndOfFileError()
+		}
+		if tok.Type == util.NEWLINE {
+			continue
+		}
+		if tok.Type == util.CLOSE_BRACE {
+			break
+		}
+		if tok.Type == util.AT {
+			mtraits, err = p.parseTrait(mtraits)
+			if err != nil {
+				return err
+			}
+		} else if tok.Type == util.SYMBOL {
+			fname := tok.Text
+			err = p.expect(util.COLON)
+			if err != nil {
+				return err
+			}
+			ftype, err := p.expectTarget()
+			fmt.Println("ftype, err", ftype, err)
 			if err != nil {
 				return err
 			}
@@ -607,30 +721,12 @@ func (p *Parser) parseService(comment string) error {
 
 func EnsureNamespaced(ns, name string) string {
 	switch name {
-	case "Boolean":
-		return "Bool"
-	case "Byte":
-		return "Int8"
-	case "Short":
-		return "Int16"
-	case "Integer":
-		return "Int32"
-	case "Long":
-		return "Int64"
-	case "Float":
-		return "Float32"
-	case "Double":
-		return "Float64"
-	case "BigInteger", "BigDecimal":
-		return "Decimal"
-	case "Blob":
-		return "Bytes"
-	case "String", "Timestamp", "UUID", "Map", "Enum", "Union":
+	case "Boolean", "Byte", "Short", "Integer", "Long", "Float", "Double", "BigInteger", "BigDecimal":
 		return name
-	case "List":
-		return "Array"
-	case "Document", "Structure":
-		return "Struct"
+	case "Blob", "String", "Timestamp", "UUID", "Enum":
+		return name
+	case "List", "Map", "Set", "Document", "Structure", "Union":
+		return name
 	}
 	if strings.Index(name, "#") < 0 {
 		return ns + "#" + name
@@ -690,6 +786,11 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, error) {
 				switch match {
 				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults":
 					val, err := p.ExpectString()
+					if err == nil {
+						args = withTrait(args, match, val)
+					}
+				case "min", "max":
+					val, err := p.ExpectNumber()
 					if err == nil {
 						args = withTrait(args, match, val)
 					}
@@ -757,18 +858,30 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		if err != nil {
 			return traits, err
 		}
-		ht := &HttpTrait{
-			Method: getString(args, "method"),
-			Uri:    getString(args, "uri"),
-			Code:   getInt(args, "code"),
+		/*		ht := &HttpTrait{
+					Method: getString(args, "method"),
+					Uri:    getString(args, "uri"),
+					Code:   getInt(args, "code"),
+				}
+		*/
+		return withTrait(traits, "smithy.api#http", args), nil
+	case "length":
+		args, err := p.parseTraitArgs()
+		if err != nil {
+			return traits, err
 		}
-		return withTrait(traits, "smithy.api#http", ht), nil
+		return withTrait(traits, "smithy.api#length", args), nil
+	case "range":
+		args, err := p.parseTraitArgs()
+		if err != nil {
+			return traits, err
+		}
+		return withTrait(traits, "smithy.api#range", args), nil
 	case "paginated":
 		args, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err
 		}
-		//fixme: check
 		return withTrait(traits, "smithy.api#paginated", args), nil
 
 	default:

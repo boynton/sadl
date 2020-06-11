@@ -101,6 +101,8 @@ func (model *Model) ToSadl() (*sadl.Model, error) {
 
 func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef *Shape) {
 	switch shapeDef.Type {
+	case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal":
+		model.importNumericShape(schema, shapeDef.Type, shapeName, shapeDef)
 	case "string":
 		model.importStringShape(schema, shapeName, shapeDef)
 	case "list":
@@ -119,6 +121,44 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 	}
 }
 
+func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef{
+		Name:        shapeName,
+		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
+	}
+	switch smithyType {
+	case "byte":
+		td.Type = "Int8"
+	case "short":
+		td.Type = "Int16"
+	case "integer":
+		td.Type = "Int32"
+	case "long":
+		td.Type = "Int65"
+	case "float":
+		td.Type = "Float32"
+	case "double":
+		td.Type = "Float64"
+	case "bigInteger":
+		td.Type = "Decimal"
+		td.Annotations = WithAnnotation(td.Annotations, "x_integer", "true")
+	case "bigDecimal":
+		td.Type = "Decimal"
+	}
+	if l := getStruct(shape.Traits, "smithy.api#range"); l != nil {
+		tmp := getDecimal(l, "min")
+		if tmp != nil {
+			td.Min = tmp
+		}
+		tmp = getDecimal(l, "max")
+		if tmp != nil {
+			td.Max = tmp
+		}
+	}
+	schema.Types = append(schema.Types, td)
+}
+
 func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	if shapeName == "UUID" {
 		//UUID is already a builtin SADL type
@@ -130,13 +170,15 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	}
 	td.Type = "String"
 	td.Pattern = getString(shape.Traits, "smithy.api#pattern")
-	tmp := getInt64(shape.Traits, "smithy.api#min")
-	if tmp != 0 {
-		td.MinSize = &tmp
-	}
-	tmp = getInt64(shape.Traits, "smithy.api#max")
-	if tmp != 0 {
-		td.MaxSize = &tmp
+	if l := getStruct(shape.Traits, "smithy.api#length"); l != nil {
+		tmp := getInt64(l, "min")
+		if tmp != 0 {
+			td.MinSize = &tmp
+		}
+		tmp = getInt64(l, "max")
+		if tmp != 0 {
+			td.MaxSize = &tmp
+		}
 	}
 	lst := getArray(shape.Traits, "smithy.api#enum")
 	if lst != nil {
@@ -163,7 +205,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), fmt.Sprintf("%v", v))
 		case "smithy.api#httpPayload", "smithy.api#httpLabel", "smithy.api#httpQuery", "smithy.api#httpHeader":
 			/* ignore, implicit in SADL */
-		case "smithy.api#required", "smithy.api#documentation":
+		case "smithy.api#required", "smithy.api#documentation", "smithy.api#range", "smithy.api#length":
 			/* ignore, implicit in SADL */
 		default:
 			fmt.Println("Unhandled struct member trait:", k, v)
@@ -180,9 +222,17 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Union"
+	prefix := model.namespace + "#"
 	for memberName, member := range shape.Members {
 		if memberName != member.Target {
-			panic("fixme: named union variants")
+			m := member.Target
+			if strings.HasPrefix(m, prefix) {
+				m = member.Target[len(prefix):]
+			}
+			if m != memberName {
+				fmt.Printf("member: %q, target: %q, m: %q\n", memberName, member.Target, m)
+				panic("fixme: named union variants")
+			}
 		}
 		td.Variants = append(td.Variants, model.shapeRefToTypeRef(schema, member.Target))
 	}
@@ -233,7 +283,6 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 }
 
 func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) string {
-	fmt.Println("shapeRefToTypeRef: ", shapeRef)
 	prefix := model.namespace + "#"
 	typeRef := shapeRef
 	if strings.HasPrefix(typeRef, prefix) {
