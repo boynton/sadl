@@ -560,7 +560,6 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 				return "UUID", annotations, nil
 			case "Decimal":
 				gen.AddImport("java.math.BigDecimal")
-				fmt.Println(util.Pretty(td))
 				if td.Min != nil {
 					annotations = append(annotations, fmt.Sprintf("@DecimalMin(%q)", td.Min.String()))
 				}
