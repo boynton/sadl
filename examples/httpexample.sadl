@@ -53,14 +53,14 @@ example GetPersonResponse (name=getPersonExample) {
    "etag": "fe4c4350480c2233ca3d6354d3b44b4e"
 }
 
+/*
 example GetPersonRequest (name=getPersonNotFoundExample) {
     "id": "bf938428-f04c-11e9-a280-8c8590216cf8"
 }
 
-/*
-    example GetPersonExcept404 (name=getPersonNotFoundExample) {
-    "body": {
-        "message": "Person not found: bf938428-f04c-11e9-a280-8c8590216cf8"
-    },
+example GetPersonExcept404 (name=getPersonNotFoundExample) {
+	"body": {
+		"message": "Person not found: bf938428-f04c-11e9-a280-8c8590216cf8"
+	},
 }
 */

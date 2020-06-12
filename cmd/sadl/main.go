@@ -57,7 +57,7 @@ Supported generators and options used from config if present
       maven: generate a maven pom.xml file to build the project
       instants: use java.time.Instant for Timestamp impl, else generate a Timestamp class.
    java-server: a shorthand for specifying the "server" option to the "java" generator
-   http-examples: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
+   http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
 
 `
 	var dir string
