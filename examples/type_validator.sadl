@@ -1,0 +1,27 @@
+//
+// Some type with constraints to test validation with
+//
+namespace example
+name type_test
+
+type NonEmptyString String (minsize=1)
+
+type TinyInt Int8 (max=100)
+type Year Int32 (min=1000, max=3000)
+type ParticularBigNumber Decimal (min=-3141592653589793238462643383279502884197169399375105819, max=3141592653589793238462643383279502884197169399375105819)
+
+type Identifier String (pattern="[a-zA-Z_][a-zA-Z_0-9]*")
+type NonSymbolicOptions String (values=["a:b","c:d","e:f"])
+
+type ThreeStringTuple Array<String> (minsize=3, maxsize=3)
+
+type Foo Struct {
+	name NonEmptyString (required)
+	description String
+	tint TinyInt
+	year Year
+	pbn ParticularBigNumber
+	ident Identifier
+	options NonSymbolicOptions
+	something ThreeStringTuple
+}

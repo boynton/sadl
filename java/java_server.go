@@ -37,7 +37,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if gen.Err != nil {
 		return
 	}
-	if gen.ServerData != nil {
+	if gen.serverData != nil {
 		return
 	}
 	serviceName := gen.Capitalize(gen.Model.Name)
@@ -45,7 +45,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if rootPath == "" {
 		rootPath = "/"
 	}
-	gen.ServerData = &ServerData{
+	gen.serverData = &ServerData{
 		RootPath:       rootPath,
 		Model:          gen.Model,
 		Name:           serviceName,
@@ -199,13 +199,13 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			writer.Flush()
 			return b.String()
 		},
-		"extraResources": func() string { return gen.ServerData.ExtraResources },
+		"extraResources": func() string { return gen.serverData.ExtraResources },
 	}
-	gen.ServerData.Package = gen.Package
+	gen.serverData.Package = gen.Package
 	if gen.Package != "" {
-		gen.ServerData.PackageLine = "package " + gen.Package + ";\n"
+		gen.serverData.PackageLine = "package " + gen.Package + ";\n"
 	}
-	gen.ServerData.Funcs = funcMap
+	gen.serverData.Funcs = funcMap
 }
 
 func (gen *Generator) CreateServer() {
@@ -215,10 +215,10 @@ func (gen *Generator) CreateServer() {
 		return
 	}
 	gen.CreateServerDataAndFuncMap(src, rez)
-	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, gen.ServerData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.ServerData.InterfaceClass, interfaceTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
-	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
-	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.ServerData, gen.ServerData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
+	gen.CreateJavaFileFromTemplate(gen.serverData.InterfaceClass, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
 	for _, hact := range gen.Model.Http {
 		gen.CreateRequestPojo(hact)
 		gen.CreateResponsePojo(hact)
