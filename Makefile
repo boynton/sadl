@@ -5,16 +5,6 @@ all bin/sadl::
 install:: all
 	cp -p bin/* $(HOME)/bin/
 
-#lib::
-#	go build github.com/boynton/sadl/util
-#	go build github.com/boynton/sadl
-#	go build github.com/boynton/sadl/io
-#	go build github.com/boynton/sadl/smithy
-#	go build github.com/boynton/sadl/openapi
-#	go build github.com/boynton/sadl/java
-#	go build github.com/boynton/sadl/golang
-#	go build github.com/boynton/sadl/graphql
-
 test::
 	go test github.com/boynton/sadl/test
 	go test github.com/boynton/sadl/io
