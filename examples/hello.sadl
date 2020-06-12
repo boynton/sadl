@@ -1,15 +1,2 @@
-// A minimal hello world action
-http GET "/hello?caller={caller}" (action=Hello) {
-   caller String (default="Mystery Person")
+name hello
 
-   expect 200 {
-      greeting String
-   }
-
-}
-type Person Struct {
-	firstname String
-	lastname String
-}
-
-type People Array<Person>

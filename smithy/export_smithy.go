@@ -16,7 +16,7 @@ func Export(model *sadl.Model, out string, conf map[string]interface{}, exportAs
 		}
 	}
 	if ns == "" {
-		ns = "unspecified"
+		ns = "example"
 	}
 	ast, err := FromSADL(model, ns)
 	if err != nil {
@@ -77,7 +77,7 @@ func noteTypeRefs(refs map[string]bool, model *sadl.Model, ts *sadl.TypeSpec) {
 
 func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	ast := &AST{
-		Version:  "1.0",
+		Version:  SmithyVersion,
 		Shapes:   make(map[string]*Shape, 0),
 		Metadata: make(map[string]interface{}, 0),
 	}
@@ -196,6 +196,9 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 			Type:       "service",
 			Version:    model.Version,
 			Operations: ops,
+		}
+		if service.Version == "" {
+			service.Version = "0.0" //Smithy requires a version on a service
 		}
 		if model.Comment != "" {
 			ensureShapeTraits(service)["smithy.api#documentation"] = model.Comment
@@ -466,7 +469,7 @@ func shapeFromEnum(ts *sadl.TypeSpec) Shape {
 
 func httpTrait(path, method string, code int) map[string]interface{} {
 	t := make(map[string]interface{}, 0)
-	t["path"] = path
+	t["uri"] = path
 	t["method"] = method
 	if code != 0 {
 		t["code"] = code

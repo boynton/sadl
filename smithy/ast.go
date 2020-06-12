@@ -6,6 +6,10 @@ import (
 	"github.com/boynton/sadl"
 )
 
+const SmithyVersion = "1.0"
+const UnspecifiedNamespace = "example"
+const UnspecifiedVersion = "0.0"
+
 type AST struct {
 	Version  string                 `json:"smithy"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
@@ -24,7 +28,7 @@ func (ast *AST) NamespaceAndServiceVersion() (string, string, string) {
 		}
 		if v.Type == "service" {
 			version = v.Version
-			name = k
+			name = k[i+1:]
 			break
 		}
 	}

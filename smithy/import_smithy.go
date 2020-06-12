@@ -56,7 +56,9 @@ type Model struct {
 	ast       *AST
 	name      string
 	namespace string //the primary one, anyway. There may be multiple namespaces
+	version   string //of the service
 	shapes    map[string]*Shape
+	ioParams  map[string]string
 }
 
 func (model *Model) getShape(name string) *Shape {
@@ -68,16 +70,24 @@ func NewModel(ast *AST, name string) *Model {
 		ast: ast,
 	}
 	model.shapes = make(map[string]*Shape, 0)
-	model.namespace, model.name, model.ast.Version = ast.NamespaceAndServiceVersion()
-	if model.name == "" {
-		model.name = name
-	}
+	model.ioParams = make(map[string]string, 0)
+	model.namespace, model.name, model.version = ast.NamespaceAndServiceVersion()
 	prefix := model.namespace + "#"
 	prefixLen := len(prefix)
 	for k, v := range ast.Shapes {
 		if strings.HasPrefix(k, prefix) {
 			kk := k[prefixLen:]
 			model.shapes[kk] = v
+			if v.Type == "operation" {
+				if v.Input != nil {
+					iok := v.Input.Target[prefixLen:]
+					model.ioParams[iok] = v.Input.Target
+				}
+				if v.Output != nil {
+					iok := v.Output.Target[prefixLen:]
+					model.ioParams[iok] = v.Output.Target
+				}
+			}
 		}
 	}
 	return model
@@ -85,13 +95,21 @@ func NewModel(ast *AST, name string) *Model {
 
 func (model *Model) ToSadl() (*sadl.Model, error) {
 	annos := make(map[string]string, 0)
-	annos["x_smithy_version"] = model.ast.Version
+
+	//	annos["x_smithy_version"] = model.ast.Version
 	schema := &sadl.Schema{
 		Name:        model.name,
 		Namespace:   model.namespace,
-		Version:     model.ast.Version,
+		Version:     model.version,
 		Annotations: annos,
 	}
+	if schema.Namespace == UnspecifiedNamespace {
+		schema.Namespace = ""
+	}
+	if schema.Version == UnspecifiedVersion {
+		schema.Version = ""
+	}
+
 	//	fmt.Println("shapes in our namespace:", util.Pretty(model.shapes))
 	for k, v := range model.shapes {
 		model.importShape(schema, k, v)
@@ -240,6 +258,9 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 }
 
 func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	if _, ok := model.ioParams[shapeName]; ok {
+		return
+	}
 	td := &sadl.TypeDef{
 		Name:        shapeName,
 		Comment:     getString(shape.Traits, "smithy.api#documentation"),
@@ -345,9 +366,10 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 	}
 
 	hdef := &sadl.HttpDef{
-		Method: method,
-		Path:   uri,
-		Name:   shapeName,
+		Method:  method,
+		Path:    uri,
+		Name:    shapeName,
+		Comment: getString(shape.Traits, "smithy.api#documentation"),
 	}
 	if code == 0 {
 		code = 200

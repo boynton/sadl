@@ -262,7 +262,7 @@ func (w *IdlWriter) EmitBlobShape(name string, shape *Shape) {
 func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("%s %s {\n", shapeName, name)
-	w.Emit("    member: %s\n", shape.Member.Target)
+	w.Emit("    member: %s\n", w.stripLocalNamespace(shape.Member.Target))
 	w.Emit("}\n")
 }
 

@@ -289,11 +289,10 @@ func stringList(lst []string) string {
 }
 
 const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Namespace}}namespace {{.Namespace}}
-{{end}}{{if .Name}}name {{.Name}}{{end}}{{if .Version}}
-version "{{.Version}}"{{end}}{{annotations .Annotations}}
-{{if .Types}}{{range .Types}}
-{{blockComment .Comment}}{{typedef .}}{{end}}{{end}}
-{{if .Actions}}{{range .Actions}}
+{{end}}{{if .Name}}name {{.Name}}
+{{end}}{{if .Version}}version "{{.Version}}"
+{{end}}{{annotations .Annotations}}{{if .Types}}{{range .Types}}
+{{blockComment .Comment}}{{typedef .}}{{end}}{{end}}{{if .Actions}}{{range .Actions}}
 {{blockComment .Comment}}{{action .}}{{end}}{{end}}{{if .Http}}{{range .Http}}
 {{blockComment .Comment}}{{http .}}{{end}}{{end}}{{if .Examples}}{{range .Examples}}
 {{blockComment .Comment}}{{example .}}{{end}}{{end}}`
