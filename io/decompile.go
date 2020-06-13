@@ -179,14 +179,35 @@ func (g *SadlGenerator) sadlTypeSpec(ts *sadl.TypeSpec, opts []string, indent st
 		}
 		return fmt.Sprintf("Struct {\n}")
 	case "Union":
-		s := fmt.Sprintf("Union<")
-		for i, v := range ts.Variants {
-			if i != 0 {
-				s += ","
+		if true {
+			s := fmt.Sprintf("Union {\n")
+			for _, fd := range ts.Variants {
+				com := ""
+				bcom := ""
+				if fd.Comment != "" {
+					if len(fd.Comment) > 100 {
+						bcom = g.FormatComment("   ", fd.Comment, 100, false)
+					} else {
+						com = " // " + fd.Comment
+					}
+				}
+				fopts := []string{}
+				for aname, aval := range fd.Annotations {
+					fopts = append(fopts, fmt.Sprintf("%s=%q", aname, aval))
+				}
+				s += fmt.Sprintf("%s   %s %s%s\n", bcom, fd.Name, g.sadlTypeSpec(&fd.TypeSpec, fopts, indent+indentAmount), com)
 			}
-			s += v
+			return s + "}"
+		} else {
+			s := fmt.Sprintf("Union<")
+			for i, v := range ts.Variants {
+				if i != 0 {
+					s += ","
+				}
+				s += v.Type
+			}
+			return s + ">"
 		}
-		return s + ">"
 	default:
 		sopts := ""
 		if len(opts) > 0 {

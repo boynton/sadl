@@ -150,7 +150,6 @@ func gqlEnum(schema *sadl.Schema, def *gql_ast.EnumDefinition) error {
 }
 
 func gqlUnion(schema *sadl.Schema, def *gql_ast.UnionDefinition) error {
-	fmt.Println("gqlUnion:", def)
 	td := &sadl.TypeDef{
 		Name: def.Name.Value,
 		TypeSpec: sadl.TypeSpec{
@@ -161,10 +160,12 @@ func gqlUnion(schema *sadl.Schema, def *gql_ast.UnionDefinition) error {
 		td.Comment = commentValue(def.Description.Value)
 	}
 	for _, vardef := range def.Types {
-		fmt.Println(" ->", util.Pretty(vardef))
-		td.Variants = append(td.Variants, vardef.Name.Value)
+		tn := vardef.Name.Value
+		vd := &sadl.UnionVariantDef{}
+		vd.Name = tn
+		vd.Type = tn
+		td.Variants = append(td.Variants, vd)
 	}
-	fmt.Println(util.Pretty(td))
 	schema.Types = append(schema.Types, td)
 	return nil
 }

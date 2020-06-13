@@ -406,6 +406,8 @@ func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*Schema, error) {
 		}
 		tmp.Format = "uuid"
 		return tmp, nil
+	case "Union":
+		return gen.exportUnionTypeDef(td)
 	}
 	//etc
 	return nil, fmt.Errorf("Implement export of this type: %q", td.Type)
@@ -431,6 +433,19 @@ func (gen *Generator) exportStructTypeDef(td *sadl.TypeDef) (*Schema, error) {
 	}
 	schema.Required = required
 	schema.Properties = properties
+	return schema, nil
+}
+
+func (gen *Generator) exportUnionTypeDef(td *sadl.TypeDef) (*Schema, error) {
+	schema := &Schema{
+		Description: td.Comment,
+	}
+	for _, vd := range td.Variants {
+		v := &Schema{
+			Ref: "#/components/schemas/" + vd.Type,
+		}
+		schema.OneOf = append(schema.OneOf, v)
+	}
 	return schema, nil
 }
 

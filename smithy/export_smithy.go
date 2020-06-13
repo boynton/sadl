@@ -67,7 +67,7 @@ func noteTypeRefs(refs map[string]bool, model *sadl.Model, ts *sadl.TypeSpec) {
 		noteTypeRefs(refs, model, &td.TypeSpec)
 	case "Union":
 		for _, variant := range ts.Variants {
-			td := model.FindType(variant)
+			td := model.FindType(variant.Type)
 			noteTypeRefs(refs, model, &td.TypeSpec)
 		}
 	case "Any":
@@ -82,6 +82,7 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		Metadata: make(map[string]interface{}, 0),
 	}
 	//	ast.Metadata["imported_from_sadl_version"] = sadl.Version
+	ast.Metadata["name"] = model.Name
 
 	refs := AllTypeRefs(model)
 	if _, ok := refs["UUID"]; ok {
@@ -377,13 +378,14 @@ func shapeFromUnion(model *sadl.Model, ns string, shapes map[string]*Shape, tnam
 		Type: "union",
 	}
 	members := make(map[string]*Member, 0)
-	for _, vtype := range ts.Variants { //todo: modify SADL to make unions more like structs
-		fd := model.FindType(vtype)
+	for _, vd := range ts.Variants { //todo: modify SADL to make unions more like structs
+		//		fd := model.FindType(vtype.Type)
 		//		ftype := typeReference(&fd.TypeSpec)
 		member := &Member{
-			Target: EnsureNamespaced(ns, vtype),
+			Target: EnsureNamespaced(ns, vd.Type),
 		}
-		members[fd.Name] = member
+		ensureMemberTraits(member)["smithy.api#documentation"] = vd.Comment
+		members[vd.Name] = member
 	}
 	shape.Members = members
 	return shape

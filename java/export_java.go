@@ -15,21 +15,23 @@ import (
 
 type Generator struct {
 	util.Generator
-	Model          *sadl.Model
-	Domain         string //the default DNS domain. Used when generating a POM, defaults to getenv("DOMAIN")
-	Name           string //the name of the service, if not in the model
-	Package        string //the package of the service. Defaults to the reverse domain name
-	Header         string //the banner to prepend to every generated file. Defaults to something obvious and simple
-	SourceDir      string //the source directory, relative to the project directory. Defaults to "src/main/java"
-	ResourceDir    string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
-	UseLombok      bool //use the Lombok library for generated POJOs. The default is to not.
-	UseGetters     bool //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
-	UseInstants    bool //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
-	UseMaven       bool //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
-	Server         bool //generate server code, including a default (but empty) implementation of the service interface.
-	needTimestamps bool
-	imports        []string
-	serverData     *ServerData
+	Model         *sadl.Model
+	Domain        string //the default DNS domain. Used when generating a POM, defaults to getenv("DOMAIN")
+	Name          string //the name of the service, if not in the model
+	Package       string //the package of the service. Defaults to the reverse domain name
+	Header        string //the banner to prepend to every generated file. Defaults to something obvious and simple
+	SourceDir     string //the source directory, relative to the project directory. Defaults to "src/main/java"
+	ResourceDir   string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
+	UseLombok     bool   //use the Lombok library for generated POJOs. The default is to not.
+	UseGetters    bool   //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
+	UseInstants   bool   //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
+	UseJsonPretty bool   //generate a toString() method that pretty prints JSON.
+	UseMaven      bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
+	Server        bool   //generate server code, including a default (but empty) implementation of the service interface.
+	needTimestamp bool
+	needJson      bool
+	imports       []string
+	serverData    *ServerData
 }
 
 func Export(model *sadl.Model, dir string, conf map[string]interface{}) error {
@@ -37,10 +39,12 @@ func Export(model *sadl.Model, dir string, conf map[string]interface{}) error {
 	for _, td := range model.Types {
 		gen.CreatePojoFromDef(td)
 	}
-	if gen.needTimestamps {
+	if gen.needTimestamp {
 		gen.CreateTimestamp()
 	}
-	gen.CreateJsonUtil()
+	if gen.needJson {
+		gen.CreateJsonUtil()
+	}
 	if gen.Err != nil {
 		return gen.Err
 	}
@@ -253,11 +257,14 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 		for _, fd := range td.Fields {
 			gen.EmitFluidSetter(className, td, fd, indent)
 		}
-		gen.Emit(`    @Override
+		if gen.UseJsonPretty {
+			gen.needJson = true
+			gen.Emit(`    @Override
     public String toString() {
         return Json.pretty(this);
     }
 `)
+		}
 		if len(nested) > 0 {
 			for iname, ispec := range nested {
 				gen.CreateStructPojo(ispec, iname, indent+"    ")
@@ -291,6 +298,7 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 	gen.Emit("    @JsonValue\n    @Override\n")
 	gen.Emit("    public String toString() {\n        return repr;\n    }\n\n")
 
+	gen.Emit("    @JsonCreator\n") //not strictly necessary for enums
 	gen.Emit("    public static " + className + " fromString(String repr) {\n")
 	gen.Emit("        for (" + className + " e : values()) {\n")
 	gen.Emit("            if (e.repr.equals(repr)) {\n")
@@ -335,38 +343,67 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	} else {
 		gen.Emit(indent + "public static class " + className + extends + " {\n")
 	}
+
 	variantType := className + "Variant"
 	nindent := indent + "    "
-	gen.Emit(nindent + variantType + " {\n")
+	gen.Emit(nindent + "public enum " + variantType + " {\n")
 
 	max := len(td.Variants)
 	delim := ","
 	for i := 0; i < max; i++ {
-		v := td.Variants[i]
+		vd := td.Variants[i]
 		if i == max-1 {
 			delim = ""
 		}
-		gen.Emit(nindent + "    " + v + delim + "\n")
+		gen.Emit(nindent + "    " + vd.Name + delim + "\n")
 	}
 	gen.Emit(nindent + "}\n\n")
 	gen.Emit(nindent + "@com.fasterxml.jackson.annotation.JsonIgnore\n")
 	gen.Emit(nindent + "public " + variantType + " variant;\n\n")
-	for _, v := range td.Variants {
+	nested := make(map[string]*sadl.TypeSpec, 0)
+	for _, vd := range td.Variants {
 		gen.Emit(nindent + "@JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
-		gen.Emit(nindent + "public " + v + " " + v + ";\n")
+
+		if vd.Comment != "" {
+			gen.Emit(gen.FormatComment(nindent, vd.Comment, 100))
+		}
+		tn, tanno, anonymous := gen.TypeName(&vd.TypeSpec, vd.Type, false)
+		if anonymous != nil {
+			tn = gen.Capitalize(vd.Name)
+			if tn == className {
+				gen.Err = fmt.Errorf("Cannot have identically named inner class with same name as containing class: %q", tn)
+				return
+			}
+			nested[tn] = anonymous
+		}
+		if tanno != nil {
+			for _, anno := range tanno {
+				gen.Emit(nindent + anno + "\n")
+			}
+		}
+		gen.Emit(nindent + "public " + tn + " " + vd.Name + ";\n")
 	}
 	//create each constructor. Do I need the empty constructor?
-	for _, v := range td.Variants {
-		gen.Emit(nindent + "\n" + nindent + "public " + className + "(" + v + " v) {\n")
-		gen.Emit(nindent + "    this.variant = " + v + ";\n")
-		gen.Emit(nindent + "    this." + v + " = v;\n" + nindent + "}\n")
+	for _, vd := range td.Variants {
+		tn, _, _ := gen.TypeName(&vd.TypeSpec, vd.Type, false)
+		gen.Emit(nindent + "\n" + nindent + "public " + className + "(" + tn + " v) {\n")
+		gen.Emit(nindent + "    this.variant = " + variantType + "." + vd.Name + ";\n")
+		gen.Emit(nindent + "    this." + vd.Name + " = v;\n" + nindent + "}\n")
 	}
 	gen.Emit("\n")
-	gen.Emit(`    @Override
+	if gen.UseJsonPretty {
+		gen.needJson = true
+		gen.Emit(`    @Override
     public String toString() {
         return Json.pretty(this);
     }
 `)
+	}
+	if len(nested) > 0 {
+		for iname, ispec := range nested {
+			gen.CreateStructPojo(ispec, iname, indent+"    ")
+		}
+	}
 	gen.Emit("}\n")
 }
 
@@ -413,6 +450,7 @@ func (gen *Generator) CreateUnitValuePojo(ts *sadl.TypeSpec, className string) {
 	case "Enum":
 		u = unitType + ".fromString(tmp[1])"
 	}
+	gen.Emit("    @JsonCreator\n")
 	gen.Emit("    public " + className + "(@NotNull String repr) {\n")
 	gen.Emit("        String[] tmp = repr.split(\" \");\n")
 	gen.Emit("        this.value = " + v + ";\n")
@@ -505,7 +543,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 		}
 		return "BigDecimal", annotations, nil
 	case "Timestamp":
-		gen.needTimestamps = true
+		gen.needTimestamp = true
 		if gen.UseInstants {
 			gen.AddImport("java.time.Instant")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
@@ -568,7 +606,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 				}
 				return "BigDecimal", annotations, nil
 			case "Timestamp":
-				gen.needTimestamps = true
+				gen.needTimestamp = true
 				if gen.UseInstants {
 					gen.AddImport("java.time.Instant")
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")

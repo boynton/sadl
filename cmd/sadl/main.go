@@ -62,13 +62,13 @@ Supported generators and options used from config if present
 `
 	var dir string
 	var name string
-	var ns string
+	var namespace string
 	var gen string
 	var configPath string
 	cmd := cli.New("sadl", helpMessage)
 	cmd.StringOption(&dir, "dir", ".", "The output directory for generators.")
 	cmd.StringOption(&name, "name", "", "The name of the model, overrides any name present in the source")
-	cmd.StringOption(&ns, "ns", "", "The namespace of the model, overrides any namespace present in the source")
+	cmd.StringOption(&namespace, "namespace", "", "The namespace of the model, overrides any namespace present in the source")
 	cmd.StringOption(&gen, "gen", "sadl", "The default generator for output.")
 	cmd.StringOption(&configPath, "conf", "", "The JSON config file to use to configure the generator")
 	args, _ := cmd.Parse()
@@ -78,8 +78,8 @@ Supported generators and options used from config if present
 	}
 	path := args[0]
 	importConf := make(map[string]interface{}, 0)
-	if ns != "" {
-		importConf["namespace"] = ns
+	if namespace != "" {
+		importConf["namespace"] = namespace
 	}
 	if name != "" {
 		importConf["name"] = name

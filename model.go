@@ -163,10 +163,10 @@ func (model *Model) EquivalentTypes(ts1, ts2 *TypeSpec) bool {
 		}
 		m := make(map[string]bool, 0)
 		for _, v := range ts1.Variants {
-			m[v] = true
+			m[v.Type] = true
 		}
 		for _, v := range ts2.Variants {
-			if _, ok := m[v]; !ok {
+			if _, ok := m[v.Type]; !ok {
 				return false
 			}
 		}

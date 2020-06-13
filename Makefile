@@ -1,3 +1,6 @@
+_debug:: bin/sadl
+	./bin/sadl examples/union_test.sadl
+
 all bin/sadl:: 
 	mkdir -p bin
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl

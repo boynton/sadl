@@ -814,7 +814,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		td.Elements = elements
 		td.Annotations = options.Annotations
 	case "Union":
-		err = p.parseUnionDef(td, params)
+		err = p.parseUnionDef(td, params, fields)
 	default:
 		err = p.Error(fmt.Sprintf("Super type must be a base type: %v", superName))
 	}
@@ -902,7 +902,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 				params = append(params, tok.Text)
 			}
 		}
-	} else if typeName == "Struct" || typeName == "Enum" {
+	} else if typeName == "Struct" || typeName == "Enum" || typeName == "Union" {
 		if tok.Type != util.OPEN_BRACE {
 			p.UngetToken()
 			options, err = p.ParseOptions(typeName, []string{})
@@ -917,7 +917,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 		if tok.Type == util.OPEN_BRACE {
 			comment := p.ParseTrailingComment("")
 			switch typeName {
-			case "Struct":
+			case "Struct", "Union":
 				var fields []*sadl.StructFieldDef
 				tok := p.GetToken()
 				if tok == nil {
@@ -1073,10 +1073,26 @@ func (p *Parser) parseEnumDef(td *sadl.TypeDef, elements []*sadl.EnumElementDef)
 	return nil
 }
 
-func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string, fields []*sadl.StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
-		td.Variants = params
+		if params != nil {
+			for _, v := range params {
+				vd := &sadl.UnionVariantDef{}
+				vd.Name = v
+				vd.Type = v
+				td.Variants = append(td.Variants, vd)
+			}
+		} else if fields != nil {
+			for _, v := range fields {
+				vd := &sadl.UnionVariantDef{}
+				vd.Name = v.Name
+				vd.Type = v.Type
+				td.Variants = append(td.Variants, vd)
+			}
+		} else {
+			return p.SyntaxError()
+		}
 		td.Comment, err = p.EndOfStatement(td.Comment)
 	}
 	return err

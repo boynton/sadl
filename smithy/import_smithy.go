@@ -13,8 +13,14 @@ import (
 func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
 	var ast *AST
 	var err error
-	name := nameFromPath(path)
-
+	name := getString(conf, "name")
+	if name == "" {
+		conf["name"] = nameFromPath(path)
+	}
+	namespace := getString(conf, "namespace")
+	if namespace == "" {
+		conf["namespace"] = UnspecifiedNamespace
+	}
 	if strings.HasSuffix(path, ".json") {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
@@ -30,12 +36,12 @@ func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
 		}
 	} else {
 		//parse Smithy IDL
-		ast, err = parse(path, conf)
+		ast, err = parse(path)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return NewModel(ast, name).ToSadl()
+	return NewModel(ast).ToSadl(conf)
 }
 
 func nameFromPath(path string) string {
@@ -65,13 +71,21 @@ func (model *Model) getShape(name string) *Shape {
 	return model.shapes[name]
 }
 
-func NewModel(ast *AST, name string) *Model {
+func NewModel(ast *AST) *Model {
 	model := &Model{
 		ast: ast,
 	}
 	model.shapes = make(map[string]*Shape, 0)
 	model.ioParams = make(map[string]string, 0)
 	model.namespace, model.name, model.version = ast.NamespaceAndServiceVersion()
+
+	if model.name == "" {
+		s := getString(ast.Metadata, "name")
+		if s != "" {
+			model.name = s
+		}
+	}
+
 	prefix := model.namespace + "#"
 	prefixLen := len(prefix)
 	for k, v := range ast.Shapes {
@@ -93,9 +107,31 @@ func NewModel(ast *AST, name string) *Model {
 	return model
 }
 
-func (model *Model) ToSadl() (*sadl.Model, error) {
+func (model *Model) ToSadl(conf map[string]interface{}) (*sadl.Model, error) {
+	name := getString(conf, "name")
+	if name != "" {
+		model.name = name
+	} else {
+		s := getString(model.ast.Metadata, "name")
+		if s != "" {
+			model.name = s
+			delete(model.ast.Metadata, "name")
+		}
+	}
+	namespace := getString(conf, "namespace")
+	if namespace != UnspecifiedNamespace {
+		model.namespace = namespace
+	}
+
 	annos := make(map[string]string, 0)
 
+	if model.ast.Metadata != nil {
+		for k, v := range model.ast.Metadata {
+			if k != "name" {
+				annos["x_"+k] = util.ToString(v) //fix this, should not need to be a string
+			}
+		}
+	}
 	//	annos["x_smithy_version"] = model.ast.Version
 	schema := &sadl.Schema{
 		Name:        model.name,
@@ -240,9 +276,16 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Union"
-	prefix := model.namespace + "#"
+	//	prefix := model.namespace + "#"
 	for memberName, member := range shape.Members {
-		if memberName != member.Target {
+		//		if memberName != member.Target {
+		vd := &sadl.UnionVariantDef{
+			Name:        memberName,
+			Comment:     getString(member.Traits, "smithy.api#documentation"),
+			Annotations: model.importTraitsAsAnnotations(nil, member.Traits),
+		}
+		vd.Type = model.shapeRefToTypeRef(schema, member.Target)
+		/*
 			m := member.Target
 			if strings.HasPrefix(m, prefix) {
 				m = member.Target[len(prefix):]
@@ -251,8 +294,10 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 				fmt.Printf("member: %q, target: %q, m: %q\n", memberName, member.Target, m)
 				panic("fixme: named union variants")
 			}
-		}
-		td.Variants = append(td.Variants, model.shapeRefToTypeRef(schema, member.Target))
+		*/
+		//		}
+		//		td.Variants = append(td.Variants, model.shapeRefToTypeRef(schema, member.Target))
+		td.Variants = append(td.Variants, vd)
 	}
 	schema.Types = append(schema.Types, td)
 }

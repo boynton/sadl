@@ -12,7 +12,7 @@ import (
 
 // a quick and dirty parser for Smithy 1.0 IDL
 
-func parse(path string, conf map[string]interface{}) (*AST, error) {
+func parse(path string) (*AST, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,6 @@ func parse(path string, conf map[string]interface{}) (*AST, error) {
 		scanner: util.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
-		conf:    conf,
 	}
 	err = p.Parse()
 	if err != nil {
@@ -34,7 +33,6 @@ func parse(path string, conf map[string]interface{}) (*AST, error) {
 type Parser struct {
 	path           string
 	source         string
-	conf           map[string]interface{}
 	scanner        *util.Scanner
 	ast            *AST
 	lastToken      *util.Token
@@ -582,7 +580,6 @@ func (p *Parser) parseUnion(traits map[string]interface{}) error {
 				return err
 			}
 			ftype, err := p.expectTarget()
-			fmt.Println("ftype, err", ftype, err)
 			if err != nil {
 				return err
 			}

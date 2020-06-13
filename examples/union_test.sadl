@@ -1,0 +1,20 @@
+type Identifier String (pattern="[a-zA-Z_][a-zA-Z_0-9]*")
+type Bar Struct {
+	name String (required)
+	comment String
+}
+
+type Foo Struct {
+	ident Identifier
+	bar Bar
+	num Int32
+}
+
+type Fooey Union {
+	ident Identifier
+	bar Bar
+	num Int32
+}
+
+type Fooey2 Union<Identifier,Bar,Int32>
+	
