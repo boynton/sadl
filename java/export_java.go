@@ -16,17 +16,17 @@ import (
 type Generator struct {
 	util.Generator
 	Model          *sadl.Model
-	Domain         string
-	Name           string
-	Package        string
-	Header         string
-	SourceDir      string
-	ResourceDir    string
-	UseLombok      bool
-	UseGetters     bool
-	UseInstants    bool
-	UseMaven       bool
-	Server         bool
+	Domain         string //the default DNS domain. Used when generating a POM, defaults to getenv("DOMAIN")
+	Name           string //the name of the service, if not in the model
+	Package        string //the package of the service. Defaults to the reverse domain name
+	Header         string //the banner to prepend to every generated file. Defaults to something obvious and simple
+	SourceDir      string //the source directory, relative to the project directory. Defaults to "src/main/java"
+	ResourceDir    string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
+	UseLombok      bool //use the Lombok library for generated POJOs. The default is to not.
+	UseGetters     bool //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
+	UseInstants    bool //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
+	UseMaven       bool //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
+	Server         bool //generate server code, including a default (but empty) implementation of the service interface.
 	needTimestamps bool
 	imports        []string
 	serverData     *ServerData
