@@ -168,9 +168,13 @@ func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
 }
 
 func (w *IdlWriter) EmitEnumTrait(v interface{}, indent string) {
-	en := asArray("enum")
+	en := v.([]map[string]interface{})
 	if len(en) > 0 {
 		s := util.Pretty(en)
+		slen := len(s)
+		if slen > 0 && s[slen-1] == '\n' {
+			s = s[:slen-1]
+		}
 		w.Emit("@enum(%s)\n", s)
 	}
 }

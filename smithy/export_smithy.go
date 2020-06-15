@@ -403,16 +403,7 @@ func shapeFromString(ts *sadl.TypeSpec) Shape {
 		ensureShapeTraits(&shape)["smithy.api#pattern"] = ts.Pattern
 	}
 	if len(ts.Values) > 0 {
-		e := make(EnumTrait, 0)
-		for _, s := range ts.Values {
-			ei := &EnumTraitItem{
-				Value: s,
-				//maybe preserve an annotation for constant name for smithy completeness?
-			}
-			//TODO: el.Annotations -> if contains x_tags, then expand to item.Tags
-			e = append(e, ei)
-		}
-		ensureShapeTraits(&shape)["smithy.api#enum"] = e
+		ensureShapeTraits(&shape)["smithy.api#enum"] = enumTrait(ts)
 	}
 	return shape
 }
@@ -455,18 +446,43 @@ func shapeFromEnum(ts *sadl.TypeSpec) Shape {
 	}
 	//for sadl, enum values *are* the symbols, so the name must be set to match the key
 	//note that this same form can work with values, where the name is optional but the key is the actual value
-	items := make(EnumTrait, 0)
-	for _, el := range ts.Elements {
-		item := &EnumTraitItem{
-			Value:         el.Symbol, //required. Q: how to get parity in SADL with differing value and names? In SADL, they are the same
-			Name:          el.Symbol, //optional, the symbolic constant name, for codegen.
-			Documentation: el.Comment,
+	/*	items := make(EnumTrait, 0)
+		for _, el := range ts.Elements {
+			item := &EnumTraitItem{
+				Value:         el.Symbol, //required. Q: how to get parity in SADL with differing value and names? In SADL, they are the same
+				Name:          el.Symbol, //optional, the symbolic constant name, for codegen.
+				Documentation: el.Comment,
+			}
+			//TODO: el.Annotations -> if contains x_tags, then expand to item.Tags
+			items = append(items, item)
 		}
-		//TODO: el.Annotations -> if contains x_tags, then expand to item.Tags
-		items = append(items, item)
-	}
-	ensureShapeTraits(&shape)["smithy.api#enum"] = items
+		ensureShapeTraits(&shape)["smithy.api#enum"] = items
+	*/
+	ensureShapeTraits(&shape)["smithy.api#enum"] = enumTrait(ts)
 	return shape
+}
+
+func enumTrait(ts *sadl.TypeSpec) []map[string]interface{} {
+	e := make([]map[string]interface{}, 0)
+	if len(ts.Elements) > 0 {
+		for _, eds := range ts.Elements {
+			ei := make(map[string]interface{}, 0)
+			ei["value"] = eds.Symbol
+			ei["name"] = eds.Symbol
+			if eds.Comment != "" {
+				ei["documentation"] = eds.Comment
+			}
+			//ei["tags"] == ?
+			e = append(e, ei)
+		}
+	} else if len(ts.Values) > 0 {
+		for _, s := range ts.Values {
+			ei := make(map[string]interface{}, 0)
+			ei["value"] = s
+			e = append(e, ei)
+		}
+	}
+	return e
 }
 
 func httpTrait(path, method string, code int) map[string]interface{} {

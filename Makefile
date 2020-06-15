@@ -1,5 +1,10 @@
 _debug:: bin/sadl
-	./bin/sadl examples/union_test.sadl
+#	./bin/sadl ../sadl_dev/_test.graphql > ../sadl_dev/_test.sadl
+#	./bin/sadl --gen graphql $(HOME)/rigs/smithy/model/common.smithy
+#	./bin/sadl --gen smithy ../sadl_dev/_test.sadl > ../sadl_dev/_test.smithy
+#	./bin/sadl ../sadl_dev/_test.smithy
+	./bin/sadl --gen graphql ../sadl_dev/_test.smithy
+
 
 all bin/sadl:: 
 	mkdir -p bin

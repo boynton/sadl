@@ -49,6 +49,14 @@ func gqlSchema(doc *gql_ast.Document, conf map[string]interface{}) (*sadl.Schema
 	}
 	ignore := make(map[string]bool, 0)
 	var err error
+	td := &sadl.TypeDef{
+		Name:    "ID",
+		Comment: "The GraphQL 'ID' type",
+		TypeSpec: sadl.TypeSpec{
+			Type: "String",
+		},
+	}
+	schema.Types = append(schema.Types, td)
 	for _, def := range doc.Definitions {
 		switch tdef := def.(type) {
 		case *gql_ast.ObjectDefinition:
@@ -106,8 +114,8 @@ func convertTypeName(n string) string {
 		return "Float64"
 	case "Boolean":
 		return "Bool"
-	case "ID":
-		return "String" //anything else for this?!
+		//	case "ID":
+		//		return "String" //anything else for this?!
 	default:
 		//Assume a reference to a user-defined type for now.
 		return n

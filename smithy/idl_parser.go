@@ -761,21 +761,22 @@ func (p *Parser) expectShapeRef() (*ShapeRef, error) {
 	return ref, nil
 }
 
-func (p *Parser) parseTraitArgs() (map[string]interface{}, error) {
+func (p *Parser) parseTraitArgs() (map[string]interface{}, interface{}, error) {
 	var err error
 	var args map[string]interface{}
+	var literal interface{}
 	tok := p.GetToken()
 	if tok == nil {
-		return args, nil
+		return args, nil, nil
 	}
 	if tok.Type == util.OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
-				return nil, p.SyntaxError()
+				return nil, nil, p.SyntaxError()
 			}
 			if tok.Type == util.CLOSE_PAREN {
-				return args, nil
+				return args, literal, nil
 			}
 			if tok.Type == util.SYMBOL {
 				p.ignore(util.COLON)
@@ -800,17 +801,22 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, error) {
 					err = p.Error("Unrecognized trait argument: " + tok.Text)
 				}
 				if err != nil {
-					return nil, err
+					return nil, nil, err
+				}
+			} else if tok.Type == util.OPEN_BRACKET {
+				literal, err = p.parseLiteralArray()
+				if err != nil {
+					return nil, nil, err
 				}
 			} else if tok.Type == util.COMMA {
 				//ignore
 			} else {
-				return nil, p.SyntaxError()
+				return nil, nil, p.SyntaxError()
 			}
 		}
 	} else {
 		p.UngetToken()
-		return args, nil
+		return args, nil, nil
 	}
 }
 
@@ -851,36 +857,38 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		}
 		return withTrait(traits, "smithy.api#"+tname, n), nil
 	case "http":
-		args, err := p.parseTraitArgs()
+		args, _, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err
 		}
-		/*		ht := &HttpTrait{
-					Method: getString(args, "method"),
-					Uri:    getString(args, "uri"),
-					Code:   getInt(args, "code"),
-				}
-		*/
 		return withTrait(traits, "smithy.api#http", args), nil
 	case "length":
-		args, err := p.parseTraitArgs()
+		args, _, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err
 		}
 		return withTrait(traits, "smithy.api#length", args), nil
 	case "range":
-		args, err := p.parseTraitArgs()
+		args, _, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err
 		}
 		return withTrait(traits, "smithy.api#range", args), nil
 	case "paginated":
-		args, err := p.parseTraitArgs()
+		args, _, err := p.parseTraitArgs()
 		if err != nil {
 			return traits, err
 		}
 		return withTrait(traits, "smithy.api#paginated", args), nil
-
+	case "enum":
+		_, lit, err := p.parseTraitArgs()
+		if err != nil {
+			return traits, err
+		}
+		if lit == nil {
+			return traits, p.SyntaxError()
+		}
+		return withTrait(traits, "smithy.api#enum", lit), nil
 	default:
 		return traits, p.Error(fmt.Sprintf("Unknown trait: @%s\n", tname))
 	}
@@ -898,7 +906,7 @@ func withTrait(traits map[string]interface{}, key string, val interface{}) map[s
 
 func withCommentTrait(traits map[string]interface{}, val string) (map[string]interface{}, string) {
 	if val != "" {
-		traits = withTrait(traits, "documentation", val)
+		traits = withTrait(traits, "smithy.api#documentation", val)
 	}
 	return traits, ""
 }

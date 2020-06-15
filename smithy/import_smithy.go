@@ -176,6 +176,7 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 }
 
 func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, shapeName string, shape *Shape) {
+	fmt.Println("importNumericShape:", smithyType)
 	td := &sadl.TypeDef{
 		Name:        shapeName,
 		Comment:     getString(shape.Traits, "smithy.api#documentation"),
@@ -199,6 +200,8 @@ func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, s
 		td.Annotations = WithAnnotation(td.Annotations, "x_integer", "true")
 	case "bigDecimal":
 		td.Type = "Decimal"
+	default:
+		panic("whoops")
 	}
 	if l := getStruct(shape.Traits, "smithy.api#range"); l != nil {
 		tmp := getDecimal(l, "min")
@@ -216,6 +219,9 @@ func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, s
 func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	if shapeName == "UUID" {
 		//UUID is already a builtin SADL type
+		return
+	}
+	if model.importEnum(schema, shapeName, shape) {
 		return
 	}
 	td := &sadl.TypeDef{
@@ -236,18 +242,62 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	}
 	lst := getArray(shape.Traits, "smithy.api#enum")
 	if lst != nil {
+		isActualEnum := true
+		for _, v := range lst {
+			m := asStruct(v)
+			if get(m, "name") == nil {
+				isActualEnum = false
+				break
+			}
+		}
+		if isActualEnum {
+		}
+		fmt.Println("enum:", util.Pretty(lst))
 		var values []string
 		for _, v := range lst {
-			m, _ := v.(map[string]interface{})
-			if _, ok := m["name"]; !ok {
-				panic("should be a true enum, not a string with values")
-			}
-			s, _ := m["value"].(string)
+			m := asStruct(v)
+			fmt.Println("-->", getString(m, "value"), "<--")
+			//			m, _ := v.(map[string]interface{})
+			//			if _, ok := m["name"]; !ok {
+			//				panic("should be a true enum, not a string with values")
+			//			}
+			//			s, _ := m["value"].(string)
+			s := getString(m, "value")
+			fmt.Println("  m, s", util.Pretty(m), s)
 			values = append(values, s)
 		}
 		td.Values = values
 	}
+	//	}
 	schema.Types = append(schema.Types, td)
+}
+func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Shape) bool {
+	lst := getArray(shape.Traits, "smithy.api#enum")
+	if lst == nil {
+		return false
+	}
+	var elements []*sadl.EnumElementDef
+	for _, v := range lst {
+		m := asStruct(v)
+		sym := getString(m, "name")
+		if sym == "" {
+			return false
+		}
+		element := &sadl.EnumElementDef{
+			Symbol:  sym,
+			Comment: getString(m, "documentation"),
+		}
+		//tags -> annotations?
+		elements = append(elements, element)
+	}
+	td := &sadl.TypeDef{
+		Name:    shapeName,
+		Comment: getString(shape.Traits, "smithy.api#documentation"),
+	}
+	td.Type = "Enum"
+	td.Elements = elements
+	schema.Types = append(schema.Types, td)
+	return true
 }
 
 func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits map[string]interface{}) map[string]string {
@@ -262,7 +312,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 		case "smithy.api#required", "smithy.api#documentation", "smithy.api#range", "smithy.api#length":
 			/* ignore, implicit in SADL */
 		default:
-			fmt.Println("Unhandled struct member trait:", k, v)
+			fmt.Println("Unhandled struct member trait:", k, " =", v)
 			panic("here")
 		}
 	}
@@ -355,33 +405,34 @@ func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) stri
 		typeRef = typeRef[len(prefix):]
 	} else {
 		switch typeRef {
-		case "smithy.api#Blob":
+		case "smithy.api#Blob", "Blob":
 			return "Blob"
-		case "smithy.api#Boolean":
+		case "smithy.api#Boolean", "Boolean":
 			return "Bool"
-		case "smithy.api#String":
+		case "smithy.api#String", "String":
 			return "String"
-		case "smithy.api#Byte":
+		case "smithy.api#Byte", "Byte":
 			return "Int8"
-		case "smithy.api#Short":
+		case "smithy.api#Short", "Short":
 			return "Int16"
-		case "smithy.api#Integer":
+		case "smithy.api#Integer", "Integer":
 			return "Int32"
-		case "smithy.api#Long":
+		case "smithy.api#Long", "Long":
 			return "Int64"
-		case "smithy.api#Float":
+		case "smithy.api#Float", "Float":
 			return "Float32"
-		case "smithy.api#Double":
+		case "smithy.api#Double", "Double":
 			return "Float64"
-		case "smithy.api#BigInteger":
+		case "smithy.api#BigInteger", "BigInteger":
 			return "Decimal" //lossy!
-		case "smithy.api#BigDecimal":
+		case "smithy.api#BigDecimal", "BigDecimal":
 			return "Decimal"
-		case "smithy.api#Timestamp":
+		case "smithy.api#Timestamp", "Timestamp":
 			return "Timestamp"
-		case "smithy.api#Document":
+		case "smithy.api#Document", "Document":
 			return "Struct" //todo: introduce a separate type for open structs.
 		default:
+			panic("no:" + typeRef)
 		}
 	}
 	//assume the type is defined
@@ -398,10 +449,11 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			method = getString(ht, "method")
 			uri = getString(ht, "uri")
 			code = getInt(ht, "code")
-		case *HttpTrait:
-			method = ht.Method
-			uri = ht.Uri
-			code = ht.Code
+			/*		case *HttpTrait:
+					method = ht.Method
+					uri = ht.Uri
+					code = ht.Code
+			*/
 		default:
 			fmt.Println("?", util.Pretty(shape))
 		}

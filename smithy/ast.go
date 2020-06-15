@@ -55,8 +55,11 @@ func asArray(v interface{}) []interface{} {
 
 func asString(v interface{}) string {
 	if v != nil {
-		if s, ok := v.(string); ok {
+		switch s := v.(type) {
+		case string:
 			return s
+		case *string:
+			return *s
 		}
 	}
 	return ""
@@ -64,10 +67,13 @@ func asString(v interface{}) string {
 
 func asBool(v interface{}) bool {
 	if v != nil {
-		if b, isBool := v.(bool); isBool {
+		switch b := v.(type) {
+		case bool:
 			return b
+		case *bool:
+			return *b
 		}
-		return true
+		return true //interpret non-nil values as boolean true for now.
 	}
 	return false
 }
@@ -192,7 +198,7 @@ type Member struct {
 
 // Constraint traits - https://awslabs.github.io/smithy/1.0/spec/core/constraint-traits.html
 //enum
-type EnumTraitItem struct {
+/*type EnumTraitItem struct {
 	Value         string   `json:"value"`
 	Name          string   `json:"name,omitempty"` //must be an Identifier, preferably upper case
 	Documentation string   `json:"documentation,omitempty"`
@@ -200,6 +206,7 @@ type EnumTraitItem struct {
 	Deprecated    bool     `json:"deprecated,omitempty"`
 }
 type EnumTrait []*EnumTraitItem
+*/
 
 //idRef
 //length
