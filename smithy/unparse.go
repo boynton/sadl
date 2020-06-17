@@ -159,11 +159,11 @@ func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
 	min := get(l, "min")
 	max := get(l, "max")
 	if min != nil && max != nil {
-		w.Emit("@range(min: %d, max: %d)\n", asInt(min), asInt(max))
+		w.Emit("@range(min: %v, max: %v)\n", asDecimal(min), asDecimal(max))
 	} else if max != nil {
-		w.Emit("@range(max: %d)\n", asInt(max))
+		w.Emit("@range(max: %v)\n", asDecimal(max))
 	} else if min != nil {
-		w.Emit("@range(min: %d)\n", asInt(min))
+		w.Emit("@range(min: %v)\n", asDecimal(min))
 	}
 }
 

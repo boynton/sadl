@@ -14,7 +14,7 @@ type Decimal struct {
 }
 
 // Encode as a JSON number. The JSON spec allows for arbitrary precision, so this is the correct thing to do.
-func (d *Decimal) MarshalJSON() ([]byte, error) {
+func (d Decimal) MarshalJSON() ([]byte, error) {
 	repr := d.Text('f', -1)
 	return []byte(repr), nil
 }

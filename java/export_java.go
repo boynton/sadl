@@ -90,7 +90,6 @@ func NewGenerator(model *sadl.Model, outdir string, conf map[string]interface{})
 	gen := &Generator{}
 	if outdir == "" {
 		outdir = "."
-		panic("yeah")
 	}
 	domain := gen.GetString(conf, "domain", "-")
 	if domain == "-" {
@@ -116,6 +115,7 @@ func NewGenerator(model *sadl.Model, outdir string, conf map[string]interface{})
 	gen.UseGetters = gen.GetBool(conf, "getters", false)
 	gen.UseInstants = gen.GetBool(conf, "instants", false)
 	gen.UseMaven = gen.GetBool(conf, "maven", true)
+	gen.UseJsonPretty = gen.GetBool(conf, "json", true)
 	gen.Model = model
 	gen.OutDir = outdir
 	srcpath := filepath.Join(outdir, gen.SourceDir)
