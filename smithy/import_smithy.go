@@ -160,7 +160,9 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 	case "string":
 		model.importStringShape(schema, shapeName, shapeDef)
 	case "list":
-		model.importListShape(schema, shapeName, shapeDef)
+		model.importListShape(schema, shapeName, shapeDef, false)
+	case "set":
+		model.importListShape(schema, shapeName, shapeDef, true)
 	case "structure":
 		model.importStructureShape(schema, shapeName, shapeDef)
 	case "union":
@@ -380,7 +382,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	schema.Types = append(schema.Types, td)
 }
 
-func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape *Shape, unique bool) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
 		Comment: getString(shape.Traits, "smithy.api#documentation"),
@@ -394,6 +396,9 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 	tmp = getInt64(shape.Traits, "smithy.api#max")
 	if tmp != 0 {
 		td.MaxSize = &tmp
+	}
+	if unique {
+		td.Annotations = WithAnnotation(td.Annotations, "x_unique", "true")
 	}
 	schema.Types = append(schema.Types, td)
 }

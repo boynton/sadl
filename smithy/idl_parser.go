@@ -104,6 +104,26 @@ func (p *Parser) Parse() error {
 			}
 		case util.AT:
 			traits, err = p.parseTrait(traits)
+		case util.DOLLAR:
+			variable, err := p.ExpectIdentifier()
+			if err != nil {
+				return err
+			}
+			err = p.expect(util.COLON)
+			if err != nil {
+				return err
+			}
+			v, err := p.parseLiteralValue()
+			if err != nil {
+				return err
+			}
+			switch variable {
+			case "version":
+				if s, ok := v.(*string); ok && strings.HasPrefix(*s, "1") {
+				} else {
+					return fmt.Errorf("Bad control statement (only version 1 or 1.0 is supported): $%s: %v\n", variable, v)
+				}
+			}
 		case util.SEMICOLON, util.NEWLINE:
 			/* ignore */
 		default:
