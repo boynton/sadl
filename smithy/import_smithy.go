@@ -275,7 +275,7 @@ func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, s
 	case "integer":
 		td.Type = "Int32"
 	case "long":
-		td.Type = "Int65"
+		td.Type = "Int64"
 	case "float":
 		td.Type = "Float32"
 	case "double":
