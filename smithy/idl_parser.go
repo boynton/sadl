@@ -93,12 +93,13 @@ func (p *Parser) Parse() error {
 				traits = nil
 			case "use":
 				use, err := p.expectShapeId()
-				shortName := stripNamespace(use)
-				if p.useTraits == nil {
-					p.useTraits = make(map[string]string, 0)
+				if err == nil {
+					shortName := stripNamespace(use)
+					if p.useTraits == nil {
+						p.useTraits = make(map[string]string, 0)
+					}
+					p.useTraits[shortName] = use
 				}
-				p.useTraits[shortName] = use
-				fmt.Println("[ignore use of", use, ", err =", err)
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
 			}

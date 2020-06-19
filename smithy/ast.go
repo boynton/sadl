@@ -53,6 +53,18 @@ func asArray(v interface{}) []interface{} {
 	return nil
 }
 
+func asStringArray(v interface{}) []string {
+	var sa []string
+	for _, i := range asArray(v) {
+		if s, ok := i.(*string); ok {
+			sa = append(sa, *s)
+		} else {
+			return nil
+		}
+	}
+	return sa
+}
+
 func asString(v interface{}) string {
 	if v != nil {
 		switch s := v.(type) {

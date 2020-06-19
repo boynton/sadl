@@ -581,7 +581,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 		td := gen.Model.FindType(name)
 		if td != nil {
 			switch td.Type {
-			case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64":
+			case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Boolean":
 				return gen.TypeName(&td.TypeSpec, td.Type, required)
 			case "String":
 				return gen.TypeName(&td.TypeSpec, "String", required)

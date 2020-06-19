@@ -431,9 +431,15 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 			/* ignore, implicit in SADL */
 		case "smithy.api#required", "smithy.api#documentation", "smithy.api#range", "smithy.api#length":
 			/* ignore, implicit in SADL */
+		case "smithy.api#tags":
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), strings.Join(asStringArray(v), ","))
+		case "smithy.api#readonly", "smithy.api#idempotent":
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
+		case "smithy.api#http":
+			/* ignore, handled elsewhere */
 		default:
-			fmt.Println("Unhandled struct member trait:", k, " =", v)
-			panic("here")
+			fmt.Println("Unhandled trait:", k, " =", v)
+			panic("here: " + k)
 		}
 	}
 	return annos
@@ -582,11 +588,6 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			method = getString(ht, "method")
 			uri = getString(ht, "uri")
 			code = getInt(ht, "code")
-			/*		case *HttpTrait:
-					method = ht.Method
-					uri = ht.Uri
-					code = ht.Code
-			*/
 		default:
 			fmt.Println("?", util.Pretty(shape))
 		}
@@ -600,6 +601,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		Path:    uri,
 		Name:    shapeName,
 		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	if code == 0 {
 		code = 200
@@ -612,9 +614,6 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			in := &sadl.HttpParamSpec{}
 			in.Name = fname
 			in.Type = model.shapeRefToTypeRef(schema, fval.Target)
-			if in.Type == "Integer" {
-				panic("here")
-			}
 			in.Required = getBool(fval.Traits, "smithy.api#required")
 			in.Query = getString(fval.Traits, "smithy.api#httpQuery")
 			if in.Query != "" {
