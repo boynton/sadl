@@ -1,6 +1,7 @@
 package io
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strconv"
@@ -21,6 +22,33 @@ func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Exten
 		return nil, err
 	}
 	return p.Validate()
+}
+
+func LoadModel(path string) (*sadl.Model, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read file %q: %v\n", path, err)
+	}
+	var schema sadl.Schema
+	err = json.Unmarshal(data, &schema)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse file %q: %v\n", path, err)
+	}
+	if schema.Sadl == "" {
+		return nil, fmt.Errorf("Cannot load file %q: %v\n", path, err)
+	}
+	return sadl.NewModel(&schema)
+}
+
+func IsValidFile(path string) bool {
+	if strings.HasSuffix(path, ".sadl") {
+		return true
+	}
+	if strings.HasSuffix(path, ".json") {
+		_, err := LoadModel(path)
+		return err == nil
+	}
+	return false
 }
 
 //func parseFile(path string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {

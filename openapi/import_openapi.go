@@ -1,48 +1,70 @@
 package openapi
 
 import (
-	//	"encoding/json"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/util"
+	"github.com/ghodss/yaml"
 )
 
 var EnumTypes bool = false
 
-//type Oas struct {
-//	V3 *oas3.OpenAPI
-//	source string
-//}
-//
-//func (oas *Oas) MarshalJSON() ([]byte, error) {
-//	return json.Marshal(oas.V3)
-//}
+func IsValidFile(path string) bool {
+	_, err := Load(path)
+	return err == nil
+}
 
-func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
+func Load(path string) (*Model, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
+	}
+	v3 := &Model{}
+	ext := filepath.Ext(path)
+	if ext == ".yaml" {
+		err = yaml.Unmarshal(data, &v3)
+	} else {
+		err = json.Unmarshal(data, &v3)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return Validate(v3)
+}
+
+func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
+	if len(paths) != 1 {
+		return nil, fmt.Errorf("Cannot merge multiple OpenAPI files")
+	}
+	path := paths[0]
 	name := path
 	n := strings.LastIndex(name, "/")
-	format := ""
+	//	format := ""
 	if n >= 0 {
 		name = name[n+1:]
 	}
 	n = strings.LastIndex(name, ".")
 	if n >= 0 {
-		format = name[n+1:]
+		//		format = name[n+1:]
 		name = name[:n]
 		name = strings.Replace(name, ".", "_", -1)
 	}
-	data, err := ioutil.ReadFile(path)
+	oas3, err := Load(path)
+	//	data, err := ioutil.ReadFile(path)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
+	//	}
+	//	oas3, err := Parse(data, format)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
-	}
-	oas3, err := Parse(data, format)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot parse OpenAPI document: %v\n", err)
+		return nil, err
+		//fmt.Errorf("Cannot parse OpenAPI document: %v\n", err)
 	}
 	model, err := oas3.ToSadl(name)
 	if err != nil {

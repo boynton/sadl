@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/boynton/cli"
-	//	"github.com/boynton/sadl"
 )
 
 /*
@@ -76,7 +75,6 @@ Supported generators and options used from config if present
 		fmt.Println(cmd.Usage())
 		os.Exit(0)
 	}
-	path := args[0]
 	importConf := make(map[string]interface{}, 0)
 	if namespace != "" {
 		importConf["namespace"] = namespace
@@ -84,7 +82,7 @@ Supported generators and options used from config if present
 	if name != "" {
 		importConf["name"] = name
 	}
-	model, err := ImportFile(path, importConf)
+	model, err := ImportFiles(args, importConf)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)

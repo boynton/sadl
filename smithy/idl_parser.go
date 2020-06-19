@@ -41,6 +41,7 @@ type Parser struct {
 	namespace      string
 	name           string
 	currentComment string
+	useTraits      map[string]string
 }
 
 func (p *Parser) Parse() error {
@@ -70,13 +71,9 @@ func (p *Parser) Parse() error {
 				err = p.parseMetadata()
 			case "service":
 				err = p.parseService(comment)
-			case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal":
+			case "byte", "short", "integer", "long", "float", "double", "bigInteger", "bigDecimal", "string", "timestamp", "boolean":
 				traits, comment = withCommentTrait(traits, comment)
-				err = p.parseNumber(tok.Text, traits)
-				traits = nil
-			case "string":
-				traits, comment = withCommentTrait(traits, comment)
-				err = p.parseString(traits)
+				err = p.parseSimpleTypeDef(tok.Text, traits)
 				traits = nil
 			case "structure":
 				traits, comment = withCommentTrait(traits, comment)
@@ -86,14 +83,22 @@ func (p *Parser) Parse() error {
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseUnion(traits)
 				traits = nil
-			case "list":
+			case "list", "set":
 				traits, comment = withCommentTrait(traits, comment)
-				err = p.parseList(traits)
+				err = p.parseCollection(tok.Text, traits)
 				traits = nil
 			case "operation":
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseOperation(traits)
 				traits = nil
+			case "use":
+				use, err := p.expectShapeId()
+				shortName := stripNamespace(use)
+				if p.useTraits == nil {
+					p.useTraits = make(map[string]string, 0)
+				}
+				p.useTraits[shortName] = use
+				fmt.Println("[ignore use of", use, ", err =", err)
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
 			}
@@ -297,7 +302,7 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 		}
 		if tok.Type == util.SYMBOL {
 			items = append(items, tok.Text)
-		} else if tok.Type == util.COMMA || tok.Type == util.NEWLINE {
+		} else if tok.Type == util.COMMA || tok.Type == util.NEWLINE || tok.Type == util.LINE_COMMENT {
 			//ignore
 		} else {
 			return nil, p.SyntaxError()
@@ -395,6 +400,47 @@ func (p *Parser) expectNamespacedIdentifier() (string, error) {
 	return ident, nil
 }
 
+func (p *Parser) expectShapeId() (string, error) {
+	txt, err := p.expectText()
+	if err != nil {
+		return "", err
+	}
+	ident := txt
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			break
+		}
+		if tok.Type != util.DOT {
+			p.UngetToken()
+			break
+		}
+		ident = ident + "."
+		txt, err = p.expectText()
+		if err != nil {
+			return "", err
+		}
+		ident = ident + txt
+	}
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			break
+		}
+		if tok.Type == util.HASH {
+			key, err := p.ExpectIdentifier()
+			if err != nil {
+				return "", err
+			}
+			ident = ident + "#" + key
+		} else {
+			p.UngetToken()
+			break
+		}
+	}
+	return ident, nil
+}
+
 func (p *Parser) parseNamespace(comment string) error {
 	//	p.schema.Comment = p.MergeComment(p.schema.Comment, comment)
 	if p.namespace != "" {
@@ -412,7 +458,7 @@ func (p *Parser) addShapeDefinition(name string, shape *Shape) {
 	p.ast.Shapes[p.ensureNamespaced(name)] = shape
 }
 
-func (p *Parser) parseNumber(typeName string, traits map[string]interface{}) error {
+func (p *Parser) parseSimpleTypeDef(typeName string, traits map[string]interface{}) error {
 	tname, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -425,22 +471,7 @@ func (p *Parser) parseNumber(typeName string, traits map[string]interface{}) err
 	return nil
 }
 
-func (p *Parser) parseString(traits map[string]interface{}) error {
-	tname, err := p.ExpectIdentifier()
-	if err != nil {
-		return err
-	}
-	shape := &Shape{
-		Type: "string",
-	}
-	if traits != nil {
-		shape.Traits = traits
-	}
-	p.addShapeDefinition(tname, shape)
-	return nil
-}
-
-func (p *Parser) parseList(traits map[string]interface{}) error {
+func (p *Parser) parseCollection(sname string, traits map[string]interface{}) error {
 	name, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -453,7 +484,7 @@ func (p *Parser) parseList(traits map[string]interface{}) error {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
-		Type:   "list",
+		Type:   sname,
 		Traits: traits,
 	}
 	var mtraits map[string]interface{}
@@ -846,9 +877,9 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		return traits, err
 	}
 	switch tname {
-	case "idempotent", "required", "httpLabel", "httpPayload", "readonly":
+	case "idempotent", "required", "httpLabel", "httpPayload", "readonly": //booleans
 		return withTrait(traits, "smithy.api#"+tname, true), nil
-	case "httpQuery", "httpHeader", "error", "documentation", "pattern":
+	case "httpQuery", "httpHeader", "error", "documentation", "pattern", "title": //strings
 		err := p.expect(util.OPEN_PAREN)
 		if err != nil {
 			return traits, err
@@ -862,6 +893,9 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 			return traits, err
 		}
 		return withTrait(traits, "smithy.api#"+tname, s), nil
+	case "tags":
+		_, tags, err := p.parseTraitArgs()
+		return withTrait(traits, "smithy.api#tags", tags), err
 	case "httpError":
 		err := p.expect(util.OPEN_PAREN)
 		if err != nil {
@@ -910,6 +944,16 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		}
 		return withTrait(traits, "smithy.api#enum", lit), nil
 	default:
+		if ctrait, ok := p.useTraits[tname]; ok {
+			args, lit, err := p.parseTraitArgs()
+			if err != nil {
+				return traits, err
+			}
+			if lit != nil {
+				return withTrait(traits, ctrait, lit), nil
+			}
+			return withTrait(traits, ctrait, args), nil
+		}
 		return traits, p.Error(fmt.Sprintf("Unknown trait: @%s\n", tname))
 	}
 }

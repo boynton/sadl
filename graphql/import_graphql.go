@@ -13,7 +13,19 @@ import (
 	gql_source "github.com/graphql-go/graphql/language/source"
 )
 
-func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
+func IsValidFile(path string) bool {
+	if strings.HasSuffix(path, ".graphql") {
+		return true
+	}
+	return false
+}
+
+func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
+	//todo: merge multiple files
+	if len(paths) != 1 {
+		return nil, fmt.Errorf("GraphQL file merging NYI")
+	}
+	path := paths[0]
 	src, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err

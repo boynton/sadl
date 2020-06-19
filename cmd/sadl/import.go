@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,37 +28,107 @@ var ImportFileExtensions = map[string][]string{
 	".yaml":    []string{"openapi"},
 }
 
-func ImportFile(path string, conf map[string]interface{}, extensions ...io.Extension) (*sadl.Model, error) {
-	ext := filepath.Ext(path)
-	if ftypes, ok := ImportFileExtensions[ext]; ok {
-		if len(ftypes) == 1 { //we are not guessing
-			return importFile(path, ftypes[0], conf, extensions)
-		}
-		//else guess by trying each one, in order. The error reporting is more generic in this case.
-		for _, ftype := range ftypes {
-			model, err := importFile(path, ftype, conf, extensions)
-			if err == nil {
-				return model, nil
+func expandPaths(paths []string) ([]string, error) {
+	var result []string
+	for _, path := range paths {
+		ext := filepath.Ext(path)
+		if _, ok := ImportFileExtensions[ext]; ok {
+			result = append(result, path)
+		} else {
+			fi, err := os.Stat(path)
+			if err != nil {
+				return nil, err
+			}
+			if fi.IsDir() {
+				err = filepath.Walk(path, func(wpath string, info os.FileInfo, errIncoming error) error {
+					if errIncoming != nil {
+						return errIncoming
+					}
+					ext := filepath.Ext(wpath)
+					if _, ok := ImportFileExtensions[ext]; ok {
+						result = append(result, wpath)
+					}
+					return nil
+				})
 			}
 		}
 	}
-	return nil, fmt.Errorf("Cannot import file: %q\n", path)
+	return result, nil
 }
 
-func importFile(path string, ftype string, conf map[string]interface{}, extensions []io.Extension) (*sadl.Model, error) {
+func ValidImportFileType(path string) string {
+	ext := filepath.Ext(path)
+	if ftypes, ok := ImportFileExtensions[ext]; ok {
+		for _, ftype := range ftypes {
+			switch ftype {
+			case "sadl":
+				if io.IsValidFile(path) {
+					return ftype
+				}
+			case "smithy":
+				if smithy.IsValidFile(path) {
+					return ftype
+				}
+			case "graphql":
+				if graphql.IsValidFile(path) {
+					return ftype
+				}
+			case "openapi":
+				if openapi.IsValidFile(path) {
+					return ftype
+				}
+			}
+		}
+	} else {
+		panic("unknown file extension: " + ext)
+	}
+	return ""
+}
+
+func ImportFiles(paths []string, conf map[string]interface{}, extensions ...io.Extension) (*sadl.Model, error) {
+	chosenType := ""
+	flatPathList, err := expandPaths(paths)
+	if err != nil {
+		return nil, err
+	}
+	var importPaths []string
+	for _, path := range flatPathList {
+		ftype := ValidImportFileType(path)
+		if ftype != "" {
+			if chosenType == "" {
+				chosenType = ftype
+			} else {
+				if ftype != chosenType {
+					return nil, fmt.Errorf("Multiple file types in input file list")
+				}
+			}
+			importPaths = append(importPaths, path)
+		}
+	}
+	if chosenType == "" {
+		return nil, fmt.Errorf("Cannot determine file type for input file(s))\n")
+	}
+	return importFiles(importPaths, chosenType, conf, extensions)
+}
+
+func importFiles(paths []string, ftype string, conf map[string]interface{}, extensions []io.Extension) (*sadl.Model, error) {
 	switch ftype {
 	case "sadl":
-		if strings.HasSuffix(path, ".json") { //the primary SADL case, reports errors prettily
-			return sadl.LoadModel(path)
+		//Q: support multiple files, so you don't have to use "include" explicitly?
+		if len(paths) != 1 {
+			return nil, fmt.Errorf("SADL doesn't support merging models, and more than on e file was specified.")
 		}
-		return io.ParseSadlFile(path, conf, extensions...)
+		if strings.HasSuffix(paths[0], ".json") { //the primary SADL case, reports errors prettily
+			return io.LoadModel(paths[0])
+		}
+		return io.ParseSadlFile(paths[0], conf, extensions...)
 	case "smithy":
-		return smithy.Import(path, conf)
+		return smithy.Import(paths, conf)
 	case "openapi":
-		return openapi.Import(path, conf)
+		return openapi.Import(paths, conf)
 	case "graphql":
-		return graphql.Import(path, conf)
+		return graphql.Import(paths, conf)
 	default:
-		return nil, fmt.Errorf("Cannot import file: %q (file type %q not recognized)\n", path, ftype)
+		return nil, fmt.Errorf("Cannot import file(s): file type %q not recognized\n", ftype)
 	}
 }

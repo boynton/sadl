@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/ghodss/yaml"
 )
 
 func OasError(format string, args ...interface{}) error {
@@ -15,7 +13,8 @@ func missingFieldError(fld, obj string) error {
 	return OasError("Missing required field '%s' in %s object", fld, obj)
 }
 
-func Parse(data []byte, format string) (*Model, error) {
+/*
+func Load(data []byte, format string) (*Model, error) {
 	var err error
 	v3 := &Model{}
 	if format == "yaml" {
@@ -28,6 +27,7 @@ func Parse(data []byte, format string) (*Model, error) {
 	}
 	return Validate(v3)
 }
+*/
 
 func Validate(v3 *Model) (*Model, error) {
 	if v3.OpenAPI == "" {

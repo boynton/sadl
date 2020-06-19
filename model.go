@@ -1,9 +1,7 @@
 package sadl
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"regexp"
 	"strings"
@@ -16,22 +14,6 @@ type Model struct {
 	Extensions map[string]interface{} `json:"extensions,omitempty"`
 	typeIndex  map[string]*TypeDef
 	httpIndex  map[string]*HttpDef
-}
-
-func LoadModel(path string) (*Model, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot read file %q: %v\n", path, err)
-	}
-	var schema Schema
-	err = json.Unmarshal(data, &schema)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot parse file %q: %v\n", path, err)
-	}
-	if schema.Sadl == "" {
-		return nil, fmt.Errorf("Cannot load file %q: %v\n", path, err)
-	}
-	return NewModel(&schema)
 }
 
 func NewModel(schema *Schema) (*Model, error) {

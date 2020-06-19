@@ -33,6 +33,18 @@ func IsSymbolChar(ch rune, first bool) bool {
 	return IsDigit(ch) || ch == '_'
 }
 
+func IsSymbol(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, c := range s {
+		if !IsSymbolChar(c, i == 0) {
+			return false
+		}
+	}
+	return true
+}
+
 func IsWhitespace(ch rune) bool {
 	return ch == ' ' || ch == '\t' || ch == '\n'
 }
@@ -42,7 +54,15 @@ func IsDigit(ch rune) bool {
 }
 
 func IsLetter(ch rune) bool {
-	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+	return IsUppercaseLetter(ch) || IsLowercaseLetter(ch)
+}
+
+func IsUppercaseLetter(ch rune) bool {
+	return ch >= 'A' && ch <= 'Z'
+}
+
+func IsLowercaseLetter(ch rune) bool {
+	return ch >= 'a' && ch <= 'z'
 }
 
 func Kind(v interface{}) string {
@@ -63,6 +83,10 @@ func Debug(args ...interface{}) {
 
 func str(arg interface{}) string {
 	return fmt.Sprintf("%v", arg)
+}
+
+func Equivalent(obj1 interface{}, obj2 interface{}) bool {
+	return Pretty(obj1) == Pretty(obj2)
 }
 
 func Pretty(obj interface{}) string {

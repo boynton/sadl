@@ -10,38 +10,69 @@ import (
 	"github.com/boynton/sadl/util"
 )
 
-func Import(path string, conf map[string]interface{}) (*sadl.Model, error) {
+//set to true to prevent enum traits that have only values from ever becoming actul enum objects.
+var StringValuesNeverEnum bool = false
+
+func IsValidFile(path string) bool {
+	if strings.HasSuffix(path, ".smithy") {
+		return true
+	}
+	if strings.HasSuffix(path, ".json") {
+		_, err := loadAST(path)
+		return err == nil
+	}
+	return false
+}
+
+func loadAST(path string) (*AST, error) {
 	var ast *AST
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read smithy AST file: %v\n", err)
+	}
+	err = json.Unmarshal(data, &ast)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
+	}
+	if ast.Version == "" {
+		return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
+	}
+	return ast, nil
+}
+
+func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
+	var model *Model
 	var err error
 	name := getString(conf, "name")
-	if name == "" {
-		conf["name"] = nameFromPath(path)
-	}
 	namespace := getString(conf, "namespace")
 	if namespace == "" {
 		conf["namespace"] = UnspecifiedNamespace
 	}
-	if strings.HasSuffix(path, ".json") {
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("Cannot read source file: %v\n", err)
+	for _, path := range paths {
+		if name == "" {
+			conf["name"] = nameFromPath(path)
 		}
-		//smithy AST
-		err = json.Unmarshal(data, &ast)
-		if err != nil {
-			return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
+		var ast *AST
+		if strings.HasSuffix(path, ".json") {
+			ast, err = loadAST(path)
+		} else {
+			//parse Smithy IDL
+			ast, err = parse(path)
 		}
-		if ast.Version == "" {
-			return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
-		}
-	} else {
-		//parse Smithy IDL
-		ast, err = parse(path)
 		if err != nil {
 			return nil, err
 		}
+		mod := NewModel(ast)
+		if model == nil {
+			model = mod
+		} else {
+			err = model.Merge(mod)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
-	return NewModel(ast).ToSadl(conf)
+	return model.ToSadl(conf)
 }
 
 func nameFromPath(path string) string {
@@ -67,8 +98,72 @@ type Model struct {
 	ioParams  map[string]string
 }
 
+//maybe filter by tag top include only parts?
+func (model *Model) Merge(another *Model) error {
+	if model.ast.Version != another.ast.Version {
+		return fmt.Errorf("cannot merge models of different Smithy versions")
+	}
+	if another.ast.Metadata != nil {
+		if model.ast.Metadata == nil {
+			model.ast.Metadata = another.ast.Metadata
+		} else {
+			for k, v2 := range another.ast.Metadata {
+				if v1, ok := model.ast.Metadata[k]; ok {
+					if a1, ok := v1.([]interface{}); ok {
+						if a2, ok := v2.([]interface{}); ok {
+							for _, v := range a2 {
+								a1 = append(a1, v)
+							}
+							model.ast.Metadata[k] = a1
+						} else {
+							return fmt.Errorf("Cannot merge models: metadata %q conflict", k)
+						}
+					}
+					if !util.Equivalent(v1, v2) {
+						return fmt.Errorf("Cannot merge models: metadata %q conflict", k)
+					}
+				}
+			}
+		}
+	}
+	for shapeName, shape2 := range another.shapes {
+		shape1 := model.getShape(shapeName)
+		//todo: shape ID conflicts in merge should be observed. Despite case sensitive names, prevent case-insensitive dups
+		absName := model.namespace + "#" + shapeName
+		if shape1 == nil {
+			model.addShape(absName, shape2)
+		} else {
+			return fmt.Errorf("Cannot merge models: %s is a duplicate shape", absName)
+		}
+	}
+	//multiple services should cause an error
+	return nil
+}
+
 func (model *Model) getShape(name string) *Shape {
 	return model.shapes[name]
+}
+
+func (model *Model) addShape(absoluteName string, shape *Shape) {
+	prefix := model.namespace + "#"
+	prefixLen := len(prefix)
+	if strings.HasPrefix(absoluteName, prefix) {
+		if _, ok := model.ast.Shapes[absoluteName]; !ok {
+			model.ast.Shapes[absoluteName] = shape
+		}
+		kk := absoluteName[prefixLen:]
+		model.shapes[kk] = shape
+		if shape.Type == "operation" {
+			if shape.Input != nil {
+				iok := shape.Input.Target[prefixLen:]
+				model.ioParams[iok] = shape.Input.Target
+			}
+			if shape.Output != nil {
+				iok := shape.Output.Target[prefixLen:]
+				model.ioParams[iok] = shape.Output.Target
+			}
+		}
+	}
 }
 
 func NewModel(ast *AST) *Model {
@@ -86,23 +181,8 @@ func NewModel(ast *AST) *Model {
 		}
 	}
 
-	prefix := model.namespace + "#"
-	prefixLen := len(prefix)
 	for k, v := range ast.Shapes {
-		if strings.HasPrefix(k, prefix) {
-			kk := k[prefixLen:]
-			model.shapes[kk] = v
-			if v.Type == "operation" {
-				if v.Input != nil {
-					iok := v.Input.Target[prefixLen:]
-					model.ioParams[iok] = v.Input.Target
-				}
-				if v.Output != nil {
-					iok := v.Output.Target[prefixLen:]
-					model.ioParams[iok] = v.Output.Target
-				}
-			}
-		}
+		model.addShape(k, v)
 	}
 	return model
 }
@@ -159,6 +239,10 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 		model.importNumericShape(schema, shapeDef.Type, shapeName, shapeDef)
 	case "string":
 		model.importStringShape(schema, shapeName, shapeDef)
+	case "timestamp":
+		model.importTimestampShape(schema, shapeName, shapeDef)
+	case "boolean":
+		model.importBooleanShape(schema, shapeName, shapeDef)
 	case "list":
 		model.importListShape(schema, shapeName, shapeDef, false)
 	case "set":
@@ -178,7 +262,6 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 }
 
 func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, shapeName string, shape *Shape) {
-	fmt.Println("importNumericShape:", smithyType)
 	td := &sadl.TypeDef{
 		Name:        shapeName,
 		Comment:     getString(shape.Traits, "smithy.api#documentation"),
@@ -244,28 +327,10 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	}
 	lst := getArray(shape.Traits, "smithy.api#enum")
 	if lst != nil {
-		isActualEnum := true
-		for _, v := range lst {
-			m := asStruct(v)
-			if get(m, "name") == nil {
-				isActualEnum = false
-				break
-			}
-		}
-		if isActualEnum {
-		}
-		fmt.Println("enum:", util.Pretty(lst))
 		var values []string
 		for _, v := range lst {
 			m := asStruct(v)
-			fmt.Println("-->", getString(m, "value"), "<--")
-			//			m, _ := v.(map[string]interface{})
-			//			if _, ok := m["name"]; !ok {
-			//				panic("should be a true enum, not a string with values")
-			//			}
-			//			s, _ := m["value"].(string)
 			s := getString(m, "value")
-			fmt.Println("  m, s", util.Pretty(m), s)
 			values = append(values, s)
 		}
 		td.Values = values
@@ -273,17 +338,45 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	//	}
 	schema.Types = append(schema.Types, td)
 }
+
+func isSmithyRecommendedEnumName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, ch := range s {
+		if i == 0 {
+			if !util.IsUppercaseLetter(ch) {
+				return false
+			}
+		} else {
+			if !(util.IsUppercaseLetter(ch) || util.IsDigit(ch) || ch == '_') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Shape) bool {
 	lst := getArray(shape.Traits, "smithy.api#enum")
 	if lst == nil {
 		return false
 	}
 	var elements []*sadl.EnumElementDef
+	isEnum := true
+	couldBeEnum := true
 	for _, v := range lst {
 		m := asStruct(v)
 		sym := getString(m, "name")
 		if sym == "" {
-			return false
+			if StringValuesNeverEnum {
+				return false
+			}
+			sym = getString(m, "value")
+			//if !util.IsSymbol(sym) {
+			if !isSmithyRecommendedEnumName(sym) {
+				return false
+			}
 		}
 		element := &sadl.EnumElementDef{
 			Symbol:  sym,
@@ -291,6 +384,11 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 		}
 		//tags -> annotations?
 		elements = append(elements, element)
+	}
+	if !isEnum {
+		if !couldBeEnum { //might want a preference on this, if the values happen to follow symbol rules now, but really are values
+			return false
+		}
 	}
 	td := &sadl.TypeDef{
 		Name:    shapeName,
@@ -300,6 +398,26 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 	td.Elements = elements
 	schema.Types = append(schema.Types, td)
 	return true
+}
+
+func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef{
+		Name:        shapeName,
+		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
+	}
+	td.Type = "Timestamp"
+	schema.Types = append(schema.Types, td)
+}
+
+func (model *Model) importBooleanShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef{
+		Name:        shapeName,
+		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
+	}
+	td.Type = "Boolean"
+	schema.Types = append(schema.Types, td)
 }
 
 func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits map[string]interface{}) map[string]string {
@@ -403,11 +521,22 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 	schema.Types = append(schema.Types, td)
 }
 
-func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) string {
+func (model *Model) ensureLocalNamespace(id string) string {
+	if strings.Index(id, "#") < 0 {
+		return id //already local
+	}
 	prefix := model.namespace + "#"
+	if strings.HasPrefix(id, prefix) {
+		return id[len(prefix):]
+	}
+	return ""
+}
+
+func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) string {
 	typeRef := shapeRef
-	if strings.HasPrefix(typeRef, prefix) {
-		typeRef = typeRef[len(prefix):]
+	ltype := model.ensureLocalNamespace(typeRef)
+	if ltype != "" {
+		typeRef = ltype
 	} else {
 		switch typeRef {
 		case "smithy.api#Blob", "Blob":
@@ -437,7 +566,7 @@ func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) stri
 		case "smithy.api#Document", "Document":
 			return "Struct" //todo: introduce a separate type for open structs.
 		default:
-			panic("no:" + typeRef)
+			panic("external namespace type refr not supported: " + typeRef)
 		}
 	}
 	//assume the type is defined
@@ -445,7 +574,6 @@ func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) stri
 }
 
 func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, shape *Shape) {
-	//	fmt.Println(shapeName, util.Pretty(shape))
 	var method, uri string
 	var code int
 	if t, ok := shape.Traits["smithy.api#http"]; ok {
