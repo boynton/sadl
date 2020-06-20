@@ -540,42 +540,40 @@ func (model *Model) ensureLocalNamespace(id string) string {
 
 func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) string {
 	typeRef := shapeRef
-	ltype := model.ensureLocalNamespace(typeRef)
-	if ltype != "" {
-		typeRef = ltype
-	} else {
-		switch typeRef {
-		case "smithy.api#Blob", "Blob":
-			return "Blob"
-		case "smithy.api#Boolean", "Boolean":
-			return "Bool"
-		case "smithy.api#String", "String":
-			return "String"
-		case "smithy.api#Byte", "Byte":
-			return "Int8"
-		case "smithy.api#Short", "Short":
-			return "Int16"
-		case "smithy.api#Integer", "Integer":
-			return "Int32"
-		case "smithy.api#Long", "Long":
-			return "Int64"
-		case "smithy.api#Float", "Float":
-			return "Float32"
-		case "smithy.api#Double", "Double":
-			return "Float64"
-		case "smithy.api#BigInteger", "BigInteger":
-			return "Decimal" //lossy!
-		case "smithy.api#BigDecimal", "BigDecimal":
-			return "Decimal"
-		case "smithy.api#Timestamp", "Timestamp":
-			return "Timestamp"
-		case "smithy.api#Document", "Document":
-			return "Struct" //todo: introduce a separate type for open structs.
-		default:
+	switch typeRef {
+	case "smithy.api#Blob", "Blob":
+		return "Bytes"
+	case "smithy.api#Boolean", "Boolean":
+		return "Bool"
+	case "smithy.api#String", "String":
+		return "String"
+	case "smithy.api#Byte", "Byte":
+		return "Int8"
+	case "smithy.api#Short", "Short":
+		return "Int16"
+	case "smithy.api#Integer", "Integer":
+		return "Int32"
+	case "smithy.api#Long", "Long":
+		return "Int64"
+	case "smithy.api#Float", "Float":
+		return "Float32"
+	case "smithy.api#Double", "Double":
+		return "Float64"
+	case "smithy.api#BigInteger", "BigInteger":
+		return "Decimal" //lossy!
+	case "smithy.api#BigDecimal", "BigDecimal":
+		return "Decimal"
+	case "smithy.api#Timestamp", "Timestamp":
+		return "Timestamp"
+	case "smithy.api#Document", "Document":
+		return "Struct" //todo: introduce a separate type for open structs.
+	default:
+		ltype := model.ensureLocalNamespace(typeRef)
+		if ltype == "" {
 			panic("external namespace type refr not supported: " + typeRef)
 		}
+		typeRef = ltype
 	}
-	//assume the type is defined
 	return typeRef
 }
 
@@ -597,10 +595,10 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 	}
 
 	hdef := &sadl.HttpDef{
-		Method:  method,
-		Path:    uri,
-		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Method:      method,
+		Path:        uri,
+		Name:        shapeName,
+		Comment:     getString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	if code == 0 {
