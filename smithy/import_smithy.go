@@ -184,6 +184,7 @@ func NewModel(ast *AST) *Model {
 	for k, v := range ast.Shapes {
 		model.addShape(k, v)
 	}
+	//	fmt.Println(util.Pretty(model.ioParams))
 	return model
 }
 
@@ -479,8 +480,20 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 }
 
 func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	//unless...no httpTraits, in which case is should equivalent to a payload description
 	if _, ok := model.ioParams[shapeName]; ok {
-		return
+		shape := model.getShape(shapeName)
+		for _, fval := range shape.Members {
+			if getBool(fval.Traits, "smithy.api#httpLabel") {
+				return
+			}
+			if getBool(fval.Traits, "smithy.api#httpPayload") {
+				return
+			}
+			if getString(fval.Traits, "smithy.api#httpQuery") != "" {
+				return
+			}
+		}
 	}
 	td := &sadl.TypeDef{
 		Name:        shapeName,
@@ -608,24 +621,41 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		inType := model.shapeRefToTypeRef(schema, shape.Input.Target)
 		inStruct := model.shapes[inType]
 		qs := ""
+		payloadMember := ""
+		hasLabel := false
+		hasQuery := false
 		for fname, fval := range inStruct.Members {
-			in := &sadl.HttpParamSpec{}
-			in.Name = fname
-			in.Type = model.shapeRefToTypeRef(schema, fval.Target)
-			in.Required = getBool(fval.Traits, "smithy.api#required")
-			in.Query = getString(fval.Traits, "smithy.api#httpQuery")
-			if in.Query != "" {
-				if qs == "" {
-					qs = "?"
-				} else {
-					qs = qs + "&"
-				}
-				qs = qs + fname + "={" + fname + "}"
+			if getBool(fval.Traits, "smithy.api#httpPayload") {
+				payloadMember = fname
+			} else if getBool(fval.Traits, "smithy.api#httpLabel") {
+				hasLabel = true
+			} else if getBool(fval.Traits, "smithy.api#httpQuery") {
+				hasQuery = true
 			}
-			in.Header = getString(fval.Traits, "smithy.api#httpHeader")
-			in.Path = getBool(fval.Traits, "smithy.api#httpLabel")
-			hdef.Inputs = append(hdef.Inputs, in)
 		}
+		in := &sadl.HttpParamSpec{}
+		if hasLabel || hasQuery || payloadMember != "" {
+			for fname, fval := range inStruct.Members {
+				in.Name = fname
+				in.Type = model.shapeRefToTypeRef(schema, fval.Target)
+				in.Required = getBool(fval.Traits, "smithy.api#required")
+				in.Query = getString(fval.Traits, "smithy.api#httpQuery")
+				if in.Query != "" {
+					if qs == "" {
+						qs = "?"
+					} else {
+						qs = qs + "&"
+					}
+					qs = qs + fname + "={" + fname + "}"
+				}
+				in.Header = getString(fval.Traits, "smithy.api#httpHeader")
+				in.Path = getBool(fval.Traits, "smithy.api#httpLabel")
+			}
+		} else {
+			in.Name = "body"
+			in.Type = inType
+		}
+		hdef.Inputs = append(hdef.Inputs, in)
 		hdef.Path = hdef.Path + qs
 	}
 
@@ -639,13 +669,15 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		//Smithy: the output struct is the result payload, unless a field is marked as payload, which allows other fields
 		//to be marked as header.
 		outBodyField := ""
+		hasLabel := false
 		for fname, fval := range outStruct.Members {
 			if getBool(fval.Traits, "smithy.api#httpPayload") {
 				outBodyField = fname
-				break
+			} else if getBool(fval.Traits, "smithy.api#httpLabel") {
+				hasLabel = true
 			}
 		}
-		if outBodyField == "" {
+		if outBodyField == "" && !hasLabel {
 			//the entire output structure is the payload, no headers possible
 			out := &sadl.HttpParamSpec{}
 			out.Name = "body"
@@ -658,6 +690,8 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 				out.Type = model.shapeRefToTypeRef(schema, fval.Target)
 				out.Required = getBool(fval.Traits, "smithy.api#required")
 				out.Header = getString(fval.Traits, "smithy.api#httpHeader")
+				out.Query = getString(fval.Traits, "smithy.api#httpQuery")
+				out.Path = getBool(fval.Traits, "smithy.api#httpLabel")
 				expected.Outputs = append(expected.Outputs, out)
 			}
 		}
