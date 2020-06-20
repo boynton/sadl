@@ -276,6 +276,7 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 
 func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 	gen.AddImport("com.fasterxml.jackson.annotation.JsonValue")
+	gen.AddImport("com.fasterxml.jackson.annotation.JsonCreator")
 
 	gen.Emit("public enum " + className + "{\n")
 	max := len(ts.Elements)
@@ -383,12 +384,15 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 		}
 		gen.Emit(nindent + "public " + tn + " " + vd.Name + ";\n")
 	}
-	//create each constructor. Do I need the empty constructor?
+	//Create static methods to construct. Cannot overload construct because of type erasure for conflicing array variants
 	for _, vd := range td.Variants {
 		tn, _, _ := gen.TypeName(&vd.TypeSpec, vd.Type, false)
-		gen.Emit(nindent + "\n" + nindent + "public " + className + "(" + tn + " v) {\n")
-		gen.Emit(nindent + "    this.variant = " + variantType + "." + vd.Name + ";\n")
-		gen.Emit(nindent + "    this." + vd.Name + " = v;\n" + nindent + "}\n")
+		gen.Emit(nindent + "\n" + nindent + "public static " + className + " of" + gen.Capitalize(vd.Name) + "(" + tn + " v) {\n")
+		gen.Emit(nindent + "    " + className + " u = new " + className + "();\n")
+		gen.Emit(nindent + "    u.variant = " + variantType + "." + vd.Name + ";\n")
+		gen.Emit(nindent + "    u." + vd.Name + " = v;\n")
+		gen.Emit(nindent + "    return u;\n")
+		gen.Emit(nindent + "}\n")
 	}
 	gen.Emit("\n")
 	if gen.UseJsonPretty {
@@ -559,7 +563,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			return "List", annotations, nil
 		}
 		td := gen.Model.FindType(ts.Items)
-		items, _, _ := gen.TypeName(&td.TypeSpec, ts.Items, true)
+		items, _, _ := gen.TypeName(&td.TypeSpec, ts.Items, false)
 		return "List<" + items + ">", annotations, nil
 	case "Map":
 		gen.AddImport("java.util.Map")
@@ -567,9 +571,9 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			return "Map", annotations, nil
 		}
 		ktd := gen.Model.FindType(ts.Keys)
-		keys, _, _ := gen.TypeName(&ktd.TypeSpec, ts.Keys, true)
+		keys, _, _ := gen.TypeName(&ktd.TypeSpec, ts.Keys, false)
 		itd := gen.Model.FindType(ts.Items)
-		items, _, _ := gen.TypeName(&itd.TypeSpec, ts.Items, true)
+		items, _, _ := gen.TypeName(&itd.TypeSpec, ts.Items, false)
 		return "Map<" + keys + "," + items + ">", annotations, nil
 	case "UUID":
 		gen.AddImport("java.util.UUID")
