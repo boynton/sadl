@@ -1,5 +1,47 @@
 package java
 
+func (gen *Generator) CreateInstantJson() {
+	if gen.Err != nil {
+		return
+	}
+	gen.Begin()
+	gen.Emit(javaInstantJson)
+	result := gen.End()
+	if gen.Err == nil {
+		gen.WriteJavaFile("InstantJson", result, gen.Package)
+	}
+}
+
+var javaInstantJson = `
+import java.time.Instant;
+
+import java.io.IOException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+
+public class InstantJson {
+
+    public static class InstantSerializer extends JsonSerializer<Instant> {
+        @Override
+	public void serialize(Instant value, JsonGenerator jgen, SerializerProvider provider) throws IOException, JsonProcessingException {
+            jgen.writeString(value.toString());
+        }
+    }
+    public static class InstantDeserializer extends JsonDeserializer<Instant> {
+        @Override
+        public Instant deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            String s = jp.getText();
+            return Instant.parse(s);
+        }
+    }
+}
+`
+
 func (gen *Generator) CreateTimestamp() {
 	if gen.Err != nil {
 		return

@@ -41,6 +41,8 @@ func Export(model *sadl.Model, dir string, conf map[string]interface{}) error {
 	}
 	if gen.needTimestamp {
 		gen.CreateTimestamp()
+	} else {
+		gen.CreateInstantJson()
 	}
 	if gen.needJson {
 		gen.CreateJsonUtil()
@@ -113,7 +115,7 @@ func NewGenerator(model *sadl.Model, outdir string, conf map[string]interface{})
 	gen.Server = gen.GetBool(conf, "server", false)
 	gen.UseLombok = gen.GetBool(conf, "lombok", false)
 	gen.UseGetters = gen.GetBool(conf, "getters", false)
-	gen.UseInstants = gen.GetBool(conf, "instants", false)
+	gen.UseInstants = gen.GetBool(conf, "instants", true)
 	gen.UseMaven = gen.GetBool(conf, "maven", true)
 	gen.UseJsonPretty = gen.GetBool(conf, "json", true)
 	gen.Model = model
@@ -547,15 +549,15 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 		}
 		return "BigDecimal", annotations, nil
 	case "Timestamp":
-		gen.needTimestamp = true
 		if gen.UseInstants {
 			gen.AddImport("java.time.Instant")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
-			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Timestamp.InstantDeserializer.class)"))
-			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Timestamp.InstantSerializer.class)"))
+			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.Deserializer.class)"))
+			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.Serializer.class)"))
 			return "Instant", annotations, nil
 		}
+		gen.needTimestamp = true
 		return "Timestamp", annotations, nil
 	case "Array":
 		gen.AddImport("java.util.List")
@@ -610,15 +612,15 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 				}
 				return "BigDecimal", annotations, nil
 			case "Timestamp":
-				gen.needTimestamp = true
 				if gen.UseInstants {
 					gen.AddImport("java.time.Instant")
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
-					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Timestamp.InstantDeserializer.class)"))
-					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Timestamp.InstantSerializer.class)"))
+					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.InstantDeserializer.class)"))
+					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.InstantSerializer.class)"))
 					return "Instant", annotations, nil
 				}
+				gen.needTimestamp = true
 				return "Timestamp", annotations, nil
 			}
 		}
