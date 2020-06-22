@@ -89,6 +89,14 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		"resClass": func(hact *sadl.HttpDef) string {
 			return gen.ResponseType(gen.ActionName(hact))
 		},
+		"resEntity": func(hact *sadl.HttpDef) string {
+			resClass := gen.ResponseType(gen.ActionName(hact))
+			if gen.UseImmutable {
+				return resClass + ".builder().build()"
+			} else {
+				return "new " + resClass + "()"
+			}
+		},
 		"handlerSig": func(hact *sadl.HttpDef) string {
 			name := gen.ActionName(hact)
 			resType := gen.ResponseType(gen.ActionName(hact))
@@ -137,9 +145,16 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			ename, etype := entityNameType(hact)
 			var b bytes.Buffer
 			writer := bufio.NewWriter(&b)
-			writer.WriteString("        " + reqname + " req = new " + reqname + "()")
+			if gen.UseImmutable {
+				writer.WriteString("        " + reqname + " req = " + reqname + ".builder()")
+			} else {
+				writer.WriteString("        " + reqname + " req = new " + reqname + "()")
+			}
 			for _, p := range params {
 				writer.WriteString("." + p + "(" + p + ")")
+			}
+			if gen.UseImmutable {
+				writer.WriteString(".build()")
 			}
 			writer.WriteString(";\n")
 			writer.WriteString("        try {\n")
@@ -147,7 +162,11 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
 				wrappedResult := ""
 				if ename != "void" && ename != "" {
-					wrappedResult = jsonWrapper(etype, "res."+ename)
+					if gen.UseImmutable {
+						wrappedResult = jsonWrapper(etype, "res.get"+gen.Capitalize(ename)+"()")
+					} else {
+						wrappedResult = jsonWrapper(etype, "res."+ename)
+					}
 				}
 				ret := fmt.Sprintf("Response.status(%d)", +hact.Expected.Status)
 				for _, out := range hact.Expected.Outputs {
@@ -266,7 +285,7 @@ public class {{.MainClass}} {
     static class {{.ImplClass}} implements {{.InterfaceClass}} {
 {{range .Model.Http}}
         {{handlerSig .}} {{openBrace}}
-            return new {{resClass .}}(); //implement me!
+            return {{resEntity .}}; //implement me!
         }
 {{end}}
     }

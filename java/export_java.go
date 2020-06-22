@@ -23,6 +23,7 @@ type Generator struct {
 	SourceDir     string //the source directory, relative to the project directory. Defaults to "src/main/java"
 	ResourceDir   string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
 	UseLombok     bool   //use the Lombok library for generated POJOs. The default is to not.
+	UseImmutable  bool   //generate immutable POJOs with a builder inner class
 	UseGetters    bool   //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
 	UseInstants   bool   //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
 	UseJsonPretty bool   //generate a toString() method that pretty prints JSON.
@@ -115,6 +116,7 @@ func NewGenerator(model *sadl.Model, outdir string, conf map[string]interface{})
 	gen.Server = gen.GetBool(conf, "server", false)
 	gen.UseLombok = gen.GetBool(conf, "lombok", false)
 	gen.UseGetters = gen.GetBool(conf, "getters", false)
+	gen.UseImmutable = gen.GetBool(conf, "immutable", true)
 	gen.UseInstants = gen.GetBool(conf, "instants", true)
 	gen.UseMaven = gen.GetBool(conf, "maven", true)
 	gen.UseJsonPretty = gen.GetBool(conf, "json", true)
@@ -200,9 +202,9 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	}
 }
 
-func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, indent string) {
+func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, indent string) {
 	optional := false
-	for _, fd := range td.Fields {
+	for _, fd := range ts.Fields {
 		if !fd.Required {
 			optional = true
 		}
@@ -214,11 +216,16 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 		gen.AddImport("javax.validation.constraints.NotNull")
 	}
 	extends := ""
+	if gen.UseImmutable {
+		gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
+		gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder")
+		gen.Emit(indent + "@JsonDeserialize(builder = " + className + "." + className + "Builder.class)\n")
+	}
 	if indent == "" {
 		if gen.UseLombok {
 			gen.Emit(indent + "@Data\n")
 			gen.AddImport("lombok.Data")
-			if len(td.Fields) > 0 {
+			if len(ts.Fields) > 0 {
 				gen.Emit(indent + "@AllArgsConstructor\n")
 				gen.AddImport("lombok.AllArgsConstructor")
 			}
@@ -232,7 +239,7 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 		gen.Emit(indent + "public static class " + className + extends + " {\n")
 	}
 	nested := make(map[string]*sadl.TypeSpec, 0)
-	for _, fd := range td.Fields {
+	for _, fd := range ts.Fields {
 		if fd.Comment != "" {
 			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100))
 		}
@@ -253,11 +260,23 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 				gen.Emit(indent + "    " + anno + "\n")
 			}
 		}
-		gen.Emit(indent + "    public " + tn + " " + fd.Name + ";\n\n")
+		if gen.UseImmutable {
+			gen.Emit(indent + "    private final " + tn + " " + fd.Name + ";\n\n")
+		} else {
+			gen.Emit(indent + "    public " + tn + " " + fd.Name + ";\n\n")
+		}
 	}
 	if !gen.UseLombok {
-		for _, fd := range td.Fields {
-			gen.EmitFluidSetter(className, td, fd, indent)
+		if gen.UseImmutable {
+			gen.EmitAllFieldsConstructor(className, ts, indent)
+			for _, fd := range ts.Fields {
+				gen.EmitGetter(className, ts, fd, indent)
+			}
+			gen.EmitBuilder(className, ts, indent+"    ")
+		} else {
+			for _, fd := range ts.Fields {
+				gen.EmitFluidSetter(className, ts, fd, indent)
+			}
 		}
 		if gen.UseJsonPretty {
 			gen.needJson = true
@@ -274,6 +293,53 @@ func (gen *Generator) CreateStructPojo(td *sadl.TypeSpec, className string, inde
 		}
 	}
 	gen.Emit("}\n")
+}
+
+func (gen *Generator) EmitAllFieldsConstructor(className string, ts *sadl.TypeSpec, indent string) {
+	var args []string
+	for _, fd := range ts.Fields {
+		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
+		args = append(args, tn+" "+fd.Name)
+	}
+	gen.Emit(indent + "    public " + className + "(" + strings.Join(args, ", ") + ") {\n")
+	for _, fd := range ts.Fields {
+		gen.Emit(indent + "        this." + fd.Name + " = " + fd.Name + ";\n")
+	}
+	gen.Emit(indent + "    }\n\n")
+}
+
+func (gen *Generator) EmitGetter(className string, ts *sadl.TypeSpec, fd *sadl.StructFieldDef, indent string) {
+	tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
+	gen.Emit(indent + "    public " + tn + " get" + gen.Capitalize(fd.Name) + "() {\n")
+	gen.Emit(indent + "        return " + fd.Name + ";\n")
+	gen.Emit(indent + "    }\n\n")
+}
+
+func (gen *Generator) EmitBuilder(className string, ts *sadl.TypeSpec, indent string) {
+	builderClass := className + "Builder"
+	gen.Emit(indent + "public static " + builderClass + " builder() {\n")
+	gen.Emit(indent + "    return new " + builderClass + "();\n")
+	gen.Emit(indent + "}\n\n")
+	gen.Emit(indent + "@JsonPOJOBuilder(withPrefix=\"\")\n")
+	gen.Emit(indent + "public static class " + builderClass + " {\n")
+	for _, fd := range ts.Fields {
+		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
+		gen.Emit(indent + "    private " + tn + " " + fd.Name + ";\n")
+	}
+	gen.Emit("\n")
+	var args []string
+	for _, fd := range ts.Fields {
+		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
+		gen.Emit(indent + "    public " + builderClass + " " + fd.Name + "(" + tn + " " + fd.Name + ") {\n")
+		gen.Emit(indent + "        this." + fd.Name + " = " + fd.Name + ";\n")
+		gen.Emit(indent + "        return this;\n")
+		gen.Emit(indent + "    }\n\n")
+		args = append(args, fd.Name)
+	}
+	gen.Emit(indent + "    public " + className + " build() {\n")
+	gen.Emit(indent + "        return new " + className + "(" + strings.Join(args, ", ") + ");\n")
+	gen.Emit(indent + "    }\n")
+	gen.Emit(indent + "}\n")
 }
 
 func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
@@ -315,21 +381,7 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 
 func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	indent := ""
-	//firstFieldName := td.Name + "Variant"
-	//other fields names: td.Variants
-	//constructors: one for each type. Is the empty constructor needed for Jackson? Probably.
-	optional := false
-	for _, fd := range td.Fields {
-		if !fd.Required {
-			optional = true
-		}
-	}
-	if optional {
-		gen.AddImport("com.fasterxml.jackson.annotation.JsonInclude")
-		//		gen.emit("@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
-	} else {
-		gen.AddImport("javax.validation.constraints.NotNull")
-	}
+	gen.AddImport("com.fasterxml.jackson.annotation.JsonInclude")
 	extends := ""
 	if indent == "" {
 		if gen.UseLombok {
