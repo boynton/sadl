@@ -248,10 +248,14 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 		model.importListShape(schema, shapeName, shapeDef, false)
 	case "set":
 		model.importListShape(schema, shapeName, shapeDef, true)
+	case "map":
+		model.importMapShape(schema, shapeName, shapeDef)
 	case "structure":
 		model.importStructureShape(schema, shapeName, shapeDef)
 	case "union":
 		model.importUnionShape(schema, shapeName, shapeDef)
+	case "blob":
+		model.importBlobShape(schema, shapeName, shapeDef)
 	case "service":
 		schema.Name = shapeName
 	case "operation":
@@ -411,6 +415,25 @@ func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, 
 	schema.Types = append(schema.Types, td)
 }
 
+func (model *Model) importBlobShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef{
+		Name:    shapeName,
+		Comment: getString(shape.Traits, "smithy.api#documentation"),
+	}
+	td.Type = "Bytes"
+	if l := getStruct(shape.Traits, "smithy.api#length"); l != nil {
+		tmp := getInt64(l, "min")
+		if tmp != 0 {
+			td.MinSize = &tmp
+		}
+		tmp = getInt64(l, "max")
+		if tmp != 0 {
+			td.MaxSize = &tmp
+		}
+	}
+	schema.Types = append(schema.Types, td)
+}
+
 func (model *Model) importBooleanShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
@@ -438,8 +461,23 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
+		case "smithy.api#timestampFormat":
+			annos = WithAnnotation(annos, "x_" + stripNamespace(k), asString(v))
+		case "smithy.api#deprecated":
+			//message
+			//since
+			dv := asStruct(v)
+			annos = WithAnnotation(annos, "x_deprecated", "true")
+			msg := getString(dv, "message")
+			if msg != "" {
+				annos = WithAnnotation(annos, "x_deprecated_message", msg)
+			}
+			since := getString(dv, "since")
+			if since!= "" {
+				annos = WithAnnotation(annos, "x_deprecated_since", since)
+			}
 		default:
-			fmt.Println("Unhandled trait:", k, " =", v)
+			fmt.Println("Unhandled trait:", k, " =", util.Pretty(v))
 			panic("here: " + k)
 		}
 	}
@@ -539,6 +577,26 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 	}
 	schema.Types = append(schema.Types, td)
 }
+
+func (model *Model) importMapShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	td := &sadl.TypeDef{
+		Name:    shapeName,
+		Comment: getString(shape.Traits, "smithy.api#documentation"),
+	}
+	td.Type = "Map"
+	td.Keys = model.shapeRefToTypeRef(schema, shape.Key.Target)
+	td.Items = model.shapeRefToTypeRef(schema, shape.Value.Target)
+	tmp := getInt64(shape.Traits, "smithy.api#min")
+	if tmp != 0 {
+		td.MinSize = &tmp
+	}
+	tmp = getInt64(shape.Traits, "smithy.api#max")
+	if tmp != 0 {
+		td.MaxSize = &tmp
+	}
+	schema.Types = append(schema.Types, td)
+}
+
 
 func (model *Model) ensureLocalNamespace(id string) string {
 	if strings.Index(id, "#") < 0 {
