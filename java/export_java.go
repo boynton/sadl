@@ -717,6 +717,14 @@ func (gen *Generator) FormatComment(indent, comment string, maxcol int) string {
 	}
 	tab := string(tabbytes)
 	prefixlen := len(prefix)
+	if strings.Index(comment, "\n") >= 0 {
+		lines := strings.Split(comment, "\n")
+		result := ""
+		for _, line := range lines {
+			result = result + tab + prefix + line + "\n"
+		}
+		return result
+	}
 	var buf bytes.Buffer
 	col := 0
 	lines := 1

@@ -312,12 +312,13 @@ func (s *Scanner) scanComment() Token {
 
 func (s *Scanner) scanString() Token {
 	escape := false
+	potentialTextBlock := true
 	var buf bytes.Buffer
 	tok := s.startToken(STRING)
 	for {
 		ch := s.read()
 		if ch == eof {
-			return tok.undefined("unterminated string")
+			return tok.undefined("Unterminated string")
 		}
 		if escape {
 			switch ch {
@@ -338,7 +339,7 @@ func (s *Scanner) scanString() Token {
 				c3 := s.read()
 				c4 := s.read()
 				if c1 == eof || c2 == eof || c3 == eof || c4 == eof {
-					return tok.undefined("unterminated string")
+					return tok.undefined("Unterminated string")
 				}
 				//handle unicode char
 				h1 := hexDigit(c1)
@@ -346,7 +347,7 @@ func (s *Scanner) scanString() Token {
 				h3 := hexDigit(c3)
 				h4 := hexDigit(c4)
 				if h1 > 15 || h2 > 15 || h3 > 15 || h4 > 15 {
-					return tok.undefined("unicode escape must contain 4 hex digits")
+					return tok.undefined("Unicode escape must contain 4 hex digits")
 				}
 				buf.WriteRune(h1<<24 + h2<<16 + h3<<8 + h4)
 			default:
@@ -358,6 +359,16 @@ func (s *Scanner) scanString() Token {
 		}
 		switch ch {
 		case '"':
+			if potentialTextBlock {
+				ch := s.read()
+				if ch != eof {
+					if ch == '"' { //three in a row
+						return s.scanTextBlock(tok)
+					}
+					s.unread(ch)
+				}
+				potentialTextBlock = false
+			}
 			return tok.finish(buf.String())
 		case '\\':
 			escape = true
@@ -366,6 +377,119 @@ func (s *Scanner) scanString() Token {
 			escape = false
 		}
 	}
+}
+
+func (s *Scanner) scanTextBlock(tok Token) Token {
+	fmt.Println("scanTextBlock...")
+	//this mimics https://openjdk.java.net/jeps/355
+	for {
+		ch := s.read()
+		if ch == eof {
+			fmt.Println("eof")
+			return tok.undefined("Unexpected end of file while scanning text block")
+		}
+		if ch == '\n' {
+			break
+		}
+		if !IsWhitespace(ch) {
+			fmt.Println("not whitespace:", string(ch))
+			return tok.undefined("Expected newline to start the text block, encountered '" + string(ch) + "'")
+		}
+	}
+	escape := false
+	quoteCount := 0
+	var buf bytes.Buffer
+	for {
+		ch := s.read()
+		if ch == eof {
+			return tok.undefined("Unterminated string")
+		}
+		if escape {
+			switch ch {
+			case 'n':
+				buf.WriteRune('\n')
+				ch = '\n'
+			case 'r':
+				buf.WriteRune('\r')
+			case 't':
+				buf.WriteRune('\t')
+			case '"':
+				buf.WriteRune(ch)
+			case '\\':
+				buf.WriteRune(ch)
+			case 'u':
+				c1 := s.read()
+				c2 := s.read()
+				c3 := s.read()
+				c4 := s.read()
+				if c1 == eof || c2 == eof || c3 == eof || c4 == eof {
+					return tok.undefined("Unterminated string")
+				}
+				//handle unicode char
+				h1 := hexDigit(c1)
+				h2 := hexDigit(c2)
+				h3 := hexDigit(c3)
+				h4 := hexDigit(c4)
+				if h1 > 15 || h2 > 15 || h3 > 15 || h4 > 15 {
+					return tok.undefined("Unicode escape must contain 4 hex digits")
+				}
+				buf.WriteRune(h1<<24 + h2<<16 + h3<<8 + h4)
+			default:
+				buf.WriteRune(ch)
+				return tok.undefined("Bad escape char in string: \\" + string(ch))
+			}
+			escape = false
+			continue
+		}
+		switch ch {
+		case '"':
+			switch quoteCount {
+			case 2:
+				return tok.finish(stripCommonPrefix(buf.String()))
+			case 1, 0:
+				quoteCount++
+			}
+		case '\\':
+			escape = true
+			quoteCount = 0
+		default:
+			buf.WriteRune(ch)
+			escape = false
+			quoteCount = 0
+		}
+	}
+}
+
+func stripCommonPrefix(s string) string {
+	lines := strings.Split(s, "\n")
+	noPrefix := 1000
+	minWhitespace := noPrefix
+	for _, l := range lines {
+		j := 0
+		for _, ch := range l {
+			if IsWhitespace(ch) {
+				j++
+			} else {
+				break
+			}
+		}
+		if j < minWhitespace {
+			minWhitespace = j
+		}
+	}
+	if minWhitespace != noPrefix {
+		if minWhitespace > 0 {
+			ss := ""
+			for i, l := range lines {
+				if i > 0 {
+					ss = ss + "\n"
+				}
+				ss = ss + l[minWhitespace:]
+			}
+			return ss
+		}
+	}
+	return s
 }
 
 func hexDigit(c rune) rune {
@@ -469,6 +593,8 @@ func formattedAnnotation(filename string, source string, prefix string, msg stri
 						toklen = len(fmt.Sprintf("%q", tok.Text))
 					} else if tok.Type == LINE_COMMENT {
 						toklen = toklen + 2
+					} else if tok.Type == UNDEFINED {
+						toklen = 1
 					}
 					left := ""
 					mid := l

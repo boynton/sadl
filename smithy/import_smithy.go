@@ -462,7 +462,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
 		case "smithy.api#timestampFormat":
-			annos = WithAnnotation(annos, "x_" + stripNamespace(k), asString(v))
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), asString(v))
 		case "smithy.api#deprecated":
 			//message
 			//since
@@ -473,7 +473,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 				annos = WithAnnotation(annos, "x_deprecated_message", msg)
 			}
 			since := getString(dv, "since")
-			if since!= "" {
+			if since != "" {
 				annos = WithAnnotation(annos, "x_deprecated_since", since)
 			}
 		default:
@@ -596,7 +596,6 @@ func (model *Model) importMapShape(schema *sadl.Schema, shapeName string, shape 
 	}
 	schema.Types = append(schema.Types, td)
 }
-
 
 func (model *Model) ensureLocalNamespace(id string) string {
 	if strings.Index(id, "#") < 0 {

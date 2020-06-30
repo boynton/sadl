@@ -226,6 +226,9 @@ func (p *Parser) assertString(tok *util.Token) (string, error) {
 	if tok.Type == util.STRING {
 		return tok.Text, nil
 	}
+	if tok.Type == util.UNDEFINED {
+		return tok.Text, p.Error(tok.Text)
+	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected string, found %v", tok.Type))
 }
 
