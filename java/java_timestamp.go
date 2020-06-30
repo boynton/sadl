@@ -26,13 +26,13 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 
 public class InstantJson {
 
-    public static class InstantSerializer extends JsonSerializer<Instant> {
+    public static class Serializer extends JsonSerializer<Instant> {
         @Override
 	public void serialize(Instant value, JsonGenerator jgen, SerializerProvider provider) throws IOException, JsonProcessingException {
             jgen.writeString(value.toString());
         }
     }
-    public static class InstantDeserializer extends JsonDeserializer<Instant> {
+    public static class Deserializer extends JsonDeserializer<Instant> {
         @Override
         public Instant deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
             String s = jp.getText();
