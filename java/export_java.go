@@ -466,14 +466,20 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 
 	for _, vd := range td.Variants {
 		tn, _, _ := gen.TypeName(&vd.TypeSpec, vd.Type, false)
-		gen.Emit("\n" + indent1 + "public " + className + "(" + tn + " v) {\n")
-		gen.Emit(indent2 + "this.variant = " + variantType + "." + vd.Name + ";\n")
-		gen.Emit(indent2 + "this." + vd.Name + " = v;\n")
-		for _, vd2 := range td.Variants {
-			if vd.Name != vd2.Name {
-				gen.Emit(indent2 + "this." + vd2.Name + " = null;\n")
+		gen.Emit("\n" + indent1 + "public static " + className + " of" + gen.Capitalize(vd.Name) + "(" + tn + " v) {\n")
+		gen.Emit(indent2 + "return new " + className + "(")
+		delim = ", "
+		for i, vd2 := range td.Variants {
+			if i == max-1 {
+				delim = ""
+			}
+			if vd.Name == vd2.Name {
+				gen.Emit("v" + delim)
+			} else {
+				gen.Emit("null" + delim)
 			}
 		}
+		gen.Emit(");\n")
 		gen.Emit(indent1 + "}\n")
 	}
 	gen.Emit("\n")
