@@ -380,28 +380,33 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 }
 
 func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
-	indent := ""
+	indent0 := ""
+	indent1 := indent0 + "    "
+	indent2 := indent1 + "    "
+	indent3 := indent2 + "    "
 	gen.AddImport("com.fasterxml.jackson.annotation.JsonInclude")
+	gen.AddImport("com.fasterxml.jackson.annotation.JsonIgnore")
+	gen.AddImport("com.fasterxml.jackson.annotation.JsonCreator")
+	gen.AddImport("com.fasterxml.jackson.annotation.JsonProperty")
 	extends := ""
-	if indent == "" {
+	if indent0 == "" {
 		if gen.UseLombok {
-			gen.Emit(indent + "@Data\n")
+			gen.Emit("@Data\n")
 			gen.AddImport("lombok.Data")
-			gen.Emit(indent + "@AllArgsConstructor\n")
+			gen.Emit("@AllArgsConstructor\n")
 			gen.AddImport("lombok.AllArgsConstructor")
-			gen.Emit(indent + "@Builder\n")
+			gen.Emit("@Builder\n")
 			gen.AddImport("lombok.Builder")
-			gen.Emit(indent + "@NoArgsConstructor\n")
+			gen.Emit("@NoArgsConstructor\n")
 			gen.AddImport("lombok.NoArgsConstructor")
 		}
-		gen.Emit(indent + "public class " + className + extends + " {\n")
+		gen.Emit("public class " + className + extends + " {\n")
 	} else {
-		gen.Emit(indent + "public static class " + className + extends + " {\n")
+		gen.Emit(indent0 + "public static class " + className + extends + " {\n")
 	}
 
-	variantType := className + "Variant"
-	nindent := indent + "    "
-	gen.Emit(nindent + "public enum " + variantType + " {\n")
+	variantType := "Variant"
+	gen.Emit(indent1 + "public enum " + variantType + " {\n")
 
 	max := len(td.Variants)
 	delim := ","
@@ -410,17 +415,17 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 		if i == max-1 {
 			delim = ""
 		}
-		gen.Emit(nindent + "    " + vd.Name + delim + "\n")
+		gen.Emit(indent2 + vd.Name + delim + "\n")
 	}
-	gen.Emit(nindent + "}\n\n")
-	gen.Emit(nindent + "@com.fasterxml.jackson.annotation.JsonIgnore\n")
-	gen.Emit(nindent + "public " + variantType + " variant;\n\n")
+	gen.Emit(indent1 + "}\n\n")
+	gen.Emit(indent1 + "@JsonIgnore\n")
+	gen.Emit(indent1 + "public " + variantType + " variant;\n\n")
 	nested := make(map[string]*sadl.TypeSpec, 0)
 	for _, vd := range td.Variants {
-		gen.Emit(nindent + "@JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
+		gen.Emit(indent1 + "@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
 
 		if vd.Comment != "" {
-			gen.Emit(gen.FormatComment(nindent, vd.Comment, 100))
+			gen.Emit(gen.FormatComment(indent1, vd.Comment, 100))
 		}
 		tn, tanno, anonymous := gen.TypeName(&vd.TypeSpec, vd.Type, false)
 		if anonymous != nil {
@@ -433,20 +438,43 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 		}
 		if tanno != nil {
 			for _, anno := range tanno {
-				gen.Emit(nindent + anno + "\n")
+				gen.Emit(indent1 + anno + "\n")
 			}
 		}
-		gen.Emit(nindent + "public " + tn + " " + vd.Name + ";\n")
+		//todo: if useGetters, make this private and generate the getter
+		gen.Emit(indent1 + "public final " + tn + " " + vd.Name + ";\n")
 	}
-	//Create static methods to construct. Cannot overload construct because of type erasure for conflicing array variants
+	gen.Emit("\n" + indent1 + "@JsonCreator\n")
+	gen.Emit(indent1 + "private " + className + "(")
+	delim = ", "
+	for i := 0; i < max; i++ {
+		vd := td.Variants[i]
+		if i == max-1 {
+			delim = ""
+		}
+		tn, _, _ := gen.TypeName(&vd.TypeSpec, vd.Type, false)
+		gen.Emit("@JsonProperty(\"" + vd.Name + "\") " + tn + " " + vd.Name + delim)
+	}
+	gen.Emit(") {\n")
+	for _, vd := range td.Variants {
+		gen.Emit(indent2 + "this." + vd.Name + " = " + vd.Name + ";\n")
+		gen.Emit(indent2 + "if (" + vd.Name + " != null) {\n")
+		gen.Emit(indent3 + "this.variant = " + variantType + "." + vd.Name + ";\n")
+		gen.Emit(indent2 + "}\n")
+	}
+	gen.Emit(indent1 + "}\n\n")
+
 	for _, vd := range td.Variants {
 		tn, _, _ := gen.TypeName(&vd.TypeSpec, vd.Type, false)
-		gen.Emit(nindent + "\n" + nindent + "public static " + className + " of" + gen.Capitalize(vd.Name) + "(" + tn + " v) {\n")
-		gen.Emit(nindent + "    " + className + " u = new " + className + "();\n")
-		gen.Emit(nindent + "    u.variant = " + variantType + "." + vd.Name + ";\n")
-		gen.Emit(nindent + "    u." + vd.Name + " = v;\n")
-		gen.Emit(nindent + "    return u;\n")
-		gen.Emit(nindent + "}\n")
+		gen.Emit("\n" + indent1 + "public " + className + "(" + tn + " v) {\n")
+		gen.Emit(indent2 + "this.variant = " + variantType + "." + vd.Name + ";\n")
+		gen.Emit(indent2 + "this." + vd.Name + " = v;\n")
+		for _, vd2 := range td.Variants {
+			if vd.Name != vd2.Name {
+				gen.Emit(indent2 + "this." + vd2.Name + " = null;\n")
+			}
+		}
+		gen.Emit(indent1 + "}\n")
 	}
 	gen.Emit("\n")
 	if gen.UseJsonPretty {
@@ -459,7 +487,7 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	}
 	if len(nested) > 0 {
 		for iname, ispec := range nested {
-			gen.CreateStructPojo(ispec, iname, indent+"    ")
+			gen.CreateStructPojo(ispec, iname, indent1)
 		}
 	}
 	gen.Emit("}\n")
