@@ -13,6 +13,17 @@ import (
 	"github.com/boynton/sadl/util"
 )
 
+var ExportFormats = []string{
+	"sadl",
+	"smithy",
+	"openapi",
+	"graphql",
+	"java",
+}
+
+func SetupCommandLineArgs(generator string) {
+}
+
 func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]interface{}) error {
 	switch generator {
 	case "json", "sadl-ast":

@@ -43,8 +43,8 @@ func loadAST(path string) (*AST, error) {
 func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
 	var model *Model
 	var err error
-	name := getString(conf, "name")
-	namespace := getString(conf, "namespace")
+	name := util.GetString(conf, "name")
+	namespace := util.GetString(conf, "namespace")
 	if namespace == "" {
 		conf["namespace"] = UnspecifiedNamespace
 	}
@@ -175,7 +175,7 @@ func NewModel(ast *AST) *Model {
 	model.namespace, model.name, model.version = ast.NamespaceAndServiceVersion()
 
 	if model.name == "" {
-		s := getString(ast.Metadata, "name")
+		s := util.GetString(ast.Metadata, "name")
 		if s != "" {
 			model.name = s
 		}
@@ -189,17 +189,17 @@ func NewModel(ast *AST) *Model {
 }
 
 func (model *Model) ToSadl(conf map[string]interface{}) (*sadl.Model, error) {
-	name := getString(conf, "name")
+	name := util.GetString(conf, "name")
 	if name != "" {
 		model.name = name
 	} else {
-		s := getString(model.ast.Metadata, "name")
+		s := util.GetString(model.ast.Metadata, "name")
 		if s != "" {
 			model.name = s
 			delete(model.ast.Metadata, "name")
 		}
 	}
-	namespace := getString(conf, "namespace")
+	namespace := util.GetString(conf, "namespace")
 	if namespace != UnspecifiedNamespace {
 		model.namespace = namespace
 	}
@@ -269,7 +269,7 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	switch smithyType {
@@ -293,12 +293,12 @@ func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, s
 	default:
 		panic("whoops")
 	}
-	if l := getStruct(shape.Traits, "smithy.api#range"); l != nil {
-		tmp := getDecimal(l, "min")
+	if l := util.GetStruct(shape.Traits, "smithy.api#range"); l != nil {
+		tmp := sadl.GetDecimal(l, "min")
 		if tmp != nil {
 			td.Min = tmp
 		}
-		tmp = getDecimal(l, "max")
+		tmp = sadl.GetDecimal(l, "max")
 		if tmp != nil {
 			td.Max = tmp
 		}
@@ -316,26 +316,26 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	}
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
 	}
 	td.Type = "String"
-	td.Pattern = getString(shape.Traits, "smithy.api#pattern")
-	if l := getStruct(shape.Traits, "smithy.api#length"); l != nil {
-		tmp := getInt64(l, "min")
+	td.Pattern = util.GetString(shape.Traits, "smithy.api#pattern")
+	if l := util.GetStruct(shape.Traits, "smithy.api#length"); l != nil {
+		tmp := util.GetInt64(l, "min")
 		if tmp != 0 {
 			td.MinSize = &tmp
 		}
-		tmp = getInt64(l, "max")
+		tmp = util.GetInt64(l, "max")
 		if tmp != 0 {
 			td.MaxSize = &tmp
 		}
 	}
-	lst := getArray(shape.Traits, "smithy.api#enum")
+	lst := util.GetArray(shape.Traits, "smithy.api#enum")
 	if lst != nil {
 		var values []string
 		for _, v := range lst {
-			m := asStruct(v)
-			s := getString(m, "value")
+			m := util.AsStruct(v)
+			s := util.GetString(m, "value")
 			values = append(values, s)
 		}
 		td.Values = values
@@ -363,7 +363,7 @@ func isSmithyRecommendedEnumName(s string) bool {
 }
 
 func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Shape) bool {
-	lst := getArray(shape.Traits, "smithy.api#enum")
+	lst := util.GetArray(shape.Traits, "smithy.api#enum")
 	if lst == nil {
 		return false
 	}
@@ -371,13 +371,13 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 	isEnum := true
 	couldBeEnum := true
 	for _, v := range lst {
-		m := asStruct(v)
-		sym := getString(m, "name")
+		m := util.AsStruct(v)
+		sym := util.GetString(m, "name")
 		if sym == "" {
 			if StringValuesNeverEnum {
 				return false
 			}
-			sym = getString(m, "value")
+			sym = util.GetString(m, "value")
 			//if !util.IsSymbol(sym) {
 			if !isSmithyRecommendedEnumName(sym) {
 				return false
@@ -385,7 +385,7 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 		}
 		element := &sadl.EnumElementDef{
 			Symbol:  sym,
-			Comment: getString(m, "documentation"),
+			Comment: util.GetString(m, "documentation"),
 		}
 		//tags -> annotations?
 		elements = append(elements, element)
@@ -397,7 +397,7 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 	}
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
 	}
 	td.Type = "Enum"
 	td.Elements = elements
@@ -408,7 +408,7 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Timestamp"
@@ -418,15 +418,15 @@ func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, 
 func (model *Model) importBlobShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
 	}
 	td.Type = "Bytes"
-	if l := getStruct(shape.Traits, "smithy.api#length"); l != nil {
-		tmp := getInt64(l, "min")
+	if l := util.GetStruct(shape.Traits, "smithy.api#length"); l != nil {
+		tmp := util.GetInt64(l, "min")
 		if tmp != 0 {
 			td.MinSize = &tmp
 		}
-		tmp = getInt64(l, "max")
+		tmp = util.GetInt64(l, "max")
 		if tmp != 0 {
 			td.MaxSize = &tmp
 		}
@@ -437,7 +437,7 @@ func (model *Model) importBlobShape(schema *sadl.Schema, shapeName string, shape
 func (model *Model) importBooleanShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Boolean"
@@ -448,7 +448,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 	for k, v := range traits {
 		switch k {
 		case "smithy.api#error":
-			annos = WithAnnotation(annos, "x_"+stripNamespace(k), asString(v))
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), util.AsString(v))
 		case "smithy.api#httpError":
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), fmt.Sprintf("%v", v))
 		case "smithy.api#httpPayload", "smithy.api#httpLabel", "smithy.api#httpQuery", "smithy.api#httpHeader":
@@ -456,26 +456,28 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 		case "smithy.api#required", "smithy.api#documentation", "smithy.api#range", "smithy.api#length":
 			/* ignore, implicit in SADL */
 		case "smithy.api#tags":
-			annos = WithAnnotation(annos, "x_"+stripNamespace(k), strings.Join(asStringArray(v), ","))
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), strings.Join(util.AsStringArray(v), ","))
 		case "smithy.api#readonly", "smithy.api#idempotent":
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
 		case "smithy.api#timestampFormat":
-			annos = WithAnnotation(annos, "x_"+stripNamespace(k), asString(v))
+			annos = WithAnnotation(annos, "x_"+stripNamespace(k), util.AsString(v))
 		case "smithy.api#deprecated":
 			//message
 			//since
-			dv := asStruct(v)
+			dv := util.AsStruct(v)
 			annos = WithAnnotation(annos, "x_deprecated", "true")
-			msg := getString(dv, "message")
+			msg := util.GetString(dv, "message")
 			if msg != "" {
 				annos = WithAnnotation(annos, "x_deprecated_message", msg)
 			}
-			since := getString(dv, "since")
+			since := util.GetString(dv, "since")
 			if since != "" {
 				annos = WithAnnotation(annos, "x_deprecated_since", since)
 			}
+		case "aws.protocols#restJson1":
+			//ignore
 		default:
 			fmt.Println("Unhandled trait:", k, " =", util.Pretty(v))
 			panic("here: " + k)
@@ -487,7 +489,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Union"
@@ -496,7 +498,7 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 		//		if memberName != member.Target {
 		vd := &sadl.UnionVariantDef{
 			Name:        memberName,
-			Comment:     getString(member.Traits, "smithy.api#documentation"),
+			Comment:     util.GetString(member.Traits, "smithy.api#documentation"),
 			Annotations: model.importTraitsAsAnnotations(nil, member.Traits),
 		}
 		vd.Type = model.shapeRefToTypeRef(schema, member.Target)
@@ -522,20 +524,20 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	if _, ok := model.ioParams[shapeName]; ok {
 		shape := model.getShape(shapeName)
 		for _, fval := range shape.Members {
-			if getBool(fval.Traits, "smithy.api#httpLabel") {
+			if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
 				return
 			}
-			if getBool(fval.Traits, "smithy.api#httpPayload") {
+			if util.GetBool(fval.Traits, "smithy.api#httpPayload") {
 				return
 			}
-			if getString(fval.Traits, "smithy.api#httpQuery") != "" {
+			if util.GetString(fval.Traits, "smithy.api#httpQuery") != "" {
 				return
 			}
 		}
 	}
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Struct"
@@ -543,12 +545,12 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	for memberName, member := range shape.Members {
 		fd := &sadl.StructFieldDef{
 			Name:        memberName,
-			Comment:     getString(member.Traits, "smithy.api#documentation"),
+			Comment:     util.GetString(member.Traits, "smithy.api#documentation"),
 			Annotations: model.importTraitsAsAnnotations(nil, member.Traits),
-			Required:    getBool(member.Traits, "smithy.api#required"),
+			Required:    util.GetBool(member.Traits, "smithy.api#required"),
 		}
 		fd.Type = model.shapeRefToTypeRef(schema, member.Target)
-		if getBool(member.Traits, "smithy.api#required") {
+		if util.GetBool(member.Traits, "smithy.api#required") {
 			fd.Required = true
 		}
 		fields = append(fields, fd)
@@ -560,15 +562,15 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape *Shape, unique bool) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
 	}
 	td.Type = "Array"
 	td.Items = model.shapeRefToTypeRef(schema, shape.Member.Target)
-	tmp := getInt64(shape.Traits, "smithy.api#min")
+	tmp := util.GetInt64(shape.Traits, "smithy.api#min")
 	if tmp != 0 {
 		td.MinSize = &tmp
 	}
-	tmp = getInt64(shape.Traits, "smithy.api#max")
+	tmp = util.GetInt64(shape.Traits, "smithy.api#max")
 	if tmp != 0 {
 		td.MaxSize = &tmp
 	}
@@ -581,16 +583,16 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 func (model *Model) importMapShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: getString(shape.Traits, "smithy.api#documentation"),
+		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
 	}
 	td.Type = "Map"
 	td.Keys = model.shapeRefToTypeRef(schema, shape.Key.Target)
 	td.Items = model.shapeRefToTypeRef(schema, shape.Value.Target)
-	tmp := getInt64(shape.Traits, "smithy.api#min")
+	tmp := util.GetInt64(shape.Traits, "smithy.api#min")
 	if tmp != 0 {
 		td.MinSize = &tmp
 	}
-	tmp = getInt64(shape.Traits, "smithy.api#max")
+	tmp = util.GetInt64(shape.Traits, "smithy.api#max")
 	if tmp != 0 {
 		td.MaxSize = &tmp
 	}
@@ -653,9 +655,9 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 	if t, ok := shape.Traits["smithy.api#http"]; ok {
 		switch ht := t.(type) {
 		case map[string]interface{}:
-			method = getString(ht, "method")
-			uri = getString(ht, "uri")
-			code = getInt(ht, "code")
+			method = util.GetString(ht, "method")
+			uri = util.GetString(ht, "uri")
+			code = util.GetInt(ht, "code")
 		default:
 			fmt.Println("?", util.Pretty(shape))
 		}
@@ -668,7 +670,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		Method:      method,
 		Path:        uri,
 		Name:        shapeName,
-		Comment:     getString(shape.Traits, "smithy.api#documentation"),
+		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	if code == 0 {
@@ -682,11 +684,11 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		hasLabel := false
 		hasQuery := false
 		for fname, fval := range inStruct.Members {
-			if getBool(fval.Traits, "smithy.api#httpPayload") {
+			if util.GetBool(fval.Traits, "smithy.api#httpPayload") {
 				payloadMember = fname
-			} else if getBool(fval.Traits, "smithy.api#httpLabel") {
+			} else if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
 				hasLabel = true
-			} else if getBool(fval.Traits, "smithy.api#httpQuery") {
+			} else if util.GetBool(fval.Traits, "smithy.api#httpQuery") {
 				hasQuery = true
 			}
 		}
@@ -695,8 +697,8 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			for fname, fval := range inStruct.Members {
 				in.Name = fname
 				in.Type = model.shapeRefToTypeRef(schema, fval.Target)
-				in.Required = getBool(fval.Traits, "smithy.api#required")
-				in.Query = getString(fval.Traits, "smithy.api#httpQuery")
+				in.Required = util.GetBool(fval.Traits, "smithy.api#required")
+				in.Query = util.GetString(fval.Traits, "smithy.api#httpQuery")
 				if in.Query != "" {
 					if qs == "" {
 						qs = "?"
@@ -705,8 +707,8 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 					}
 					qs = qs + fname + "={" + fname + "}"
 				}
-				in.Header = getString(fval.Traits, "smithy.api#httpHeader")
-				in.Path = getBool(fval.Traits, "smithy.api#httpLabel")
+				in.Header = util.GetString(fval.Traits, "smithy.api#httpHeader")
+				in.Path = util.GetBool(fval.Traits, "smithy.api#httpLabel")
 			}
 		} else {
 			in.Name = "body"
@@ -728,9 +730,9 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		outBodyField := ""
 		hasLabel := false
 		for fname, fval := range outStruct.Members {
-			if getBool(fval.Traits, "smithy.api#httpPayload") {
+			if util.GetBool(fval.Traits, "smithy.api#httpPayload") {
 				outBodyField = fname
-			} else if getBool(fval.Traits, "smithy.api#httpLabel") {
+			} else if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
 				hasLabel = true
 			}
 		}
@@ -745,10 +747,10 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 				out := &sadl.HttpParamSpec{}
 				out.Name = fname
 				out.Type = model.shapeRefToTypeRef(schema, fval.Target)
-				out.Required = getBool(fval.Traits, "smithy.api#required")
-				out.Header = getString(fval.Traits, "smithy.api#httpHeader")
-				out.Query = getString(fval.Traits, "smithy.api#httpQuery")
-				out.Path = getBool(fval.Traits, "smithy.api#httpLabel")
+				out.Required = util.GetBool(fval.Traits, "smithy.api#required")
+				out.Header = util.GetString(fval.Traits, "smithy.api#httpHeader")
+				out.Query = util.GetString(fval.Traits, "smithy.api#httpQuery")
+				out.Path = util.GetBool(fval.Traits, "smithy.api#httpLabel")
 				expected.Outputs = append(expected.Outputs, out)
 			}
 		}
@@ -762,8 +764,8 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			}
 			exc := &sadl.HttpExceptionSpec{}
 			exc.Type = eType
-			exc.Status = int32(getInt(eStruct.Traits, "smithy.api#httpError"))
-			exc.Comment = getString(eStruct.Traits, "smithy.api#documentation")
+			exc.Status = int32(util.GetInt(eStruct.Traits, "smithy.api#httpError"))
+			exc.Comment = util.GetString(eStruct.Traits, "smithy.api#documentation")
 			//preserve other traits as annotations?
 			hdef.Exceptions = append(hdef.Exceptions, exc)
 		}

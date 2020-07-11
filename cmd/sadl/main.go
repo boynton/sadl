@@ -1,30 +1,19 @@
 package main
 
 import (
-	"encoding/json"
+	//	"encoding/json"
+	"flag"
 	"fmt"
-	"io/ioutil"
+	//	"io/ioutil"
 	"os"
 
-	"github.com/boynton/cli"
+	"github.com/boynton/sadl"
 )
 
-/*
-To parse/load/import a supported spec format and invoke the default generator:
-$ sadl foo.sadl
-$ sadl foo.smithy
-$ sadl foo.graphql -
-$ sadl foo.json -> figures out the correct format to import (openapi, smithy ast, sadl json)
-
-The default generator outputs formatted SADL source. Output is to stdout by default. The output directory can be specified:
-$ sadl -dir . foo.sadl -> creates a
-Other generators include:
-$ sadl -g json foo.smithy -> outputs the pretty-printed JSON representation of the SADL model
-$ sadl -g java-server foo.sadl -> generats
-*/
-
 func main() {
-	helpMessage := `Supported API description formats for each input file extension:
+	helpMessage := `
+
+Supported API description formats for each input file extension:
    .sadl     sadl
    .smithy   smithy
    .graphql  graphql
@@ -34,8 +23,9 @@ func main() {
 The 'name' and 'namespace' options allow specifying those attributes for input formats
 that do not require or support them. Otherwise a default is used.
 
-The 'conf' option is the name of a JSON config file. Code generators generally use the
-'dir' option, conversions to other API description formats just output to stdout.
+The '-c' option specifies the name of a JSON config file. Code generators generally use the
+'-o' option to specify the output directory, conversions to other API description formats
+just output to stdout.
 
 Supported generators and options used from config if present
    sadl: Prints the SADL representation to stdout. This is the default.
@@ -59,20 +49,35 @@ Supported generators and options used from config if present
    http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
 
 `
-	var dir string
-	var name string
-	var namespace string
-	var gen string
-	var configPath string
-	cmd := cli.New("sadl", helpMessage)
-	cmd.StringOption(&dir, "dir", ".", "The output directory for generators.")
-	cmd.StringOption(&name, "name", "", "The name of the model, overrides any name present in the source")
-	cmd.StringOption(&namespace, "namespace", "", "The namespace of the model, overrides any namespace present in the source")
-	cmd.StringOption(&gen, "gen", "sadl", "The default generator for output.")
-	cmd.StringOption(&configPath, "conf", "", "The JSON config file to use to configure the generator")
-	args, _ := cmd.Parse()
+	pType := flag.String("t", "sadl", "Only read files of this type. By default, any valid input file type is accepted.")
+	pOut := flag.String("o", ".", "The output file or directory. Defaults to current directory")
+	pName := flag.String("n", "", "The name of the model, overrides any name present in the source")
+	pNamespace := flag.String("ns", "", "The namespace of the model, overrides any namespace present in the source")
+	pGen := flag.String("g", "sadl", "The generator for output")
+	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.json")
+	pForce := flag.Bool("f", false, "Force overwrite of existing files")
+	pHelp := flag.Bool("help", false, "Show more helpful information")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: sadl [options] file ...\n\nOptions:\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	if *pHelp {
+		fmt.Fprintf(os.Stderr, helpMessage)
+		os.Exit(1)
+	}
+
+	args := flag.Args()
+	out := *pOut
+	name := *pName
+	namespace := *pNamespace
+	gen := *pGen
+	configPath := *pConf
+	force := *pForce
+	formatType := *pType
+
 	if len(args) == 0 {
-		fmt.Println(cmd.Usage())
+		flag.Usage()
 		os.Exit(0)
 	}
 	importConf := make(map[string]interface{}, 0)
@@ -82,25 +87,25 @@ Supported generators and options used from config if present
 	if name != "" {
 		importConf["name"] = name
 	}
+	if formatType != "" {
+		importConf["type"] = formatType
+	}
 	model, err := ImportFiles(args, importConf)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
 	}
-	var conf map[string]interface{}
+	var conf *sadl.Data
 	if configPath != "" {
-		b, err := ioutil.ReadFile(configPath)
+		conf, err = sadl.DataFromFile(configPath)
 		if err != nil {
 			fmt.Printf("Cannot read config file %q: %v\n", configPath, err)
-			os.Exit(3)
 		}
-		err = json.Unmarshal(b, &conf)
-		if err != nil {
-			fmt.Printf("Cannot parse config file %q: %v\n", configPath, err)
-			os.Exit(3)
-		}
+	} else {
+		conf = &sadl.Data{}
 	}
-	err = ExportFiles(model, gen, dir, conf)
+	conf.Put("force-overwrite", force)
+	err = ExportFiles(model, gen, out, conf.AsMap())
 	if err != nil {
 		fmt.Printf("*** %v\n", err)
 		os.Exit(4)

@@ -24,8 +24,11 @@ func Export(model *sadl.Model, conf map[string]interface{}) error {
 }
 
 func stringExample(ex interface{}) string {
-	if s, ok := ex.(*string); ok {
-		return *s
+	switch v := ex.(type) {
+	case *string:
+		return *v
+	case *sadl.Decimal:
+		return v.String()
 	}
 	return ""
 }
@@ -85,6 +88,7 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 					bodyExample = util.Pretty(ex)
 				}
 			}
+			path = stripMissingOptionalQueryParams(path)
 			headers = headers + "Accept: application/json\n"
 			s := method + " " + path + " HTTP/1.1\n" + headers + "\n" + bodyExample
 			body = body + "\n" + s + "\n"
@@ -118,4 +122,21 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 func dateHeader() string {
 	t := time.Now()
 	return t.Format("Mon, 2 Jan 2006 15:04:05 GMT")
+}
+
+func stripMissingOptionalQueryParams(uri string) string {
+	n := strings.Index(uri, "?")
+	if n < 0 {
+		return uri
+	}
+	path := uri[:n+1]
+	query := uri[n+1:]
+	items := strings.Split(query, "&")
+	newItems := make([]string, 0)
+	for _, item := range items {
+		if !strings.HasSuffix(item, "=") {
+			newItems = append(newItems, item)
+		}
+	}
+	return path + strings.Join(newItems, "&")
 }

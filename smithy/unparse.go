@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/util"
 )
 
@@ -142,28 +143,28 @@ func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
 }
 
 func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
-	l := asStruct(v)
-	min := get(l, "min")
-	max := get(l, "max")
+	l := util.AsStruct(v)
+	min := util.Get(l, "min")
+	max := util.Get(l, "max")
 	if min != nil && max != nil {
-		w.Emit("@length(min: %d, max: %d)\n", asInt(min), asInt(max))
+		w.Emit("@length(min: %d, max: %d)\n", util.AsInt(min), util.AsInt(max))
 	} else if max != nil {
-		w.Emit("@length(max: %d)\n", asInt(max))
+		w.Emit("@length(max: %d)\n", util.AsInt(max))
 	} else if min != nil {
-		w.Emit("@length(min: %d)\n", asInt(min))
+		w.Emit("@length(min: %d)\n", util.AsInt(min))
 	}
 }
 
 func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
-	l := asStruct(v)
-	min := get(l, "min")
-	max := get(l, "max")
+	l := util.AsStruct(v)
+	min := util.Get(l, "min")
+	max := util.Get(l, "max")
 	if min != nil && max != nil {
-		w.Emit("@range(min: %v, max: %v)\n", asDecimal(min), asDecimal(max))
+		w.Emit("@range(min: %v, max: %v)\n", sadl.AsDecimal(min), sadl.AsDecimal(max))
 	} else if max != nil {
-		w.Emit("@range(max: %v)\n", asDecimal(max))
+		w.Emit("@range(max: %v)\n", sadl.AsDecimal(max))
 	} else if min != nil {
-		w.Emit("@range(min: %v)\n", asDecimal(min))
+		w.Emit("@range(min: %v)\n", sadl.AsDecimal(min))
 	}
 }
 
@@ -208,9 +209,9 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 		uri = v.Uri
 		code = v.Code
 	case map[string]interface{}:
-		method = getString(v, "method")
-		uri = getString(v, "uri")
-		code = getInt(v, "code")
+		method = util.GetString(v, "method")
+		uri = util.GetString(v, "uri")
+		code = util.GetInt(v, "code")
 	default:
 		panic("What?!")
 	}
@@ -313,13 +314,13 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 	for k, v := range traits {
 		switch k {
 		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
-			w.EmitBooleanTrait(asBool(v), stripNamespace(k), indent)
+			w.EmitBooleanTrait(util.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#documentation":
-			w.EmitDocumentation(asString(v), indent)
+			w.EmitDocumentation(util.AsString(v), indent)
 		case "smithy.api#httpLabel", "smithy.api#httpPayload":
-			w.EmitBooleanTrait(asBool(v), stripNamespace(k), indent)
+			w.EmitBooleanTrait(util.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader":
-			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
+			w.EmitStringTrait(util.AsString(v), stripNamespace(k), indent)
 		case "smithy.api#deprecated":
 			w.EmitDeprecatedTrait(v, indent)
 		case "smithy.api#http":
@@ -333,7 +334,7 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 		case "smithy.api#enum":
 			w.EmitEnumTrait(v, indent)
 		case "smithy.api#pattern", "smithy.api#error":
-			w.EmitStringTrait(asString(v), stripNamespace(k), indent)
+			w.EmitStringTrait(util.AsString(v), stripNamespace(k), indent)
 		case "aws.protocols#restJson1":
 			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
 		default:

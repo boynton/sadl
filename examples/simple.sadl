@@ -1,0 +1,162 @@
+name simple
+namespace example
+
+type Identifier String (pattern="0-9a-zA-Z_")
+
+type Entity Struct {
+	id UUID
+	name String
+}
+
+type PaginatedEntities Struct {
+	entities Array<Entity>
+	continuation String
+}
+
+type NotFound Struct {
+	code Identifier
+	message String
+}
+
+type BadRequest Struct {
+	code Identifier
+	message String
+}
+
+http POST "/entities" (action=createEntity) {
+	body Entity
+
+	//on creation, the `id` field of the entity will be set
+	expect 201 {
+		body Entity
+	}
+	except 400 BadRequest
+}
+
+/*
+example CreateEntityRequest (name=createEntityExample) {
+	"body": {
+		"name": "Entity One"
+	}
+}
+example CreateEntityResponse (name=createEntityExample) {
+	"body": {
+		"id": "1ce437b0-1dd2-11b2-ab40-acde48001122",
+		"name": "Entity One"
+	},
+	"status": 201
+}
+
+example CreateEntityRequest (name=createSecondEntityExample) {
+	"body": {
+		"name": "Entity Two"
+	}
+}
+example CreateEntityResponse (name=createSecondEntityExample) {
+	"body": {
+		"id": "1ce437b0-1dd2-11b2-8c80-acde48001122",
+		"name": "Entity Two"
+	}
+}
+*/
+
+http GET "/entities/{id}" (action=getEntity) {
+	id UUID
+	expect 200 {
+		body Entity
+	}
+	except 404 NotFound
+}
+
+/*
+example GetEntityRequest (name=getEntityExample) {
+	"id": "1ce437b0-1dd2-11b2-ab40-acde48001122"
+}
+
+example GetEntityResponse (name=getEntityExample) {
+	"body": {
+		"id": "1ce437b0-1dd2-11b2-ab40-acde48001122",
+		"name": "Entity One"
+	}
+}
+*/
+
+http PUT "/entities/{id}" (action=UpdateEntity) {
+	id UUID
+	body Entity
+
+	expect 200 {
+		body Entity
+	}
+	except 400 BadRequest
+	except 404 NotFound
+}
+
+http DELETE "/entities/{id}" (action=deleteEntity) {
+	id UUID
+
+	//on success, no content is returned
+	expect 204 {
+	}
+	except 404 NotFound
+}
+
+http GET "/entities?limit={limit}&continuation={continuation}" (action=listEntities) {
+	limit Int32
+	continuation String
+
+	expect 200 {
+		body PaginatedEntities
+	}	
+}
+
+/*
+example ListEntitiesRequest (name=listEntitiesExample) {
+}
+
+example ListEntitiesResponse (name=listEntitiesExample) {
+	"body": {
+		"entities": [
+			 {
+				 "id": "1ce437b0-1dd2-11b2-ab40-acde48001122",
+				 "name": "Entity One"
+			 },
+			{
+				"id": "1ce437b0-1dd2-11b2-8c80-acde48001122",
+				"name": "Entity Two"
+			}
+		]
+	}
+}
+*/
+
+example ListEntitiesRequest (name=listPartialEntitiesExample) {
+	"limit": 1
+}
+
+example ListEntitiesResponse (name=listPartialEntitiesExample) {
+	"body": {
+		"entities": [
+			{
+				"id": "1ce437b0-1dd2-11b2-ab40-acde48001122",
+				"name": "Entity One"
+			}
+		],
+		"continuation": "1ce437b01dd211b2959cacde48001122"
+	}
+}
+
+example ListEntitiesRequest (name=listRemainingEntitiesExample) {
+	"continuation": "1ce437b01dd211b2959cacde48001122"
+}
+
+example ListEntitiesResponse (name=listRemainingEntitiesExample) {
+   "body": {
+      "entities": [
+			{
+				"id": "1ce437b0-1dd2-11b2-8c80-acde48001122",
+				"name": "Entity Two"
+			}
+		]
+	}
+}

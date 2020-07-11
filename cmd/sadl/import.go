@@ -114,11 +114,11 @@ func ImportFiles(paths []string, conf map[string]interface{}, extensions ...io.E
 func importFiles(paths []string, ftype string, conf map[string]interface{}, extensions []io.Extension) (*sadl.Model, error) {
 	switch ftype {
 	case "sadl":
-		//Q: support multiple files, so you don't have to use "include" explicitly?
 		if len(paths) != 1 {
-			return nil, fmt.Errorf("SADL doesn't support merging models, and more than on e file was specified.")
+			//To Do: merge files/models
+			return nil, fmt.Errorf("SADL doesn't support merging models, and more than one file was specified.")
 		}
-		if strings.HasSuffix(paths[0], ".json") { //the primary SADL case, reports errors prettily
+		if strings.HasSuffix(paths[0], ".json") {
 			return io.LoadModel(paths[0])
 		}
 		return io.ParseSadlFile(paths[0], conf, extensions...)

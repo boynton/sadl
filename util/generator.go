@@ -10,11 +10,20 @@ import (
 )
 
 type Generator struct {
+	Config map[string]interface{}
 	OutDir string
 	Err    error
 	buf    bytes.Buffer
 	file   *os.File
 	writer *bufio.Writer
+}
+
+func (gen *Generator) GetConfigString(k string, defaultValue string) string {
+	return gen.GetString(gen.Config, k, defaultValue)
+}
+
+func (gen *Generator) GetConfigBool(k string, defaultValue bool) bool {
+	return gen.GetBool(gen.Config, k, defaultValue)
 }
 
 func (gen *Generator) GetString(m map[string]interface{}, k string, defaultValue string) string {
@@ -73,7 +82,7 @@ func (gen *Generator) End() string {
 }
 
 func (gen *Generator) WriteFile(path string, content string) {
-	if gen.FileExists(path) {
+	if !gen.GetConfigBool("force-overwrite", false) && gen.FileExists(path) {
 		//if debug, echo it anyway?
 		fmt.Printf("[%s already exists, not overwriting]\n", path)
 		return

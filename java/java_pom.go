@@ -13,16 +13,10 @@ func (gen *Generator) CreatePom() {
 	dir := gen.OutDir
 	lombok := gen.UseLombok
 	path := filepath.Join(dir, "pom.xml")
-	if gen.FileExists(path) {
-		fmt.Println("[pom.xml already exists, not overwriting]")
+	if !gen.GetConfigBool("force-overwrite", false) && gen.FileExists(path) {
+		fmt.Printf("[%s already exists, not overwriting]\n", path)
 		return
 	}
-	/*	f, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		writer := bufio.NewWriter(f)
-	*/
 	dependsMgt := jerseyDependsMgt
 	depends := jerseyDepends
 	versions := jerseyVersion
