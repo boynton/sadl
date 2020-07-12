@@ -59,12 +59,10 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 		}
 		reqExample = exlist[0]
 		resExample = exlist[1]
-//		reqExample, _ = ex.Example.(map[string]interface{})
-//		resExample, _ = ex.Example.(map[string]interface{})
 		if resExample == nil {
 			panic("whoops, no matching response")
 		}
-		body = "#\n# " + exName + " (action=" + hdef.Name + ")\n#\n"
+		body = body + "#\n# " + exName + " (action=" + hdef.Name + ")\n#\n"
 		if reqExample != nil {
 			body = body + "#   Request:"
 			
@@ -137,6 +135,9 @@ func stripMissingOptionalQueryParams(uri string) string {
 		if !strings.HasSuffix(item, "=") {
 			newItems = append(newItems, item)
 		}
+	}
+	if len(newItems) == 0 {
+		return path[:len(path)-1]
 	}
 	return path + strings.Join(newItems, "&")
 }

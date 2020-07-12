@@ -33,7 +33,6 @@ http POST "/entities" (action=createEntity) {
 	except 400 BadRequest
 }
 
-/*
 example CreateEntityRequest (name=createEntityExample) {
 	"body": {
 		"name": "Entity One"
@@ -58,7 +57,6 @@ example CreateEntityResponse (name=createSecondEntityExample) {
 		"name": "Entity Two"
 	}
 }
-*/
 
 http GET "/entities/{id}" (action=getEntity) {
 	id UUID
@@ -68,7 +66,6 @@ http GET "/entities/{id}" (action=getEntity) {
 	except 404 NotFound
 }
 
-/*
 example GetEntityRequest (name=getEntityExample) {
 	"id": "1ce437b0-1dd2-11b2-ab40-acde48001122"
 }
@@ -79,7 +76,6 @@ example GetEntityResponse (name=getEntityExample) {
 		"name": "Entity One"
 	}
 }
-*/
 
 http PUT "/entities/{id}" (action=UpdateEntity) {
 	id UUID
@@ -110,7 +106,6 @@ http GET "/entities?limit={limit}&continuation={continuation}" (action=listEntit
 	}	
 }
 
-/*
 example ListEntitiesRequest (name=listEntitiesExample) {
 }
 
@@ -128,7 +123,6 @@ example ListEntitiesResponse (name=listEntitiesExample) {
 		]
 	}
 }
-*/
 
 example ListEntitiesRequest (name=listPartialEntitiesExample) {
 	"limit": 1
