@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
-	//	"github.com/graphql-go/graphql/language/ast"
 )
 
 func Export(model *sadl.Model, conf map[string]interface{}) error {
@@ -27,12 +25,7 @@ func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
 		conf:   conf,
 		arrays: make(map[string]*sadl.TypeDef, 0),
 	}
-
-	fmt.Println(util.Pretty(model))
-	fmt.Println("-------------")
 	w.Begin()
-	//	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
-	//	emitted := make(map[string]bool, 0)
 	var err error
 	for _, td := range model.Types {
 		if td.Type == "Array" {
@@ -47,11 +40,8 @@ func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
 			err = w.EmitStructDef(td)
 		case "Union":
 			err = w.EmitUnionDef(td)
-		case "String":
-			if td.Name == "ID" {
-				continue
-			}
-			panic("fixme: " + td.Type + " for typedef named " + td.Name)
+		case "String", "Bool", "Int8", "Int16", "Int32", "Int64", "Float32", "Float64", "Decimal":
+			//these get replace by the equivalent type, you cannot "subtype" thesein GraphQL
 		case "Array":
 			//skip these. All references to it should be replaced with literal GraphQL list syntax.
 		default:
@@ -113,7 +103,7 @@ func (w *GraphqlWriter) EmitStructDef(td *sadl.TypeDef) error {
 
 func (w *GraphqlWriter) typeRef(ts *sadl.TypeSpec) string {
 	if td, ok := w.arrays[ts.Type]; ok {
-		return w.typeRef(&td.TypeSpec)
+		ts = &td.TypeSpec
 	}
 	switch ts.Type {
 	case "Bool":
@@ -128,8 +118,24 @@ func (w *GraphqlWriter) typeRef(ts *sadl.TypeSpec) string {
 		return "Double"
 	case "Array":
 		return fmt.Sprintf("[%s!]", ts.Items)
-		//what is an n
 	default:
+		td := w.model.FindType(ts.Type)
+		if td != nil {
+			switch td.Type {
+			case "Int8", "Int16", "Int32":
+				return "Int"
+			case "Int64":
+				return "GraphQL cannot represent integers with more than 32 bits of precision"
+			case "Decimal":
+				return "GraphQL cannot represent arbitrary precision decimal numbers"
+			case "Float32", "Float64":
+				return "Float"
+			case "Bool":
+				return "Boolean"
+			case "String":
+				return "String"
+			}
+		}
 		return ts.Type
 	}
 }
