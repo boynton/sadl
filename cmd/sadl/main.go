@@ -1,14 +1,24 @@
 package main
 
 import (
-	//	"encoding/json"
 	"flag"
 	"fmt"
-	//	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/boynton/sadl"
 )
+
+type ArrayOption []string
+
+func (ao *ArrayOption) String() string {
+	return "An array of options"
+}
+
+func (ao *ArrayOption) Set(value string) error {
+	*ao = append(*ao, value)
+	return nil
+}
 
 func main() {
 	helpMessage := `
@@ -23,9 +33,9 @@ Supported API description formats for each input file extension:
 The 'name' and 'namespace' options allow specifying those attributes for input formats
 that do not require or support them. Otherwise a default is used.
 
-The '-c' option specifies the name of a JSON config file. Code generators generally use the
-'-o' option to specify the output directory, conversions to other API description formats
-just output to stdout.
+The '-c' option specifies the name of a YAML config file, the default of which is
+$HOME/.sadl-config.yaml. Code generators generally use the '-o' option to specify the
+output directory, conversions to other API description formats just output to stdout.
 
 Supported generators and options used from config if present
    sadl: Prints the SADL representation to stdout. This is the default.
@@ -33,29 +43,34 @@ Supported generators and options used from config if present
    smithy: Prints the Smithy IDL representation to stdout. Options:
       name: supply this value as the name for a service for inputs that do not have a name
       namespace: supply this value as the namespace for inputs that do not have a namespace
-   smithy-ast: Prints the Smithy AST represenbtation to stdout, same options as 'smithy'
+   smithy-ast: Prints the Smithy AST representation to stdout, same options as 'smithy'
    openapi: Prints the OpenAPI Spec v3 representation to stdout
-   graphql: Prints the GraphQL representation to stdout.
+   graphql: Prints the GraphQL representation to stdout. Options:
+      custom-scalars: a map of any of ["Int64", "Decimal", "Timestamp", "UUID"] to a custom scalar name.
    java: Generate Java code for the model, server, client plumbing. Options:
       header: a string to include at the top of every generated java file
-      lombok: use Lombok for generated model POJOs to reduce boilerplate
-      getters: create model POJOs with traditional getter/setter style
+      lombok: use Lombok for generated model POJOs to reduce boilerplate, default is false
+      getters: create model POJOs with traditional getter/setter style, default is true
+      immutable: Create POJOs as immutable with a builder static inner class, default is true
       source: specify the default source directory, default to "src/main/java"
       resource: specify the default resouece directory, default to "src/main/resource"
-      server: include server plumbing code, using Jersey for JAX-RS implementation
-      maven: generate a maven pom.xml file to build the project
+      server: include server plumbing code, using Jersey for JAX-RS implementation.
+      project: "maven" generates a pom.xml file to build the project, others (i.e. gradle) will be added
+      domain: The domain name for the project, for use in things like the maven pom.xml file.
       instants: use java.time.Instant for Timestamp impl, else generate a Timestamp class.
-   java-server: a shorthand for specifying the "server" option to the "java" generator
+   java-server: a shorthand for specifying the "server" option to the "java" generator. Same options.
    http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
 
 `
+	var genOpts ArrayOption
 	pType := flag.String("t", "sadl", "Only read files of this type. By default, any valid input file type is accepted.")
-	pOut := flag.String("o", ".", "The output file or directory. Defaults to current directory")
+	pOut := flag.String("o", "/tmp/generated", "The output file or directory.")
 	pName := flag.String("n", "", "The name of the model, overrides any name present in the source")
 	pNamespace := flag.String("ns", "", "The namespace of the model, overrides any namespace present in the source")
 	pGen := flag.String("g", "sadl", "The generator for output")
-	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.json")
+	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.yaml")
 	pForce := flag.Bool("f", false, "Force overwrite of existing files")
+	flag.Var(&genOpts, "x", "An option to pass to the generator")
 	pHelp := flag.Bool("help", false, "Show more helpful information")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sadl [options] file ...\n\nOptions:\n")
@@ -66,7 +81,6 @@ Supported generators and options used from config if present
 		fmt.Fprintf(os.Stderr, helpMessage)
 		os.Exit(1)
 	}
-
 	args := flag.Args()
 	out := *pOut
 	name := *pName
@@ -96,6 +110,15 @@ Supported generators and options used from config if present
 		os.Exit(2)
 	}
 	var conf *sadl.Data
+	if configPath == "" {
+		configPath = os.Getenv("HOME") + "/.sadl-config.yaml"
+		if !fileExists(configPath) {
+			configPath = os.Getenv("HOME") + "/.sadl-config.yaml"
+			if !fileExists(configPath) {
+				configPath = ""
+			}
+		}
+	}
 	if configPath != "" {
 		conf, err = sadl.DataFromFile(configPath)
 		if err != nil {
@@ -105,9 +128,31 @@ Supported generators and options used from config if present
 		conf = &sadl.Data{}
 	}
 	conf.Put("force-overwrite", force)
-	err = ExportFiles(model, gen, out, conf.AsMap())
+	genConf := conf.GetStruct(gen)
+	for _, kv := range genOpts {
+		k := kv
+		var v interface{}
+		v = true
+		kvs := strings.Split(kv, "=")
+		if len(kvs) > 1 {
+			k = kvs[0]
+			v = kvs[1]
+		}
+		genConf[k] = v
+		//to do: set up generator option based on this string key/value pair
+		fmt.Printf("[setting a generator option: %q => %v]\n", k, v)
+	}
+	err = ExportFiles(model, gen, out, genConf)
 	if err != nil {
 		fmt.Printf("*** %v\n", err)
 		os.Exit(4)
 	}
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
