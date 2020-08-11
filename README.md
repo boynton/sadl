@@ -27,22 +27,41 @@ descriptions, optimized for simplicity and speed.
 
 ## Example Schemas
 
-TBD. For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples) directory.
-
-For an example of integrated GraphQL, see [this](https://github.com/boynton/sadl2javagql). That project defines a graphql
-extension to SADL, built on normal HTTP actions (i.e. the graphql only knows to make the same calls your http interface defines).
+TBD. For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples) directory. Or
+take a file in a know format and just parse it to output the SADL representation of it.
 
 ## Usage
 
-To just parse, show errors, and output the JSON representation of the resulting model:
+To get SADL and shoiw basic usage:
 
     go get github.com/boynton/sadl/...
+    $(GOPATH)/bin/sadl
+
+In general, it takes an arbitrary input file, parses it, and outputs with a generator, which defaults to SADL itself.
+
+To just parse, show errors, and output the JSON representation of the resulting model:
+
     $(GOPATH)/bin/sadl foo.sadl
 
 To generate Java code:
 
-    $(GOPATH)/bin/sadl2java
-    usage: sadl2java -dir projdir -src relative_source_dir -rez relative_resource_dir -package java.package.name -pom -server -getters -lombok some_model.sadl
+    $(GOPATH)/bin/sadl -g java foo.sadl
+
+There are a variety of options possible to place in the config file (use the -help option to see the list for each generator). An
+example config file might look like this:
+
+```
+java:
+   domain: "boynton.com"
+
+graphql:
+   custom-scalars:
+      UUID: UUID
+      Timestamp: Timestamp
+      Decimal: Decimal
+      Int64: Long
+```
+
 
 The `pom` option creates a Maven pom.xml file with dependencies to build the resulting code, and the `server` option produces example JAX-RS server code (using
 Jersey, Jackson, and Jetty), useful as a quick ready-to-build project creation tool.
