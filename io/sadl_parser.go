@@ -177,11 +177,15 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 		Sadl:  sadl.Version,
 		Types: make([]*sadl.TypeDef, 0),
 	}
+	name := util.GetString(p.conf, "name")
+	if name != "" {
+		p.schema.Name = name
+	}
 	if p.schema.Name == "" {
 		p.schema.Name = util.BaseFileName(p.path)
 	}
 	if p.schema.Namespace == "" {
-		p.schema.Namespace = util.GetString(p.conf, "ns")
+		p.schema.Namespace = util.GetString(p.conf, "namespace")
 	}
 	comment := ""
 	for {
