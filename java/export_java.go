@@ -616,20 +616,24 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 		}
 		return "String", annotations, nil
 	case "Byte", "Short", "Integer", "Long", "Float", "Double":
-		if ts.Min != nil {
-			annotations = append(annotations, fmt.Sprintf("@Min(%s)", ts.Min.String()))
-		}
-		if ts.Max != nil {
-			annotations = append(annotations, fmt.Sprintf("@Max(%s)", ts.Max.String()))
+		if ts != nil {
+			if ts.Min != nil {
+				annotations = append(annotations, fmt.Sprintf("@Min(%s)", ts.Min.String()))
+			}
+			if ts.Max != nil {
+				annotations = append(annotations, fmt.Sprintf("@Max(%s)", ts.Max.String()))
+			}
 		}
 		return name, annotations, nil
 	case "Decimal":
 		gen.AddImport("java.math.BigDecimal")
-		if ts.Min != nil {
-			annotations = append(annotations, fmt.Sprintf("@DecimalMin(%q)", ts.Min.String()))
-		}
-		if ts.Max != nil {
-			annotations = append(annotations, fmt.Sprintf("@DecimalMax(%q)", ts.Max.String()))
+		if ts != nil {
+			if ts.Min != nil {
+				annotations = append(annotations, fmt.Sprintf("@DecimalMin(%q)", ts.Min.String()))
+			}
+			if ts.Max != nil {
+				annotations = append(annotations, fmt.Sprintf("@DecimalMax(%q)", ts.Max.String()))
+			}
 		}
 		return "BigDecimal", annotations, nil
 	case "Timestamp":
