@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/boynton/sadl"
+	"github.com/boynton/sadl/util"
 )
 
 func Export(model *sadl.Model, conf map[string]interface{}) error {
@@ -21,9 +22,10 @@ func Export(model *sadl.Model, conf map[string]interface{}) error {
 func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
 	w := &GraphqlWriter{
 		//		namespace: ns,
-		model:  model,
-		conf:   conf,
-		arrays: make(map[string]*sadl.TypeDef, 0),
+		model:         model,
+		conf:          conf,
+		arrays:        make(map[string]*sadl.TypeDef, 0),
+		customScalars: make(map[string]bool, 0),
 	}
 	w.Begin()
 	var err error
@@ -51,18 +53,22 @@ func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
 			return "", err
 		}
 	}
+	for k, _ := range w.customScalars {
+		w.Emit("scalar %s\n", k)
+	}
 	return w.End(), nil
 }
 
 type GraphqlWriter struct {
-	model     *sadl.Model
-	arrays    map[string]*sadl.TypeDef
-	conf      map[string]interface{}
-	buf       bytes.Buffer
-	writer    *bufio.Writer
-	namespace string
-	name      string
-	version   string
+	model         *sadl.Model
+	arrays        map[string]*sadl.TypeDef
+	conf          map[string]interface{}
+	buf           bytes.Buffer
+	writer        *bufio.Writer
+	namespace     string
+	name          string
+	version       string
+	customScalars map[string]bool
 }
 
 func (w *GraphqlWriter) Begin() {
@@ -101,39 +107,55 @@ func (w *GraphqlWriter) EmitStructDef(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (w *GraphqlWriter) typeRef(ts *sadl.TypeSpec) string {
-	if td, ok := w.arrays[ts.Type]; ok {
-		ts = &td.TypeSpec
+func (w *GraphqlWriter) customScalar(name string, defaultMapping string) string {
+	if m, ok := w.conf["custom-scalars"]; ok {
+		mm := util.AsStruct(m)
+		if tn, ok := mm[name]; ok {
+			tname := util.AsString(tn)
+			w.customScalars[tname] = true
+			fmt.Printf("******* custom scalar for %q: %q\n", name, tname)
+			return tname
+		}
 	}
-	switch ts.Type {
+	return defaultMapping
+}
+
+func (w *GraphqlWriter) scalarType(name string) string {
+	switch name {
 	case "Bool":
 		return "Boolean"
 	case "String":
 		return "String"
+	case "UUID", "Timestamp":
+		return w.customScalar(name, "String")
 	case "Int32", "Int16", "Int8":
 		return "Int"
-	case "Int64":
-		return "GraphQL cannot represent integers with more than 32 bits of precision"
 	case "Float64", "Float32":
-		return "Double"
+		return "Float"
+	case "Int64", "Decimal":
+		return w.customScalar(name, "Float")
+	default:
+		return ""
+	}
+}
+
+func (w *GraphqlWriter) typeRef(ts *sadl.TypeSpec) string {
+	if td, ok := w.arrays[ts.Type]; ok {
+		ts = &td.TypeSpec
+	}
+	tsName := w.scalarType(ts.Type)
+	if tsName != "" {
+		return tsName
+	}
+	switch ts.Type {
 	case "Array":
 		return fmt.Sprintf("[%s!]", ts.Items)
 	default:
 		td := w.model.FindType(ts.Type)
 		if td != nil {
-			switch td.Type {
-			case "Int8", "Int16", "Int32":
-				return "Int"
-			case "Int64":
-				return "GraphQL cannot represent integers with more than 32 bits of precision"
-			case "Decimal":
-				return "GraphQL cannot represent arbitrary precision decimal numbers"
-			case "Float32", "Float64":
-				return "Float"
-			case "Bool":
-				return "Boolean"
-			case "String":
-				return "String"
+			tsName = w.scalarType(td.Type)
+			if tsName != "" {
+				return tsName
 			}
 		}
 		return ts.Type
