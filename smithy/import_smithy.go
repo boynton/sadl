@@ -494,7 +494,7 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 	}
 	td.Type = "Union"
 	//	prefix := model.namespace + "#"
-	for memberName, member := range shape.Members {
+	for memberName, member := range shape.Members { //this order is not deterministic, because map
 		//		if memberName != member.Target {
 		vd := &sadl.UnionVariantDef{
 			Name:        memberName,
@@ -523,7 +523,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	//unless...no httpTraits, in which case is should equivalent to a payload description
 	if _, ok := model.ioParams[shapeName]; ok {
 		shape := model.getShape(shapeName)
-		for _, fval := range shape.Members {
+		for _, fval := range shape.Members { //this order is not deterministic, because map
 			if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
 				return
 			}
@@ -542,7 +542,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	}
 	td.Type = "Struct"
 	var fields []*sadl.StructFieldDef
-	for memberName, member := range shape.Members {
+	for memberName, member := range shape.Members { //this order is not deterministic, because map
 		fd := &sadl.StructFieldDef{
 			Name:        memberName,
 			Comment:     util.GetString(member.Traits, "smithy.api#documentation"),
@@ -683,7 +683,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		payloadMember := ""
 		hasLabel := false
 		hasQuery := false
-		for fname, fval := range inStruct.Members {
+		for fname, fval := range inStruct.Members { //this order is not deterministic, because map
 			if util.GetBool(fval.Traits, "smithy.api#httpPayload") {
 				payloadMember = fname
 			} else if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
@@ -692,9 +692,10 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 				hasQuery = true
 			}
 		}
-		in := &sadl.HttpParamSpec{}
 		if hasLabel || hasQuery || payloadMember != "" {
-			for fname, fval := range inStruct.Members {
+			//the input might *have* a body
+			for fname, fval := range inStruct.Members { //this order is not deterministic, because map
+				in := &sadl.HttpParamSpec{}
 				in.Name = fname
 				in.Type = model.shapeRefToTypeRef(schema, fval.Target)
 				in.Required = util.GetBool(fval.Traits, "smithy.api#required")
@@ -709,12 +710,15 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 				}
 				in.Header = util.GetString(fval.Traits, "smithy.api#httpHeader")
 				in.Path = util.GetBool(fval.Traits, "smithy.api#httpLabel")
+				hdef.Inputs = append(hdef.Inputs, in)
 			}
 		} else {
+			//the input *is* a body. Generate a name for it.
+			in := &sadl.HttpParamSpec{}
 			in.Name = "body"
 			in.Type = inType
+			hdef.Inputs = append(hdef.Inputs, in)
 		}
-		hdef.Inputs = append(hdef.Inputs, in)
 		hdef.Path = hdef.Path + qs
 	}
 
@@ -729,7 +733,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		//to be marked as header.
 		outBodyField := ""
 		hasLabel := false
-		for fname, fval := range outStruct.Members {
+		for fname, fval := range outStruct.Members { //this order is not deterministic, because map
 			if util.GetBool(fval.Traits, "smithy.api#httpPayload") {
 				outBodyField = fname
 			} else if util.GetBool(fval.Traits, "smithy.api#httpLabel") {
@@ -743,7 +747,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			out.Type = model.shapeRefToTypeRef(schema, outType)
 			expected.Outputs = append(expected.Outputs, out)
 		} else {
-			for fname, fval := range outStruct.Members {
+			for fname, fval := range outStruct.Members { //this order is not deterministic, because map
 				out := &sadl.HttpParamSpec{}
 				out.Name = fname
 				out.Type = model.shapeRefToTypeRef(schema, fval.Target)

@@ -280,7 +280,7 @@ func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("union %s {\n", name)
 	count := len(shape.Members)
-	for fname, mem := range shape.Members {
+	for fname, mem := range shape.Members { //this order is not deterministic, because map
 		w.EmitTraits(mem.Traits, "    ")
 		w.Emit("    %s: %s", fname, w.stripLocalNamespace(mem.Target))
 		count--
@@ -348,7 +348,7 @@ func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("structure %s {\n", name)
 	indent := "    "
-	for k, v := range shape.Members {
+	for k, v := range shape.Members { //this order is not deterministic, because map
 		w.EmitTraits(v.Traits, indent)
 		w.Emit("%s%s: %s,\n", indent, k, v.Target)
 	}
