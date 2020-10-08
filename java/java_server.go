@@ -171,7 +171,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				ret := fmt.Sprintf("Response.status(%d)", +hact.Expected.Status)
 				for _, out := range hact.Expected.Outputs {
 					if out.Header != "" {
-						ret = ret + ".header(\"" + out.Header + "\", res." + out.Name + ")"
+						ret = ret + ".header(\"" + out.Header + "\", res.get" + gen.Capitalize(out.Name) + "())"
 					}
 				}
 				if wrappedResult != "" {
@@ -294,6 +294,7 @@ public class {{.MainClass}} {
 
 const resourcesTemplate = `
 import java.util.*;
+import java.time.Instant;
 import javax.inject.Inject;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;

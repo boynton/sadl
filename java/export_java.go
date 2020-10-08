@@ -1,7 +1,6 @@
 package java
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -165,7 +164,7 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	}
 	gen.Begin()
 	if comment != "" {
-		gen.Emit(gen.FormatComment("", comment, 100))
+		gen.Emit(gen.FormatComment("", comment, 100, false))
 	}
 	switch ts.Type {
 	case "Struct":
@@ -239,7 +238,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 	nested := make(map[string]*sadl.TypeSpec, 0)
 	for _, fd := range ts.Fields {
 		if fd.Comment != "" {
-			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100))
+			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100, false))
 		}
 		if !fd.Required {
 			gen.Emit(indent + "    @JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
@@ -354,7 +353,7 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 		}
 		comment := "\n"
 		if el.Comment != "" {
-			comment = gen.FormatComment(" ", el.Comment, 0)
+			comment = gen.FormatComment(" ", el.Comment, 0, false)
 		}
 		gen.Emit("    " + strings.ToUpper(el.Symbol) + "(\"" + el.Symbol + "\")" + delim + comment)
 	}
@@ -423,7 +422,7 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 		gen.Emit(indent1 + "@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
 
 		if vd.Comment != "" {
-			gen.Emit(gen.FormatComment(indent1, vd.Comment, 100))
+			gen.Emit(gen.FormatComment(indent1, vd.Comment, 100, false))
 		}
 		tn, tanno, anonymous := gen.TypeName(&vd.TypeSpec, vd.Type, false)
 		if anonymous != nil {
@@ -739,52 +738,4 @@ func primitiveType(name string) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-func (gen *Generator) FormatComment(indent, comment string, maxcol int) string {
-	prefix := "// "
-	left := len(indent)
-	if maxcol <= left {
-		return indent + prefix + comment + "\n"
-	}
-	tabbytes := make([]byte, 0, left)
-	for i := 0; i < left; i++ {
-		tabbytes = append(tabbytes, ' ')
-	}
-	tab := string(tabbytes)
-	prefixlen := len(prefix)
-	if strings.Index(comment, "\n") >= 0 {
-		lines := strings.Split(comment, "\n")
-		result := ""
-		for _, line := range lines {
-			result = result + tab + prefix + line + "\n"
-		}
-		return result
-	}
-	var buf bytes.Buffer
-	col := 0
-	lines := 1
-	tokens := strings.Split(comment, " ")
-	for _, tok := range tokens {
-		toklen := len(tok)
-		if col+toklen >= maxcol {
-			buf.WriteString("\n")
-			lines++
-			col = 0
-		}
-		if col == 0 {
-			buf.WriteString(tab)
-			buf.WriteString(prefix)
-			buf.WriteString(tok)
-			col = left + prefixlen + toklen
-		} else {
-			buf.WriteString(" ")
-			buf.WriteString(tok)
-			col += toklen + 1
-		}
-	}
-	buf.WriteString("\n")
-	emptyPrefix := strings.Trim(prefix, " ")
-	pad := tab + emptyPrefix + "\n"
-	return pad + buf.String() + pad
 }

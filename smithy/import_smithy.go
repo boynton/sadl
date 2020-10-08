@@ -266,10 +266,22 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 	}
 }
 
+func (model *Model) escapeComment(doc string) string {
+	lines := strings.Split(doc, "\n")
+	if len(lines) == 1 {
+		return doc
+	}
+	for i, line := range lines {
+		lines[i] = strings.Trim(line, " ")
+	}
+	//	return strings.Replace(strings.Replace(doc, "\n", " ", -1), "  ", " ", -1)
+	return strings.Join(lines, "\n")
+}
+
 func (model *Model) importNumericShape(schema *sadl.Schema, smithyType string, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	switch smithyType {
@@ -316,7 +328,7 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 	}
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment: model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 	}
 	td.Type = "String"
 	td.Pattern = util.GetString(shape.Traits, "smithy.api#pattern")
@@ -397,7 +409,7 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 	}
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment: model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 	}
 	td.Type = "Enum"
 	td.Elements = elements
@@ -408,7 +420,7 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Timestamp"
@@ -418,7 +430,7 @@ func (model *Model) importTimestampShape(schema *sadl.Schema, shapeName string, 
 func (model *Model) importBlobShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment: model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 	}
 	td.Type = "Bytes"
 	if l := util.GetStruct(shape.Traits, "smithy.api#length"); l != nil {
@@ -437,7 +449,7 @@ func (model *Model) importBlobShape(schema *sadl.Schema, shapeName string, shape
 func (model *Model) importBooleanShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Boolean"
@@ -489,7 +501,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Union"
@@ -498,7 +510,7 @@ func (model *Model) importUnionShape(schema *sadl.Schema, shapeName string, shap
 		//		if memberName != member.Target {
 		vd := &sadl.UnionVariantDef{
 			Name:        memberName,
-			Comment:     util.GetString(member.Traits, "smithy.api#documentation"),
+			Comment:     model.escapeComment(util.GetString(member.Traits, "smithy.api#documentation")),
 			Annotations: model.importTraitsAsAnnotations(nil, member.Traits),
 		}
 		vd.Type = model.shapeRefToTypeRef(schema, member.Target)
@@ -537,7 +549,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	}
 	td := &sadl.TypeDef{
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	td.Type = "Struct"
@@ -545,7 +557,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 	for memberName, member := range shape.Members { //this order is not deterministic, because map
 		fd := &sadl.StructFieldDef{
 			Name:        memberName,
-			Comment:     util.GetString(member.Traits, "smithy.api#documentation"),
+			Comment:     model.escapeComment(util.GetString(member.Traits, "smithy.api#documentation")),
 			Annotations: model.importTraitsAsAnnotations(nil, member.Traits),
 			Required:    util.GetBool(member.Traits, "smithy.api#required"),
 		}
@@ -562,7 +574,7 @@ func (model *Model) importStructureShape(schema *sadl.Schema, shapeName string, 
 func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape *Shape, unique bool) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment: model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 	}
 	td.Type = "Array"
 	td.Items = model.shapeRefToTypeRef(schema, shape.Member.Target)
@@ -583,7 +595,7 @@ func (model *Model) importListShape(schema *sadl.Schema, shapeName string, shape
 func (model *Model) importMapShape(schema *sadl.Schema, shapeName string, shape *Shape) {
 	td := &sadl.TypeDef{
 		Name:    shapeName,
-		Comment: util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment: model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 	}
 	td.Type = "Map"
 	td.Keys = model.shapeRefToTypeRef(schema, shape.Key.Target)
@@ -670,7 +682,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		Method:      method,
 		Path:        uri,
 		Name:        shapeName,
-		Comment:     util.GetString(shape.Traits, "smithy.api#documentation"),
+		Comment:     model.escapeComment(util.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
 	if code == 0 {
@@ -769,7 +781,7 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 			exc := &sadl.HttpExceptionSpec{}
 			exc.Type = eType
 			exc.Status = int32(util.GetInt(eStruct.Traits, "smithy.api#httpError"))
-			exc.Comment = util.GetString(eStruct.Traits, "smithy.api#documentation")
+			exc.Comment = model.escapeComment(util.GetString(eStruct.Traits, "smithy.api#documentation"))
 			//preserve other traits as annotations?
 			hdef.Exceptions = append(hdef.Exceptions, exc)
 		}

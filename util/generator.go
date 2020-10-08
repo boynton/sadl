@@ -136,44 +136,5 @@ func (gen *Generator) FileExists(path string) bool {
 }
 
 func (gen *Generator) FormatComment(indent, comment string, maxcol int, extraPad bool) string {
-	prefix := "// "
-	left := len(indent)
-	if maxcol <= left {
-		return indent + prefix + comment + "\n"
-	}
-	tabbytes := make([]byte, 0, left)
-	for i := 0; i < left; i++ {
-		tabbytes = append(tabbytes, ' ')
-	}
-	tab := string(tabbytes)
-	prefixlen := len(prefix)
-	var buf bytes.Buffer
-	col := 0
-	lines := 1
-	tokens := strings.Split(comment, " ")
-	for _, tok := range tokens {
-		toklen := len(tok)
-		if col+toklen >= maxcol {
-			buf.WriteString("\n")
-			lines++
-			col = 0
-		}
-		if col == 0 {
-			buf.WriteString(tab)
-			buf.WriteString(prefix)
-			buf.WriteString(tok)
-			col = left + prefixlen + toklen
-		} else {
-			buf.WriteString(" ")
-			buf.WriteString(tok)
-			col += toklen + 1
-		}
-	}
-	buf.WriteString("\n")
-	emptyPrefix := strings.Trim(prefix, " ")
-	pad := ""
-	if extraPad {
-		pad = tab + emptyPrefix + "\n"
-	}
-	return pad + buf.String() + pad
+	return FormatComment(indent, "//", comment, maxcol, extraPad)
 }

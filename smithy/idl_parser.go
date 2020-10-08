@@ -315,14 +315,15 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 	return items, nil
 }
 
+func trimRightSpace(s string) string {
+	return strings.TrimRight(s, " \t\n\v\f\r")
+}
+
 func (p *Parser) MergeComment(comment1 string, comment2 string) string {
 	if comment1 == "" {
-		return strings.TrimSpace(comment2)
+		return trimRightSpace(comment2)
 	}
-	if comment2 == "" {
-		return strings.TrimSpace(comment1)
-	}
-	return strings.TrimSpace(comment1) + " " + strings.TrimSpace(comment2)
+	return comment1 + "\n" + trimRightSpace(comment2)
 }
 
 func (p *Parser) Error(msg string) error {
