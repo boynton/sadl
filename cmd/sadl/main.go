@@ -71,6 +71,7 @@ Supported generators and options used from config if present
 	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.yaml")
 	pForce := flag.Bool("f", false, "Force overwrite of existing files")
 	flag.Var(&genOpts, "x", "An option to pass to the generator")
+	pVersion := flag.Bool("v", false, "Show SADL version and exit")
 	pHelp := flag.Bool("help", false, "Show more helpful information")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sadl [options] file ...\n\nOptions:\n")
@@ -80,6 +81,10 @@ Supported generators and options used from config if present
 	if *pHelp {
 		fmt.Fprintf(os.Stderr, helpMessage)
 		os.Exit(1)
+	}
+	if *pVersion {
+		fmt.Printf("SADL v%s\n", sadl.Version)
+		os.Exit(0)
 	}
 	args := flag.Args()
 	out := *pOut
