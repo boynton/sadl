@@ -94,15 +94,15 @@ Supported generators and options used from config if present
 		flag.Usage()
 		os.Exit(0)
 	}
-	importConf := make(map[string]interface{}, 0)
+	importConf := sadl.NewData()
 	if namespace != "" {
-		importConf["namespace"] = namespace
+		importConf.Put("namespace", namespace)
 	}
 	if name != "" {
-		importConf["name"] = name
+		importConf.Put("name", name)
 	}
 	if formatType != "" {
-		importConf["type"] = formatType
+		importConf.Put("type", formatType)
 	}
 	model, err := ImportFiles(args, importConf)
 	if err != nil {
@@ -113,10 +113,7 @@ Supported generators and options used from config if present
 	if configPath == "" {
 		configPath = os.Getenv("HOME") + "/.sadl-config.yaml"
 		if !fileExists(configPath) {
-			configPath = os.Getenv("HOME") + "/.sadl-config.yaml"
-			if !fileExists(configPath) {
-				configPath = ""
-			}
+			configPath = ""
 		}
 	}
 	if configPath != "" {
@@ -125,10 +122,14 @@ Supported generators and options used from config if present
 			fmt.Printf("Cannot read config file %q: %v\n", configPath, err)
 		}
 	} else {
-		conf = &sadl.Data{}
+		conf = sadl.NewData()
 	}
-	conf.Put("force-overwrite", force)
-	genConf := conf.GetStruct(gen)
+	gc := gen
+	if gen == "java-server" { //todo: get rid of this hack
+		gc = "java"
+	}
+	genConf := conf.GetData(gc)
+	genConf.Put("force-overwrite", force)
 	for _, kv := range genOpts {
 		k := kv
 		var v interface{}
@@ -138,7 +139,7 @@ Supported generators and options used from config if present
 			k = kvs[0]
 			v = kvs[1]
 		}
-		genConf[k] = v
+		genConf.Put(k, v)
 		//to do: set up generator option based on this string key/value pair
 		fmt.Printf("[setting a generator option: %q => %v]\n", k, v)
 	}

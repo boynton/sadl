@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
-func Export(model *sadl.Model, conf map[string]interface{}) error {
+func Export(model *sadl.Model, conf *sadl.Data) error {
 	for _, hdef := range model.Http {
 		snippet, err := generateHttpTrace(model, hdef)
 		if err != nil {
@@ -35,8 +34,8 @@ func stringExample(ex interface{}) string {
 
 func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 	examples := model.Examples
-	reqType := util.Capitalize(hdef.Name) + "Request"
-	resType := util.Capitalize(hdef.Name) + "Response"
+	reqType := sadl.Capitalize(hdef.Name) + "Request"
+	resType := sadl.Capitalize(hdef.Name) + "Response"
 	namedExamples := make(map[string][]map[string]interface{}, 0)
 	var reqExample, resExample map[string]interface{}
 
@@ -83,7 +82,7 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 					sex := stringExample(ex)
 					headers = headers + in.Header + ": " + sex + "\n"
 				} else { //body
-					bodyExample = util.Pretty(ex)
+					bodyExample = sadl.Pretty(ex)
 				}
 			}
 			path = stripMissingOptionalQueryParams(path)
@@ -103,7 +102,7 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 						sex := stringExample(ex)
 						headers = headers + out.Header + ": " + sex + "\n"
 					} else { //body
-						bodyExample = util.Pretty(ex)
+						bodyExample = sadl.Pretty(ex)
 					}
 				}
 				headers = headers + "Date: " + dateHeader() + "\n"

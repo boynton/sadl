@@ -6,11 +6,9 @@ import (
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/graphql"
 	"github.com/boynton/sadl/httptrace"
-	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/java"
 	"github.com/boynton/sadl/openapi"
 	"github.com/boynton/sadl/smithy"
-	"github.com/boynton/sadl/util"
 )
 
 var ExportFormats = []string{
@@ -24,13 +22,13 @@ var ExportFormats = []string{
 func SetupCommandLineArgs(generator string) {
 }
 
-func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]interface{}) error {
+func ExportFiles(model *sadl.Model, generator, dir string, conf *sadl.Data) error {
 	switch generator {
 	case "json", "sadl-ast":
-		fmt.Println(util.Pretty(model))
+		fmt.Println(sadl.Pretty(model))
 		return nil
 	case "sadl":
-		fmt.Println(io.DecompileSadl(model))
+		fmt.Println(sadl.DecompileSadl(model))
 		return nil
 	case "smithy":
 		return smithy.Export(model, dir, conf, false)
@@ -39,10 +37,7 @@ func ExportFiles(model *sadl.Model, generator, dir string, conf map[string]inter
 	case "java":
 		return java.Export(model, dir, conf)
 	case "java-server":
-		if conf == nil {
-			conf = make(map[string]interface{}, 0)
-		}
-		conf["server"] = true
+		conf.Put("server", true)
 		return java.Export(model, dir, conf)
 	case "openapi":
 		return openapi.Export(model, conf)

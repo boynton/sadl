@@ -1,4 +1,4 @@
-package util
+package sadl
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 )
 
 type Generator struct {
-	Config map[string]interface{}
+	Config *Data
 	OutDir string
 	Err    error
 	buf    bytes.Buffer
@@ -19,11 +19,32 @@ type Generator struct {
 }
 
 func (gen *Generator) GetConfigString(k string, defaultValue string) string {
-	return gen.GetString(gen.Config, k, defaultValue)
+	if !gen.Config.Has(k) {
+		return defaultValue
+	}
+	return gen.Config.GetString(k)
 }
 
 func (gen *Generator) GetConfigBool(k string, defaultValue bool) bool {
-	return gen.GetBool(gen.Config, k, defaultValue)
+	if !gen.Config.Has(k) {
+		return defaultValue
+	}
+	return gen.Config.GetBool(k)
+}
+
+func (gen *Generator) GetConfigInt(k string, defaultValue int) int {
+	if !gen.Config.Has(k) {
+		return defaultValue
+	}
+	return gen.Config.GetInt(k)
+}
+
+/*
+func (gen *Generator) GetConfigStruct(k string) Data {
+	if !gen.Config.Has(k) {
+		return Data{}
+	}
+	return gen.Config.GetInt(k)
 }
 
 func (gen *Generator) GetString(m map[string]interface{}, k string, defaultValue string) string {
@@ -58,6 +79,7 @@ func (gen *Generator) GetInt(m map[string]interface{}, k string, defaultValue in
 	}
 	return defaultValue
 }
+*/
 
 func (gen *Generator) Emit(s string) {
 	if gen.Err == nil && gen.writer != nil {
@@ -82,7 +104,7 @@ func (gen *Generator) End() string {
 }
 
 func (gen *Generator) WriteFile(path string, content string) {
-	if !gen.GetConfigBool("force-overwrite", false) && gen.FileExists(path) {
+	if !gen.Config.GetBool("force-overwrite") && gen.FileExists(path) {
 		//if debug, echo it anyway?
 		fmt.Printf("[%s already exists, not overwriting]\n", path)
 		return
@@ -107,7 +129,6 @@ func (gen *Generator) EmitTemplate(name string, tmplSource string, data interfac
 	writer := bufio.NewWriter(&b)
 	tmpl, err := template.New(name).Funcs(funcMap).Parse(tmplSource)
 	if err != nil {
-		fmt.Println("emitTemplate -> cannot create template:", gen.Err)
 		gen.Err = err
 		return
 	}

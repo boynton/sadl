@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
-
 	gql_ast "github.com/graphql-go/graphql/language/ast"
 	gql_parser "github.com/graphql-go/graphql/language/parser"
 	gql_source "github.com/graphql-go/graphql/language/source"
@@ -20,7 +18,7 @@ func IsValidFile(path string) bool {
 	return false
 }
 
-func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
+func Import(paths []string, conf *sadl.Data) (*sadl.Model, error) {
 	//todo: merge multiple files
 	if len(paths) != 1 {
 		return nil, fmt.Errorf("GraphQL file merging NYI")
@@ -49,12 +47,12 @@ func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
 	return sadl.NewModel(schema)
 }
 
-func gqlSchema(doc *gql_ast.Document, conf map[string]interface{}) (*sadl.Schema, error) {
-	name := util.GetString(conf, "name")
+func gqlSchema(doc *gql_ast.Document, conf *sadl.Data) (*sadl.Schema, error) {
+	name := conf.GetString("name")
 	if name == "" {
 		name = "generatedFromGraphQL"
 	}
-	namespace := util.GetString(conf, "namespace")
+	namespace := conf.GetString("namespace")
 	schema := &sadl.Schema{
 		Name:      name,
 		Namespace: namespace,
@@ -95,7 +93,7 @@ func gqlSchema(doc *gql_ast.Document, conf map[string]interface{}) (*sadl.Schema
 			case "UUID":
 				//Allow the name through, a native SADL type
 			default:
-				err = fmt.Errorf("Unsupported custom scalar: %s\n", util.Pretty(def))
+				err = fmt.Errorf("Unsupported custom scalar: %s\n", sadl.Pretty(def))
 			}
 		default:
 			err = fmt.Errorf("Unsupported definition: %v\n", def.GetKind())

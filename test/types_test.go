@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 func encode(obj interface{}) (string, error) {
@@ -28,7 +27,7 @@ func TestTimestamp(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(util.Pretty(ts))
+		fmt.Println(sadl.Pretty(ts))
 	}
 }
 
@@ -48,7 +47,7 @@ func TestUUID(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(util.Pretty(u1))
+		fmt.Println(sadl.Pretty(u1))
 	}
 }
 
@@ -68,7 +67,7 @@ func TestGood2Decimal(test *testing.T) {
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
-		fmt.Println(util.Pretty(d))
+		fmt.Println(sadl.Pretty(d))
 	}
 }
 
@@ -117,7 +116,7 @@ func TestUnitValue(test *testing.T) {
 	val := 100.0
 	unit := "USD"
 	q1 := sadl.NewUnitValue(val, unit)
-	jsonData := util.Pretty(q1)
+	jsonData := sadl.Pretty(q1)
 	var q *sadl.UnitValue
 	err := decode(jsonData, &q)
 	if err != nil {
@@ -130,7 +129,7 @@ func TestUnitValue(test *testing.T) {
 		} else if q.Unit != unit {
 			test.Errorf("UnitValue JSON round trip resulting in UnitValue.unit: %v", q.Unit)
 		} else {
-			fmt.Println("Valid UnitValue:", util.Pretty(q))
+			fmt.Println("Valid UnitValue:", sadl.Pretty(q))
 		}
 	}
 }

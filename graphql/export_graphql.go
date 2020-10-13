@@ -6,10 +6,9 @@ import (
 	"fmt"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
-func Export(model *sadl.Model, conf map[string]interface{}) error {
+func Export(model *sadl.Model, conf *sadl.Data) error {
 	s, err := FromSadl(model, conf)
 	if err != nil {
 		panic(fmt.Sprintf("*** %v\n", err))
@@ -19,11 +18,11 @@ func Export(model *sadl.Model, conf map[string]interface{}) error {
 	return nil
 }
 
-func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
+func FromSadl(model *sadl.Model, conf *sadl.Data) (string, error) {
 	w := &GraphqlWriter{
 		//		namespace: ns,
 		model:         model,
-		conf:          conf,
+		config:        conf,
 		arrays:        make(map[string]*sadl.TypeDef, 0),
 		customScalars: make(map[string]bool, 0),
 	}
@@ -62,7 +61,7 @@ func FromSadl(model *sadl.Model, conf map[string]interface{}) (string, error) {
 type GraphqlWriter struct {
 	model         *sadl.Model
 	arrays        map[string]*sadl.TypeDef
-	conf          map[string]interface{}
+	config        *sadl.Data
 	buf           bytes.Buffer
 	writer        *bufio.Writer
 	namespace     string
@@ -108,14 +107,10 @@ func (w *GraphqlWriter) EmitStructDef(td *sadl.TypeDef) error {
 }
 
 func (w *GraphqlWriter) customScalar(name string, defaultMapping string) string {
-	if m, ok := w.conf["custom-scalars"]; ok {
-		mm := util.AsStruct(m)
-		if tn, ok := mm[name]; ok {
-			tname := util.AsString(tn)
-			w.customScalars[tname] = true
-			fmt.Printf("******* custom scalar for %q: %q\n", name, tname)
-			return tname
-		}
+	tname := w.config.GetString("custom-scalars", name)
+	if tname != "" {
+		w.customScalars[tname] = true
+		return tname
 	}
 	return defaultMapping
 }

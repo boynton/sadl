@@ -5,8 +5,6 @@ import (
 	"math"
 	"regexp"
 	"strings"
-
-	"github.com/boynton/sadl/util"
 )
 
 type Model struct {
@@ -212,7 +210,7 @@ func (model *Model) ValidateBool(context string, td *TypeSpec, value interface{}
 	case *bool, bool:
 		return nil
 	}
-	return fmt.Errorf("%s: Not a valid Bool: %v", context, util.Pretty(value))
+	return fmt.Errorf("%s: Not a valid Bool: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateUUID(context string, td *TypeSpec, value interface{}) error {
@@ -231,7 +229,7 @@ func (model *Model) ValidateUUID(context string, td *TypeSpec, value interface{}
 			return nil
 		}
 	}
-	return fmt.Errorf("%s: Not a valid UUID: %v", context, util.Pretty(value))
+	return fmt.Errorf("%s: Not a valid UUID: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateUnitValue(context string, td *TypeSpec, value interface{}) error {
@@ -252,7 +250,7 @@ func (model *Model) ValidateUnitValue(context string, td *TypeSpec, value interf
 			return err
 		}
 	}
-	return fmt.Errorf("%s: Not a valid UnitValue: %v", context, util.Pretty(value))
+	return fmt.Errorf("%s: Not a valid UnitValue: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateEnum(context string, td *TypeSpec, value interface{}) error {
@@ -270,7 +268,7 @@ func (model *Model) ValidateEnum(context string, td *TypeSpec, value interface{}
 			}
 		}
 	}
-	return fmt.Errorf("%s: Not a valid Enum: %v", context, util.Pretty(value))
+	return fmt.Errorf("%s: Not a valid Enum: %v", context, Pretty(value))
 }
 
 func (model *Model) ValidateNumber(context string, td *TypeSpec, value interface{}) error {
@@ -313,7 +311,7 @@ func (model *Model) ValidateNumber(context string, td *TypeSpec, value interface
 			}
 		}
 	default:
-		return fmt.Errorf("%s: Not a number: %v", context, util.Pretty(value))
+		return fmt.Errorf("%s: Not a number: %v", context, Pretty(value))
 	}
 	return nil
 }
@@ -343,12 +341,12 @@ func (model *Model) ValidateStruct(context string, td *TypeSpec, value interface
 				}
 			} else {
 				if field.Required {
-					return fmt.Errorf("%s missing required field '%s': %s", context, field.Name, util.Pretty(value))
+					return fmt.Errorf("%s missing required field '%s': %s", context, field.Name, Pretty(value))
 				}
 			}
 		}
 	default:
-		return fmt.Errorf("Not a Struct: %s", util.Pretty(td))
+		return fmt.Errorf("Not a Struct: %s", Pretty(td))
 	}
 	return nil
 }
@@ -370,12 +368,12 @@ func (model *Model) ValidateArray(context string, td *TypeSpec, value interface{
 		}
 		if td.MaxSize != nil {
 			if len(a) > int(*td.MaxSize) {
-				return fmt.Errorf("%s: Array is too large (maxsize=%d): %v", context, *td.MaxSize, util.Pretty(value))
+				return fmt.Errorf("%s: Array is too large (maxsize=%d): %v", context, *td.MaxSize, Pretty(value))
 			}
 		}
 		if td.MinSize != nil {
 			if len(a) < int(*td.MinSize) {
-				return fmt.Errorf("%s: Array is too small (minsize=%d): %v", context, *td.MinSize, util.Pretty(value))
+				return fmt.Errorf("%s: Array is too small (minsize=%d): %v", context, *td.MinSize, Pretty(value))
 			}
 		}
 		return nil
@@ -401,12 +399,12 @@ func (model *Model) ValidateMap(context string, td *TypeSpec, value interface{})
 		}
 		if td.MaxSize != nil {
 			if len(a) > int(*td.MaxSize) {
-				return fmt.Errorf("%s: Map is too large (maxsize=%d): %v", context, *td.MaxSize, util.Pretty(value))
+				return fmt.Errorf("%s: Map is too large (maxsize=%d): %v", context, *td.MaxSize, Pretty(value))
 			}
 		}
 		if td.MinSize != nil {
 			if len(a) < int(*td.MinSize) {
-				return fmt.Errorf("%s: Map is too small (minsize=%d): %v", context, *td.MinSize, util.Pretty(value))
+				return fmt.Errorf("%s: Map is too small (minsize=%d): %v", context, *td.MinSize, Pretty(value))
 			}
 		}
 		return nil
@@ -472,11 +470,11 @@ func IsSymbol(s string) bool {
 	if s == "" {
 		return false
 	}
-	if !util.IsSymbolChar(rune(s[0]), true) { //fixme
+	if !IsSymbolChar(rune(s[0]), true) { //fixme
 		return false
 	}
 	for _, ch := range s[1:] {
-		if !util.IsSymbolChar(rune(ch), false) { //FIXME
+		if !IsSymbolChar(rune(ch), false) { //FIXME
 			return false
 		}
 	}
@@ -500,7 +498,7 @@ func (model *Model) fail(td *TypeSpec, val interface{}, msg string) error {
 	case *Decimal, int32, int64, int16, int8, float32, float64:
 		v = fmt.Sprintf("%v", d)
 	default:
-		v = util.Pretty(val)
+		v = Pretty(val)
 	}
 	if msg != "" {
 		msg = " (" + msg + ")"
@@ -519,7 +517,7 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 	} else {
 		//http requests and responses are not quite like structs, although inputs and expected outputs are of type StructFieldDef
 		if strings.HasSuffix(theType, "Request") {
-			httpName := util.Uncapitalize(theType[:len(theType)-len("Request")])
+			httpName := Uncapitalize(theType[:len(theType)-len("Request")])
 			h := model.FindHttp(httpName)
 			if h != nil {
 				if len(lst) > 0 {
@@ -543,7 +541,7 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 				}
 			}
 		} else if strings.HasSuffix(theType, "Response") {
-			httpName := util.Uncapitalize(theType[:len(theType)-len("Response")])
+			httpName := Uncapitalize(theType[:len(theType)-len("Response")])
 			h := model.FindHttp(httpName)
 			if h != nil {
 				if len(lst) > 0 {
@@ -569,7 +567,7 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 		}
 	}
 	if ts == nil {
-		return nil, fmt.Errorf("Undefined type '%s' in example: %s", theType, util.Pretty(ex))
+		return nil, fmt.Errorf("Undefined type '%s' in example: %s", theType, Pretty(ex))
 	}
 	for len(lst) > 0 {
 		if ts.Type != "Struct" {
@@ -590,4 +588,45 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 		ts = &field.TypeSpec
 	}
 	return ts, nil
+}
+
+//for every typedef and action parameter that has an inline enum def, create a toplevel enum def and refer to it instead.
+//This reduces duplicate definitions.
+//This produces an error if name conflicts cannot be resolved.
+func (model *Model) ConvertInlineEnums() error {
+	//	refs := make(map[string]*TypeSpec, 0)
+	var tds []*TypeDef
+	for _, td := range model.Types {
+		switch td.Type {
+		case "Struct":
+			for _, fdef := range td.Fields {
+				if fdef.Type == "Enum" {
+					tname := Capitalize(fdef.Name)
+					if !strings.HasPrefix(tname, td.Name) {
+						tname = td.Name + tname
+					}
+					ntd := &TypeDef{
+						TypeSpec: fdef.TypeSpec,
+						Name:     tname,
+					}
+					prev := model.FindType(tname)
+					if prev != nil {
+						if !model.EquivalentTypes(&prev.TypeSpec, &fdef.TypeSpec) {
+							//Alternatively, could prefix the struct type name to the new type `td.Name + tname` to make it unique. Steill not foolproof.
+							return fmt.Errorf("cannot refactor, duplicate type names for non-equivalent types: %s and %s\n", Pretty(prev), Pretty(fdef))
+						}
+					}
+					var blank TypeSpec
+					fdef.TypeSpec = blank
+					fdef.Type = tname
+					tds = append(tds, ntd)
+				}
+			}
+		}
+	}
+	for _, td := range tds {
+		model.Types = append(model.Types, td)
+		model.typeIndex[td.Name] = td
+	}
+	return nil
 }

@@ -5,15 +5,13 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
-func Export(model *sadl.Model, out string, conf map[string]interface{}, exportAst bool) error {
+func Export(model *sadl.Model, out string, conf *sadl.Data, exportAst bool) error {
 	ns := model.Namespace
-	if v, ok := conf["namespace"]; ok {
-		if s, ok := v.(string); ok {
-			ns = s
-		}
+	ns2 := conf.GetString("namespace")
+	if ns2 != "" {
+		ns = ns2
 	}
 	if ns == "" {
 		ns = "example"
@@ -23,7 +21,7 @@ func Export(model *sadl.Model, out string, conf map[string]interface{}, exportAs
 		return fmt.Errorf("sadl2smithy: Cannot convert SADL to Smithy: %v\n", err)
 	}
 	if exportAst {
-		fmt.Println(util.Pretty(ast))
+		fmt.Println(sadl.Pretty(ast))
 	} else {
 		fmt.Print(ast.IDL(ns))
 	}
@@ -266,7 +264,7 @@ func listTypeReference(model *sadl.Model, ns string, shapes map[string]*Shape, p
 	ftype := capitalize(prefix) + capitalize(fd.Name)
 	td := model.FindType(ftype)
 	if td != nil {
-		fmt.Printf("Inline defs not allowed, synthesize %q to refer to: %s\n", ftype, util.Pretty(fd))
+		fmt.Printf("Inline defs not allowed, synthesize %q to refer to: %s\n", ftype, sadl.Pretty(fd))
 		panic("Already have one with that name!!!")
 	}
 	ltype := "list"
@@ -288,7 +286,7 @@ func mapTypeReference(model *sadl.Model, ns string, shapes map[string]*Shape, pr
 	ftype := capitalize(prefix) + capitalize(fd.Name)
 	td := model.FindType(ftype)
 	if td != nil {
-		fmt.Printf("Inline defs not allowed, synthesize %q to refer to: %s\n", ftype, util.Pretty(fd))
+		fmt.Printf("Inline defs not allowed, synthesize %q to refer to: %s\n", ftype, sadl.Pretty(fd))
 		panic("Already have one with that name!!!")
 	}
 	shape := Shape{
@@ -344,8 +342,8 @@ func defineShapeFromTypeSpec(model *sadl.Model, ns string, shapes map[string]*Sh
 	case "Map":
 		shape = shapeFromMap(model, ns, shapes, name, ts)
 	default:
-		fmt.Println("So far:", util.Pretty(model))
-		panic("handle this type:" + util.Pretty(ts))
+		fmt.Println("So far:", sadl.Pretty(model))
+		panic("handle this type:" + sadl.Pretty(ts))
 	}
 	if comment != "" {
 		ensureShapeTraits(&shape)["smithy.api#documentation"] = comment

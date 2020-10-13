@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 	"github.com/ghodss/yaml"
 )
 
@@ -39,7 +38,7 @@ func Load(path string) (*Model, error) {
 	return Validate(v3)
 }
 
-func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
+func Import(paths []string, conf *sadl.Data) (*sadl.Model, error) {
 	if len(paths) != 1 {
 		return nil, fmt.Errorf("Cannot merge multiple OpenAPI files")
 	}
@@ -57,14 +56,8 @@ func Import(paths []string, conf map[string]interface{}) (*sadl.Model, error) {
 		name = strings.Replace(name, ".", "_", -1)
 	}
 	oas3, err := Load(path)
-	//	data, err := ioutil.ReadFile(path)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("Cannot read OpenAPI file: %v\n", err)
-	//	}
-	//	oas3, err := Parse(data, format)
 	if err != nil {
 		return nil, err
-		//fmt.Errorf("Cannot parse OpenAPI document: %v\n", err)
 	}
 	model, err := oas3.ToSadl(name)
 	if err != nil {
@@ -462,7 +455,7 @@ func convertOasPathToAction(schema *sadl.Schema, op *Operation, method string) (
 	if td2 == nil {
 		schema.Types = append(schema.Types, td)
 	} else {
-		fmt.Println(reqTypeName, "already defined as", util.Pretty(td2), "Would have replaced with ", util.Pretty(td))
+		fmt.Println(reqTypeName, "already defined as", sadl.Pretty(td2), "Would have replaced with ", sadl.Pretty(td))
 	}
 	act.Input = reqTypeName
 
@@ -561,7 +554,7 @@ func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, e
 		case "header":
 			spec.Header = param.Name
 		case "cookie":
-			return nil, fmt.Errorf("Cookie params NYI: %v", util.AsString(param))
+			return nil, fmt.Errorf("Cookie params NYI: %v", sadl.AsString(param))
 		}
 		spec.Type = oasTypeRef(param.Schema)
 		if spec.Type == "" {
@@ -639,7 +632,7 @@ func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, e
 		eparam := op.Responses[expectedStatus]
 		if eparam == nil {
 			fmt.Println("expectedStatus, eparam:", expectedStatus, eparam)
-			fmt.Println(util.Pretty(op.Responses))
+			fmt.Println(sadl.Pretty(op.Responses))
 			panic("whoops")
 		}
 		var err error
@@ -687,7 +680,7 @@ func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, e
 					}
 					ex.Outputs = append(ex.Outputs, result)
 				} else {
-					fmt.Println("HTTP Action has no expected result type:", util.Pretty(eparam))
+					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(eparam))
 				}
 			}
 		}
@@ -787,7 +780,7 @@ func guessOperationName(op *Operation, method string) string {
 						return entityType
 					}
 				} else {
-					fmt.Println("HTTP Action has no expected result type:", util.Pretty(resp))
+					fmt.Println("HTTP Action has no expected result type:", sadl.Pretty(resp))
 				}
 			}
 		}

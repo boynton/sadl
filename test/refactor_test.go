@@ -3,18 +3,17 @@ package test
 import (
 	"testing"
 
-	"github.com/boynton/sadl/io"
-	"github.com/boynton/sadl/util"
+	"github.com/boynton/sadl"
 )
 
 func TestRefactorStruct(test *testing.T) {
-	model, err := io.ParseSadlString(`type Foo Struct {
+	model, err := sadl.ParseSadlString(`type Foo Struct {
     values Enum {
        ONE,
        TWO
     }
 }
-`, nil)
+`, sadl.NewData())
 	if err != nil {
 		test.Errorf("%v", err)
 	} else {
@@ -23,7 +22,7 @@ func TestRefactorStruct(test *testing.T) {
 			test.Errorf("%v", err)
 		}
 		if len(model.Types) != 2 {
-			test.Errorf("Failed to refactor inline Enums: %s", util.Pretty(model))
+			test.Errorf("Failed to refactor inline Enums: %s", sadl.Pretty(model))
 		}
 	}
 }

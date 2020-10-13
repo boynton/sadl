@@ -1,4 +1,4 @@
-package util
+package sadl
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ func ToString(obj interface{}) string {
 	return string(s)
 }
 
-func AsStruct(v interface{}) map[string]interface{} {
+func AsMap(v interface{}) map[string]interface{} {
 	if v != nil {
 		if m, ok := v.(map[string]interface{}); ok {
 			return m
@@ -39,11 +39,17 @@ func AsArray(v interface{}) []interface{} {
 
 func AsStringArray(v interface{}) []string {
 	var sa []string
-	for _, i := range AsArray(v) {
-		if s, ok := i.(*string); ok {
-			sa = append(sa, *s)
-		} else {
-			return nil
+	a := AsArray(v)
+	if a != nil {
+		for _, i := range a {
+			switch s := i.(type) {
+			case *string:
+				sa = append(sa, *s)
+			case string:
+				sa = append(sa, s)
+			default:
+				return nil
+			}
 		}
 	}
 	return sa
@@ -94,6 +100,17 @@ func AsFloat64(v interface{}) float64 {
 	return 0
 }
 
+func AsDecimal(v interface{}) *Decimal {
+	switch n := v.(type) {
+	case Decimal:
+		return &n
+	case *Decimal:
+		return n
+	default:
+		return nil
+	}
+}
+
 func Get(m map[string]interface{}, key string) interface{} {
 	if m != nil {
 		if v, ok := m[key]; ok {
@@ -105,6 +122,9 @@ func Get(m map[string]interface{}, key string) interface{} {
 
 func GetString(m map[string]interface{}, key string) string {
 	return AsString(m[key])
+}
+func GetStringArray(m map[string]interface{}, key string) []string {
+	return AsStringArray(m[key])
 }
 func GetBool(m map[string]interface{}, key string) bool {
 	return AsBool(m[key])
@@ -118,6 +138,9 @@ func GetInt64(m map[string]interface{}, key string) int64 {
 func GetArray(m map[string]interface{}, key string) []interface{} {
 	return AsArray(m[key])
 }
-func GetStruct(m map[string]interface{}, key string) map[string]interface{} {
-	return AsStruct(m[key])
+func GetMap(m map[string]interface{}, key string) map[string]interface{} {
+	return AsMap(m[key])
+}
+func GetDecimal(m map[string]interface{}, key string) *Decimal {
+	return AsDecimal(m[key])
 }

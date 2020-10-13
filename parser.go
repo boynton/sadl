@@ -1,4 +1,4 @@
-package io
+package sadl
 
 import (
 	"encoding/json"
@@ -6,9 +6,6 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
-
-	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 //
@@ -16,7 +13,7 @@ import (
 // ...
 // model, err := sadl.ParseFile("/some/path")
 //
-func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
+func ParseSadlFile(path string, conf *Data, extensions ...Extension) (*Model, error) {
 	p, err := parseFileNoValidate(path, conf, extensions)
 	if err != nil {
 		return nil, err
@@ -24,12 +21,12 @@ func ParseSadlFile(path string, conf map[string]interface{}, extensions ...Exten
 	return p.Validate()
 }
 
-func LoadModel(path string) (*sadl.Model, error) {
+func LoadModel(path string) (*Model, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot read file %q: %v\n", path, err)
 	}
-	var schema sadl.Schema
+	var schema Schema
 	err = json.Unmarshal(data, &schema)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot parse file %q: %v\n", path, err)
@@ -37,7 +34,7 @@ func LoadModel(path string) (*sadl.Model, error) {
 	if schema.Sadl == "" {
 		return nil, fmt.Errorf("Cannot load file %q: %v\n", path, err)
 	}
-	return sadl.NewModel(&schema)
+	return NewModel(&schema)
 }
 
 func IsValidFile(path string) bool {
@@ -51,18 +48,14 @@ func IsValidFile(path string) bool {
 	return false
 }
 
-//func parseFile(path string, conf map[string]interface{}, extensions []Extension) (*sadl.Model, error) {
-//	return parseFile(path, conf, extensions)
-//}
-
 //
 // import "github.com/boynton/sadl"
 // ...
 // model, err := sadl.ParseString("...")
 //
-func ParseSadlString(src string, conf map[string]interface{}, extensions ...Extension) (*sadl.Model, error) {
+func ParseSadlString(src string, conf *Data, extensions ...Extension) (*Model, error) {
 	p := &Parser{
-		scanner: util.NewScanner(strings.NewReader(src)),
+		scanner: NewScanner(strings.NewReader(src)),
 		source:  src,
 		conf:    conf,
 	}
@@ -74,13 +67,13 @@ func ParseSadlString(src string, conf map[string]interface{}, extensions ...Exte
 type Parser struct {
 	path           string
 	source         string
-	conf           map[string]interface{}
-	scanner        *util.Scanner
-	model          *sadl.Model
-	schema         *sadl.Schema
-	lastToken      *util.Token
-	prevLastToken  *util.Token
-	ungottenToken  *util.Token
+	conf           *Data
+	scanner        *Scanner
+	model          *Model
+	schema         *Schema
+	lastToken      *Token
+	prevLastToken  *Token
+	ungottenToken  *Token
 	currentComment string
 	extensions     map[string]Extension
 }
@@ -92,14 +85,14 @@ type Extension interface {
 	Validate(p *Parser) error
 }
 
-func parseFileNoValidate(path string, conf map[string]interface{}, extensions []Extension) (*Parser, error) {
+func parseFileNoValidate(path string, conf *Data, extensions []Extension) (*Parser, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	src := string(b)
 	p := &Parser{
-		scanner: util.NewScanner(strings.NewReader(src)),
+		scanner: NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
 		conf:    conf,
@@ -115,35 +108,35 @@ func (p *Parser) CurrentComment() string {
 	return p.currentComment
 }
 
-func (p *Parser) Model() *sadl.Model {
+func (p *Parser) Model() *Model {
 	return p.model
 }
 
 func (p *Parser) UngetToken() {
-	util.Debug("UngetToken() -> ", p.lastToken)
+	Debug("UngetToken() -> ", p.lastToken)
 	p.ungottenToken = p.lastToken
 	p.lastToken = p.prevLastToken
 }
 
-func (p *Parser) GetToken() *util.Token {
+func (p *Parser) GetToken() *Token {
 	if p.ungottenToken != nil {
 		p.lastToken = p.ungottenToken
 		p.ungottenToken = nil
-		util.Debug("GetToken() -> ", p.lastToken)
+		Debug("GetToken() -> ", p.lastToken)
 		return p.lastToken
 	}
 	p.prevLastToken = p.lastToken
 	tok := p.scanner.Scan()
 	for {
-		if tok.Type == util.EOF {
+		if tok.Type == EOF {
 			return nil //fixme
-		} else if tok.Type != util.BLOCK_COMMENT {
+		} else if tok.Type != BLOCK_COMMENT {
 			break
 		}
 		tok = p.scanner.Scan()
 	}
 	p.lastToken = &tok
-	util.Debug("GetToken() -> ", p.lastToken)
+	Debug("GetToken() -> ", p.lastToken)
 	return p.lastToken
 }
 
@@ -158,7 +151,7 @@ func (p *Parser) Source() string {
 	return source
 }
 
-func (p *Parser) Parse(extensions []Extension) (*sadl.Model, error) {
+func (p *Parser) Parse(extensions []Extension) (*Model, error) {
 	err := p.ParseNoValidate(extensions)
 	if err != nil {
 		return nil, err
@@ -173,19 +166,19 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 			return err
 		}
 	}
-	p.schema = &sadl.Schema{
-		Sadl:  sadl.Version,
-		Types: make([]*sadl.TypeDef, 0),
+	p.schema = &Schema{
+		Sadl:  Version,
+		Types: make([]*TypeDef, 0),
 	}
-	name := util.GetString(p.conf, "name")
+	name := p.conf.GetString("name")
 	if name != "" {
 		p.schema.Name = name
 	}
 	if p.schema.Name == "" {
-		p.schema.Name = util.BaseFileName(p.path)
+		p.schema.Name = BaseFileName(p.path)
 	}
 	if p.schema.Namespace == "" {
-		p.schema.Namespace = util.GetString(p.conf, "namespace")
+		p.schema.Namespace = p.conf.GetString("namespace")
 	}
 	comment := ""
 	for {
@@ -195,7 +188,7 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 			break
 		}
 		switch tok.Type {
-		case util.SYMBOL:
+		case SYMBOL:
 			switch tok.Text {
 			case "name":
 				err = p.parseNameDirective(comment)
@@ -230,11 +223,11 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 				}
 			}
 			comment = ""
-		case util.LINE_COMMENT:
+		case LINE_COMMENT:
 			comment = p.MergeComment(comment, tok.Text)
-		case util.SEMICOLON:
+		case SEMICOLON:
 			/* ignore */
-		case util.NEWLINE:
+		case NEWLINE:
 			/* ignore */
 		default:
 			return p.expectedDirectiveError()
@@ -244,7 +237,7 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 		}
 	}
 	var err error
-	p.model, err = sadl.NewModel(p.schema)
+	p.model, err = NewModel(p.schema)
 	p.schema = nil
 	if err != nil {
 		return err
@@ -271,7 +264,7 @@ func (p *Parser) parseNamespaceDirective(comment string) error {
 		if tok == nil {
 			break
 		}
-		if tok.Type != util.DOT {
+		if tok.Type != DOT {
 			p.UngetToken()
 			break
 		}
@@ -302,7 +295,7 @@ func (p *Parser) parseVersionDirective(comment string) error {
 		return p.EndOfFileError()
 	}
 	switch tok.Type {
-	case util.NUMBER, util.SYMBOL, util.STRING:
+	case NUMBER, SYMBOL, STRING:
 		p.schema.Version = tok.Text
 		return nil
 	default:
@@ -346,7 +339,7 @@ func (p *Parser) parseIncludeDirective(comment string) error {
 		incparser, err = parseFileNoValidate(fname, p.conf, p.extensionList())
 		if err == nil {
 			inc := incparser.model
-			tmpModel, err := sadl.NewModel(p.schema)
+			tmpModel, err := NewModel(p.schema)
 			if err != nil {
 				return err
 			}
@@ -375,7 +368,7 @@ func (p *Parser) parseActionDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	err = p.expect(util.OPEN_PAREN)
+	err = p.expect(OPEN_PAREN)
 	if err != nil {
 		return err
 	}
@@ -384,14 +377,14 @@ func (p *Parser) parseActionDirective(comment string) error {
 		return p.EndOfFileError()
 	}
 	input := ""
-	if tok.Type == util.SYMBOL {
+	if tok.Type == SYMBOL {
 		input = tok.Text
 		tok = p.GetToken()
 		if tok == nil {
 			return p.EndOfFileError()
 		}
 	}
-	if tok.Type != util.CLOSE_PAREN {
+	if tok.Type != CLOSE_PAREN {
 		return p.SyntaxError()
 	}
 	output := ""
@@ -399,12 +392,12 @@ func (p *Parser) parseActionDirective(comment string) error {
 	var etypes []string
 	tok = p.GetToken()
 	if tok != nil {
-		if tok.Type == util.SYMBOL {
+		if tok.Type == SYMBOL {
 			if tok.Text != "except" {
 				output = tok.Text
 				tok = p.GetToken()
 			}
-			if tok != nil && tok.Type == util.SYMBOL && tok.Text == "except" {
+			if tok != nil && tok.Type == SYMBOL && tok.Text == "except" {
 				for {
 					etype := p.getIdentifier()
 					if etype == "" {
@@ -417,7 +410,7 @@ func (p *Parser) parseActionDirective(comment string) error {
 				}
 			} else {
 				if tok != nil {
-					if tok.Type == util.SYMBOL {
+					if tok.Type == SYMBOL {
 						return p.SyntaxError()
 					}
 					p.UngetToken()
@@ -432,7 +425,7 @@ func (p *Parser) parseActionDirective(comment string) error {
 		return err
 	}
 	comment, err = p.EndOfStatement(comment)
-	action := &sadl.ActionDef{
+	action := &ActionDef{
 		Name:        name,
 		Input:       input,
 		Output:      output,
@@ -449,11 +442,11 @@ func (p *Parser) getIdentifier() string {
 	if tok == nil {
 		return ""
 	}
-	if tok.Type == util.COMMA {
+	if tok.Type == COMMA {
 		//ignore the comma, try again
 		return p.getIdentifier()
 	}
-	if tok.Type == util.SYMBOL {
+	if tok.Type == SYMBOL {
 		return tok.Text
 	}
 	p.UngetToken()
@@ -481,7 +474,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if err != nil {
 		return err
 	}
-	op := &sadl.HttpDef{
+	op := &HttpDef{
 		Method:      method,
 		Path:        pathTemplate,
 		Name:        options.Action,
@@ -492,7 +485,7 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type == util.OPEN_BRACE {
+	if tok.Type == OPEN_BRACE {
 		var done bool
 		op.Comment = p.ParseTrailingComment(comment)
 		comment = ""
@@ -517,17 +510,17 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	return nil
 }
 
-func ensureResourceName(hact *sadl.HttpDef) error {
+func ensureResourceName(hact *HttpDef) error {
 	if hact.Resource == "" {
 		hact.Resource = resourceName(hact)
 		if hact.Resource == "" {
-			return fmt.Errorf("Cannot determine resource name: %s", util.Pretty(hact))
+			return fmt.Errorf("Cannot determine resource name: %s", Pretty(hact))
 		}
 	}
 	return nil
 }
 
-func ensureRequiredParams(hact *sadl.HttpDef) {
+func ensureRequiredParams(hact *HttpDef) {
 	for _, in := range hact.Inputs {
 		if in.Query == "" && in.Header != "" { //body or pathparam
 			in.Required = true
@@ -546,7 +539,7 @@ func ensureRequiredParams(hact *sadl.HttpDef) {
 	}
 }
 
-func resourceName(hact *sadl.HttpDef) string {
+func resourceName(hact *HttpDef) string {
 	parts := strings.Split(hact.Path, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
 		if strings.Index(parts[i], "{") < 0 {
@@ -556,11 +549,11 @@ func resourceName(hact *sadl.HttpDef) string {
 	return ""
 }
 
-func actionName(hact *sadl.HttpDef) string {
-	return strings.ToLower(hact.Method) + util.Capitalize(hact.Resource)
+func actionName(hact *HttpDef) string {
+	return strings.ToLower(hact.Method) + Capitalize(hact.Resource)
 }
 
-func ensureActionName(hact *sadl.HttpDef) error {
+func ensureActionName(hact *HttpDef) error {
 	if hact.Name == "" {
 		err := ensureResourceName(hact)
 		if err != nil {
@@ -571,7 +564,7 @@ func ensureActionName(hact *sadl.HttpDef) error {
 	return nil
 }
 
-func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error {
+func (p *Parser) parseHttpSpec(op *HttpDef, comment string, top bool) error {
 	pathTemplate := op.Path
 	ename, err := p.ExpectIdentifier()
 	if err != nil {
@@ -602,8 +595,8 @@ func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error
 		return err
 	}
 	comment, err = p.EndOfStatement(comment)
-	spec := &sadl.HttpParamSpec{
-		StructFieldDef: sadl.StructFieldDef{
+	spec := &HttpParamSpec{
+		StructFieldDef: StructFieldDef{
 			Name:        ename,
 			Annotations: options.Annotations,
 			Comment:     comment,
@@ -632,7 +625,7 @@ func (p *Parser) parseHttpSpec(op *sadl.HttpDef, comment string, top bool) error
 	return nil
 }
 
-func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
+func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 	if op.Expected != nil {
 		return p.Error("Only a single 'expect' directive is allowed per HTTP action")
 	}
@@ -644,7 +637,7 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	if err != nil {
 		return err
 	}
-	op.Expected = &sadl.HttpExpectedSpec{
+	op.Expected = &HttpExpectedSpec{
 		Status:      estatus,
 		Annotations: options.Annotations,
 	}
@@ -652,7 +645,7 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type == util.OPEN_BRACE {
+	if tok.Type == OPEN_BRACE {
 		op.Expected.Comment = p.ParseTrailingComment(comment)
 		comment = ""
 		for {
@@ -666,11 +659,11 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 				return err
 			}
 		}
-	} else if tok.Type == util.SYMBOL {
-		output := &sadl.HttpParamSpec{
-			StructFieldDef: sadl.StructFieldDef{
+	} else if tok.Type == SYMBOL {
+		output := &HttpParamSpec{
+			StructFieldDef: StructFieldDef{
 				Name: "body",
-				TypeSpec: sadl.TypeSpec{
+				TypeSpec: TypeSpec{
 					Type: tok.Text,
 				},
 			},
@@ -683,7 +676,7 @@ func (p *Parser) parseHttpExpectedSpec(op *sadl.HttpDef, comment string) error {
 	return err
 }
 
-func (p *Parser) parseHttpExceptionSpec(op *sadl.HttpDef, comment string) error {
+func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
 	var estatus int32
 	tok := p.GetToken()
 	if tok == nil {
@@ -713,7 +706,7 @@ func (p *Parser) parseHttpExceptionSpec(op *sadl.HttpDef, comment string) error 
 	if err != nil {
 		return err
 	}
-	exc := &sadl.HttpExceptionSpec{
+	exc := &HttpExceptionSpec{
 		Type:        etype,
 		Status:      estatus,
 		Annotations: options.Annotations,
@@ -757,15 +750,15 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 		return false, comment, p.EndOfFileError()
 	}
 	for {
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == CLOSE_BRACE {
 			return true, comment, nil
-		} else if tok.Type == util.LINE_COMMENT {
+		} else if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 			tok = p.GetToken()
 			if tok == nil {
 				return false, comment, p.EndOfFileError()
 			}
-		} else if tok.Type == util.NEWLINE {
+		} else if tok.Type == NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return false, comment, p.EndOfFileError()
@@ -788,7 +781,7 @@ func (p *Parser) parseExampleDirective(comment string) error {
 	}
 	val, err := p.parseLiteralValue()
 	if err == nil {
-		ex := &sadl.ExampleDef{
+		ex := &ExampleDef{
 			Target:  target,
 			Example: val,
 			Comment: comment,
@@ -811,8 +804,8 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		return err
 	}
 	comment = p.MergeComment(comment, comment2)
-	td := &sadl.TypeDef{
-		TypeSpec: sadl.TypeSpec{
+	td := &TypeDef{
+		TypeSpec: TypeSpec{
 			Type: superName,
 		},
 		Name:    typeName,
@@ -857,7 +850,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 	return nil
 }
 
-func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string, error) {
+func (p *Parser) ParseTypeSpec(comment string) (*TypeSpec, *Options, string, error) {
 	tsType, tsParams, tsFields, tsElements, options, tsComment, err := p.ParseTypeSpecElements()
 	if err != nil {
 		return nil, nil, "", err
@@ -881,7 +874,7 @@ func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string
 	if err != nil {
 		return nil, nil, "", err
 	}
-	ts := &sadl.TypeSpec{
+	ts := &TypeSpec{
 		Type:     tsType,
 		Items:    tsItems,
 		Keys:     tsKeys,
@@ -893,7 +886,7 @@ func (p *Parser) ParseTypeSpec(comment string) (*sadl.TypeSpec, *Options, string
 	return ts, options, comment, nil
 }
 
-func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldDef, []*sadl.EnumElementDef, *Options, string, error) {
+func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, []*EnumElementDef, *Options, string, error) {
 	options := &Options{}
 	typeName, err := p.ExpectIdentifier()
 	if err != nil {
@@ -903,7 +896,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 	if tok == nil {
 		return typeName, nil, nil, nil, options, "", nil
 	}
-	if tok.Type == util.OPEN_ANGLE {
+	if tok.Type == OPEN_ANGLE {
 		var params []string
 		var expectedParams int
 		switch typeName {
@@ -921,21 +914,21 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 			if tok == nil {
 				return typeName, nil, nil, nil, options, "", p.EndOfFileError()
 			}
-			if tok.Type != util.COMMA {
-				if tok.Type == util.CLOSE_ANGLE {
+			if tok.Type != COMMA {
+				if tok.Type == CLOSE_ANGLE {
 					if expectedParams >= 0 && expectedParams != len(params) {
 						return typeName, nil, nil, nil, options, "", p.SyntaxError()
 					}
 					return typeName, params, nil, nil, options, "", nil
 				}
-				if tok.Type != util.SYMBOL {
+				if tok.Type != SYMBOL {
 					return typeName, params, nil, nil, options, "", p.SyntaxError()
 				}
 				params = append(params, tok.Text)
 			}
 		}
 	} else if typeName == "Struct" || typeName == "Enum" || typeName == "Union" {
-		if tok.Type != util.OPEN_BRACE {
+		if tok.Type != OPEN_BRACE {
 			p.UngetToken()
 			options, err = p.ParseOptions(typeName, []string{})
 			if err != nil {
@@ -946,16 +939,16 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 				return typeName, nil, nil, nil, options, "", p.EndOfFileError()
 			}
 		}
-		if tok.Type == util.OPEN_BRACE {
+		if tok.Type == OPEN_BRACE {
 			comment := p.ParseTrailingComment("")
 			switch typeName {
 			case "Struct", "Union":
-				var fields []*sadl.StructFieldDef
+				var fields []*StructFieldDef
 				tok := p.GetToken()
 				if tok == nil {
 					return typeName, nil, fields, nil, options, comment, p.SyntaxError()
 				}
-				if tok.Type != util.NEWLINE {
+				if tok.Type != NEWLINE {
 					p.UngetToken()
 				}
 				for {
@@ -972,12 +965,12 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 				p.UngetToken() //the closing brace
 				return typeName, nil, fields, nil, options, comment, nil
 			case "Enum":
-				var elements []*sadl.EnumElementDef
+				var elements []*EnumElementDef
 				tok := p.GetToken()
 				if tok == nil {
 					return typeName, nil, nil, nil, options, comment, p.SyntaxError()
 				}
-				if tok.Type != util.NEWLINE {
+				if tok.Type != NEWLINE {
 					p.UngetToken()
 				}
 				for {
@@ -1001,7 +994,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*sadl.StructFieldD
 	return typeName, nil, nil, nil, options, "", nil
 }
 
-func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
+func (p *Parser) parseAnyDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1009,7 +1002,7 @@ func (p *Parser) parseAnyDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseBoolDef(td *sadl.TypeDef) error {
+func (p *Parser) parseBoolDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1017,7 +1010,7 @@ func (p *Parser) parseBoolDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseNumberDef(td *sadl.TypeDef) error {
+func (p *Parser) parseNumberDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "min", "max")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1025,7 +1018,7 @@ func (p *Parser) parseNumberDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseBytesDef(td *sadl.TypeDef) error {
+func (p *Parser) parseBytesDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "minsize", "maxsize")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1033,7 +1026,7 @@ func (p *Parser) parseBytesDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseStringDef(td *sadl.TypeDef) error {
+func (p *Parser) parseStringDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "minsize", "maxsize", "pattern", "values", "reference")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1041,7 +1034,7 @@ func (p *Parser) parseStringDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseTimestampDef(td *sadl.TypeDef) error {
+func (p *Parser) parseTimestampDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1049,7 +1042,7 @@ func (p *Parser) parseTimestampDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseUUIDDef(td *sadl.TypeDef) error {
+func (p *Parser) parseUUIDDef(td *TypeDef) error {
 	err := p.parseTypeOptions(td, "reference")
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
@@ -1057,7 +1050,7 @@ func (p *Parser) parseUUIDDef(td *sadl.TypeDef) error {
 	return err
 }
 
-func (p *Parser) parseUnitValueDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseUnitValueDef(td *TypeDef, params []string) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Value, td.Unit, err = p.unitValueParams(params)
@@ -1068,7 +1061,7 @@ func (p *Parser) parseUnitValueDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseArrayDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseArrayDef(td *TypeDef, params []string) error {
 	var err error
 	td.Items, err = p.arrayParams(params)
 	if err == nil {
@@ -1080,7 +1073,7 @@ func (p *Parser) parseArrayDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
+func (p *Parser) parseMapDef(td *TypeDef, params []string) error {
 	var err error
 	td.Keys, td.Items, err = p.mapParams(params)
 	if err == nil {
@@ -1092,7 +1085,7 @@ func (p *Parser) parseMapDef(td *sadl.TypeDef, params []string) error {
 	return err
 }
 
-func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef) error {
+func (p *Parser) parseStructDef(td *TypeDef, fields []*StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		td.Fields = fields
@@ -1100,24 +1093,24 @@ func (p *Parser) parseStructDef(td *sadl.TypeDef, fields []*sadl.StructFieldDef)
 	return err
 }
 
-func (p *Parser) parseEnumDef(td *sadl.TypeDef, elements []*sadl.EnumElementDef) error {
+func (p *Parser) parseEnumDef(td *TypeDef, elements []*EnumElementDef) error {
 	td.Elements = elements
 	return nil
 }
 
-func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string, fields []*sadl.StructFieldDef) error {
+func (p *Parser) parseUnionDef(td *TypeDef, params []string, fields []*StructFieldDef) error {
 	err := p.parseTypeOptions(td)
 	if err == nil {
 		if params != nil {
 			for _, v := range params {
-				vd := &sadl.UnionVariantDef{}
+				vd := &UnionVariantDef{}
 				vd.Name = v
 				vd.Type = v
 				td.Variants = append(td.Variants, vd)
 			}
 		} else if fields != nil {
 			for _, v := range fields {
-				vd := &sadl.UnionVariantDef{}
+				vd := &UnionVariantDef{}
 				vd.Name = v.Name
 				vd.Type = v.Type
 				td.Variants = append(td.Variants, vd)
@@ -1131,8 +1124,8 @@ func (p *Parser) parseUnionDef(td *sadl.TypeDef, params []string, fields []*sadl
 }
 
 func (p *Parser) Error(msg string) error {
-	util.Debug("*** error, last token:", p.lastToken)
-	return fmt.Errorf("*** %s\n", util.FormattedAnnotation(p.path, p.Source(), "", msg, p.lastToken, util.RED, 5))
+	Debug("*** error, last token:", p.lastToken)
+	return fmt.Errorf("*** %s\n", FormattedAnnotation(p.path, p.Source(), "", msg, p.lastToken, RED, 5))
 }
 
 func (p *Parser) SyntaxError() error {
@@ -1143,11 +1136,11 @@ func (p *Parser) EndOfFileError() error {
 	return p.Error("Unexpected end of file")
 }
 
-func (p *Parser) assertIdentifier(tok *util.Token) (string, error) {
+func (p *Parser) assertIdentifier(tok *Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == util.SYMBOL {
+	if tok.Type == SYMBOL {
 		return tok.Text, nil
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected symbol, found %v", tok.Type))
@@ -1168,7 +1161,7 @@ func (p *Parser) ExpectCompoundIdentifier() (string, error) {
 	if tok == nil {
 		return s, nil
 	}
-	if tok.Type != util.DOT {
+	if tok.Type != DOT {
 		p.UngetToken()
 		return s, nil
 	}
@@ -1180,18 +1173,18 @@ func (p *Parser) ExpectCompoundIdentifier() (string, error) {
 }
 
 func (p *Parser) expectEqualsIdentifier() (string, error) {
-	err := p.expect(util.EQUALS)
+	err := p.expect(EQUALS)
 	if err != nil {
 		return "", err
 	}
 	return p.ExpectIdentifier()
 }
 
-func (p *Parser) assertString(tok *util.Token) (string, error) {
+func (p *Parser) assertString(tok *Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == util.STRING {
+	if tok.Type == STRING {
 		return tok.Text, nil
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected string, found %v", tok.Type))
@@ -1203,7 +1196,7 @@ func (p *Parser) ExpectString() (string, error) {
 }
 
 func (p *Parser) expectEqualsString() (string, error) {
-	err := p.expect(util.EQUALS)
+	err := p.expect(EQUALS)
 	if err != nil {
 		return "", err
 	}
@@ -1235,7 +1228,7 @@ func (p *Parser) expectInt32() (int32, error) {
 
 func (p *Parser) expectEqualsInt32() (*int32, error) {
 	var val int32
-	err := p.expect(util.EQUALS)
+	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
 	}
@@ -1260,7 +1253,7 @@ func (p *Parser) expectInt64() (int64, error) {
 
 func (p *Parser) expectEqualsInt64() (*int64, error) {
 	var val int64
-	err := p.expect(util.EQUALS)
+	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
 	}
@@ -1271,26 +1264,26 @@ func (p *Parser) expectEqualsInt64() (*int64, error) {
 	return &val, nil
 }
 
-func (p *Parser) expectNumber() (*sadl.Decimal, error) {
+func (p *Parser) expectNumber() (*Decimal, error) {
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
 	if tok.IsNumeric() {
-		return sadl.ParseDecimal(tok.Text)
+		return ParseDecimal(tok.Text)
 	}
 	return nil, p.Error(fmt.Sprintf("Expected number, found %v", tok.Type))
 }
 
-func (p *Parser) expectEqualsNumber() (*sadl.Decimal, error) {
-	err := p.expect(util.EQUALS)
+func (p *Parser) expectEqualsNumber() (*Decimal, error) {
+	err := p.expect(EQUALS)
 	if err != nil {
 		return nil, err
 	}
 	return p.expectNumber()
 }
 
-func (p *Parser) expect(toktype util.TokenType) error {
+func (p *Parser) expect(toktype TokenType) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.EndOfFileError()
@@ -1312,7 +1305,7 @@ func containsOption(options []string, option string) bool {
 	return false
 }
 
-func (p *Parser) parseTypeOptions(td *sadl.TypeDef, acceptable ...string) error {
+func (p *Parser) parseTypeOptions(td *TypeDef, acceptable ...string) error {
 	options, err := p.ParseOptions(td.Type, acceptable)
 	if err == nil {
 		td.Pattern = options.Pattern
@@ -1334,8 +1327,8 @@ type Options struct {
 	Values      []string
 	MinSize     *int64
 	MaxSize     *int64
-	Min         *sadl.Decimal
-	Max         *sadl.Decimal
+	Min         *Decimal
+	Max         *Decimal
 	Action      string
 	Resource    string
 	Header      string
@@ -1351,16 +1344,16 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 	if tok == nil {
 		return options, nil
 	}
-	if tok.Type == util.OPEN_PAREN {
+	if tok.Type == OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return nil, p.SyntaxError()
 			}
-			if tok.Type == util.CLOSE_PAREN {
+			if tok.Type == CLOSE_PAREN {
 				return options, nil
 			}
-			if tok.Type == util.SYMBOL {
+			if tok.Type == SYMBOL {
 				match := strings.ToLower(tok.Text)
 				if strings.HasPrefix(match, "x_") {
 					options.Annotations, err = p.parseExtendedOption(options.Annotations, tok.Text)
@@ -1401,7 +1394,7 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 				if err != nil {
 					return nil, err
 				}
-			} else if tok.Type == util.COMMA {
+			} else if tok.Type == COMMA {
 				//ignore
 			} else {
 				return nil, p.SyntaxError()
@@ -1421,28 +1414,28 @@ func (p *Parser) parseStringToEndOfLine() (string, string, error) {
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type == util.EQUALS {
+	if tok.Type == EQUALS {
 		//ignore it except error if at end of file
 		tok = p.GetToken()
 		if tok == nil {
 			return "", "", p.EndOfFileError()
 		}
 	}
-	if tok.Type == util.STRING {
+	if tok.Type == STRING {
 		val = tok.Text
 		tok = p.GetToken()
 	}
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type == util.LINE_COMMENT {
+	if tok.Type == LINE_COMMENT {
 		comment = tok.Text
 		tok = p.GetToken()
 	}
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type != util.NEWLINE {
+	if tok.Type != NEWLINE {
 		return "", "", p.SyntaxError()
 	}
 	return val, comment, nil
@@ -1462,7 +1455,7 @@ func (p *Parser) parseExtendedOption(annos map[string]string, anno string) (map[
 	var val string
 	tok := p.GetToken()
 	if tok != nil {
-		if tok.Type == util.EQUALS {
+		if tok.Type == EQUALS {
 			val, err = p.ExpectString()
 		} else {
 			p.UngetToken()
@@ -1480,37 +1473,37 @@ func (p *Parser) parseExtendedOption(annos map[string]string, anno string) (map[
 	return annos, err
 }
 
-func (p *Parser) parseBytesOptions(typedef *sadl.TypeDef) error {
+func (p *Parser) parseBytesOptions(typedef *TypeDef) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.SyntaxError()
 	}
 	expected := ""
-	if tok.Type == util.OPEN_PAREN {
+	if tok.Type == OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return p.SyntaxError()
 			}
-			if tok.Type == util.CLOSE_PAREN {
+			if tok.Type == CLOSE_PAREN {
 				return nil
 			}
-			if tok.Type == util.SYMBOL {
+			if tok.Type == SYMBOL {
 				switch tok.Text {
 				case "minsize", "maxsize":
 					expected = tok.Text
 				default:
 					return p.Error("invalid bytes option: " + tok.Text)
 				}
-			} else if tok.Type == util.EQUALS {
+			} else if tok.Type == EQUALS {
 				if expected == "" {
 					return p.SyntaxError()
 				}
-			} else if tok.Type == util.NUMBER {
+			} else if tok.Type == NUMBER {
 				if expected == "" {
 					return p.SyntaxError()
 				}
-				val, err := sadl.ParseDecimal(tok.Text)
+				val, err := ParseDecimal(tok.Text)
 				if err != nil {
 					return err
 				}
@@ -1538,7 +1531,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != util.EQUALS {
+	if tok.Type != EQUALS {
 		return nil, p.SyntaxError()
 	}
 
@@ -1546,7 +1539,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACKET {
+	if tok.Type != OPEN_BRACKET {
 		return nil, p.SyntaxError()
 	}
 	for {
@@ -1554,12 +1547,12 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACKET {
+		if tok.Type == CLOSE_BRACKET {
 			break
 		}
-		if tok.Type == util.STRING {
+		if tok.Type == STRING {
 			values = append(values, tok.Text)
-		} else if tok.Type == util.COMMA || tok.Type == util.NEWLINE {
+		} else if tok.Type == COMMA || tok.Type == NEWLINE {
 			//ignore
 		} else {
 			return nil, p.SyntaxError()
@@ -1568,7 +1561,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	return values, nil
 }
 
-func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
+func (p *Parser) parseEnumElementDef() (*EnumElementDef, error) {
 	comment := ""
 	sym := ""
 	var err error
@@ -1577,11 +1570,11 @@ func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == CLOSE_BRACE {
 			return nil, nil
-		} else if tok.Type == util.LINE_COMMENT {
+		} else if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
-		} else if tok.Type == util.SEMICOLON || tok.Type == util.NEWLINE || tok.Type == util.COMMA {
+		} else if tok.Type == SEMICOLON || tok.Type == NEWLINE || tok.Type == COMMA {
 			//ignore
 		} else {
 			sym, err = p.assertIdentifier(tok)
@@ -1596,7 +1589,7 @@ func (p *Parser) parseEnumElementDef() (*sadl.EnumElementDef, error) {
 		return nil, err
 	}
 	comment = p.ParseTrailingComment(comment)
-	return &sadl.EnumElementDef{
+	return &EnumElementDef{
 		Symbol:      sym,
 		Comment:     comment,
 		Annotations: options.Annotations,
@@ -1608,29 +1601,29 @@ func (p *Parser) expectNewline() error {
 	if tok == nil {
 		return p.SyntaxError()
 	}
-	if tok.Type != util.NEWLINE {
+	if tok.Type != NEWLINE {
 		p.UngetToken()
 		return p.SyntaxError()
 	}
 	return nil
 }
 
-func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
+func (p *Parser) parseStructFieldDef() (*StructFieldDef, error) {
 	var comment string
 	tok := p.GetToken()
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
 	for {
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == CLOSE_BRACE {
 			return nil, nil
-		} else if tok.Type == util.LINE_COMMENT {
+		} else if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment("", tok.Text)
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
-		} else if tok.Type == util.NEWLINE {
+		} else if tok.Type == NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
@@ -1649,7 +1642,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 		return nil, err
 	}
 	comment = p.MergeComment(comment, fcomment)
-	field := &sadl.StructFieldDef{
+	field := &StructFieldDef{
 		Name:     fname,
 		Comment:  comment,
 		TypeSpec: *ts,
@@ -1672,7 +1665,7 @@ func (p *Parser) parseStructFieldDef() (*sadl.StructFieldDef, error) {
 	return field, nil
 }
 
-func (p *Parser) parseStructFieldOptions(field *sadl.StructFieldDef) error {
+func (p *Parser) parseStructFieldOptions(field *StructFieldDef) error {
 	var acceptable []string
 	switch field.Type {
 	case "String":
@@ -1703,7 +1696,7 @@ func (p *Parser) parseStructFieldOptions(field *sadl.StructFieldDef) error {
 }
 
 func (p *Parser) parseEqualsLiteral() (interface{}, error) {
-	err := p.expect(util.EQUALS)
+	err := p.expect(EQUALS)
 	if err != nil {
 		return 0, err
 	}
@@ -1718,24 +1711,24 @@ func (p *Parser) parseLiteralValue() (interface{}, error) {
 	return p.parseLiteral(tok)
 }
 
-func (p *Parser) parseLiteral(tok *util.Token) (interface{}, error) {
+func (p *Parser) parseLiteral(tok *Token) (interface{}, error) {
 	switch tok.Type {
-	case util.SYMBOL:
+	case SYMBOL:
 		return p.parseLiteralSymbol(tok)
-	case util.STRING:
+	case STRING:
 		return p.parseLiteralString(tok)
-	case util.NUMBER:
+	case NUMBER:
 		return p.parseLiteralNumber(tok)
-	case util.OPEN_BRACKET:
+	case OPEN_BRACKET:
 		return p.parseLiteralArray()
-	case util.OPEN_BRACE:
+	case OPEN_BRACE:
 		return p.parseLiteralObject()
 	default:
 		return nil, p.SyntaxError()
 	}
 }
 
-func (p *Parser) parseLiteralSymbol(tok *util.Token) (interface{}, error) {
+func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
 	switch tok.Text {
 	case "true":
 		return true, nil
@@ -1747,7 +1740,7 @@ func (p *Parser) parseLiteralSymbol(tok *util.Token) (interface{}, error) {
 		return nil, fmt.Errorf("Not a valid symbol: %s", tok.Text)
 	}
 }
-func (p *Parser) parseLiteralString(tok *util.Token) (*string, error) {
+func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 	s := "\"" + tok.Text + "\""
 	q, err := strconv.Unquote(s)
 	if err != nil {
@@ -1756,8 +1749,8 @@ func (p *Parser) parseLiteralString(tok *util.Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(tok *util.Token) (interface{}, error) {
-	num, err := sadl.ParseDecimal(tok.Text)
+func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
+	num, err := ParseDecimal(tok.Text)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
 	}
@@ -1771,11 +1764,11 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type != util.NEWLINE {
-			if tok.Type == util.CLOSE_BRACKET {
+		if tok.Type != NEWLINE {
+			if tok.Type == CLOSE_BRACKET {
 				return ary, nil
 			}
-			if tok.Type != util.COMMA {
+			if tok.Type != COMMA {
 				obj, err := p.parseLiteral(tok)
 				if err != nil {
 					return nil, err
@@ -1794,15 +1787,15 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == CLOSE_BRACE {
 			return obj, nil
 		}
-		if tok.Type == util.STRING {
+		if tok.Type == STRING {
 			pkey, err := p.parseLiteralString(tok)
 			if err != nil {
 				return nil, err
 			}
-			err = p.expect(util.COLON)
+			err = p.expect(COLON)
 			if err != nil {
 				return nil, err
 			}
@@ -1811,7 +1804,7 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 				return nil, err
 			}
 			obj[*pkey] = val
-		} else if tok.Type == util.SYMBOL {
+		} else if tok.Type == SYMBOL {
 			return nil, p.Error("Expected String key for JSON object, found symbol '" + tok.Text + "'")
 		} else {
 			//fmt.Println("ignoring this token:", tok)
@@ -1832,21 +1825,21 @@ func (p *Parser) arrayParams(params []string) (string, error) {
 	return items, nil
 }
 
-func (p *Parser) parseCollectionOptions(typedef *sadl.TypeDef) error {
+func (p *Parser) parseCollectionOptions(typedef *TypeDef) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.SyntaxError()
 	}
-	if tok.Type == util.OPEN_PAREN {
+	if tok.Type == OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return p.SyntaxError()
 			}
-			if tok.Type == util.CLOSE_PAREN {
+			if tok.Type == CLOSE_PAREN {
 				return nil
 			}
-			if tok.Type == util.SYMBOL {
+			if tok.Type == SYMBOL {
 				switch tok.Text {
 				case "minsize":
 					num, err := p.expectEqualsInt64()
@@ -1910,11 +1903,11 @@ func (p *Parser) EndOfStatement(comment string) (string, error) {
 		if tok == nil {
 			return comment, nil
 		}
-		if tok.Type == util.SEMICOLON {
+		if tok.Type == SEMICOLON {
 			//ignore it
-		} else if tok.Type == util.LINE_COMMENT {
+		} else if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
-		} else if tok.Type == util.NEWLINE {
+		} else if tok.Type == NEWLINE {
 			return comment, nil
 		} else {
 			return comment, p.SyntaxError()
@@ -1928,7 +1921,7 @@ func (p *Parser) parseLeadingComment(comment string) string {
 		if tok == nil {
 			return comment
 		}
-		if tok.Type == util.LINE_COMMENT {
+		if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 		} else {
 			p.UngetToken()
@@ -1940,7 +1933,7 @@ func (p *Parser) parseLeadingComment(comment string) string {
 func (p *Parser) ParseTrailingComment(comment string) string {
 	tok := p.GetToken()
 	if tok != nil {
-		if tok.Type == util.LINE_COMMENT {
+		if tok.Type == LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 		} else {
 			p.UngetToken()
@@ -1959,7 +1952,7 @@ func (p *Parser) MergeComment(comment1 string, comment2 string) string {
 	return strings.TrimSpace(comment1) + " " + strings.TrimSpace(comment2)
 }
 
-func (p *Parser) Validate() (*sadl.Model, error) {
+func (p *Parser) Validate() (*Model, error) {
 	var err error
 	for _, td := range p.model.Types {
 		switch td.Type {
@@ -2007,12 +2000,12 @@ func (p *Parser) Validate() (*sadl.Model, error) {
 	return p.model, err
 }
 
-func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
+func (p *Parser) validateExample(ex *ExampleDef) error {
 	//todo: be able to address action requests & responses as targets
 	//	ts, err := p.model.FindExampleType(ex)
 	var err error
 	td := p.model.FindType(ex.Target)
-	var ts *sadl.TypeSpec
+	var ts *TypeSpec
 	if td != nil {
 		ts = &td.TypeSpec
 	} else {
@@ -2034,7 +2027,7 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 	}
 	if ts == nil {
 		if strings.HasSuffix(ex.Target, "Request") {
-			hname := util.Uncapitalize(ex.Target[:len(ex.Target)-7])
+			hname := Uncapitalize(ex.Target[:len(ex.Target)-7])
 			hact := p.model.FindHttp(hname)
 			if hact == nil {
 				err = fmt.Errorf("Example target not found for '%s' (no http action named '%s' found)", ex.Target, hname)
@@ -2042,7 +2035,7 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 				return p.validateExampleAgainstHttpRequest(hact, ex)
 			}
 		} else if strings.HasSuffix(ex.Target, "Response") {
-			hname := util.Uncapitalize(ex.Target[:len(ex.Target)-8])
+			hname := Uncapitalize(ex.Target[:len(ex.Target)-8])
 			hact := p.model.FindHttp(hname)
 			if hact == nil {
 				err = fmt.Errorf("Example target not found for '%s' (no http action named '%s' found)", ex.Target, hname)
@@ -2062,7 +2055,7 @@ func (p *Parser) validateExample(ex *sadl.ExampleDef) error {
 	return p.model.ValidateAgainstTypeSpec("example for "+ex.Target, ts, ex.Example)
 }
 
-func (p *Parser) validateExampleAgainstHttpRequest(hact *sadl.HttpDef, ex *sadl.ExampleDef) error {
+func (p *Parser) validateExampleAgainstHttpRequest(hact *HttpDef, ex *ExampleDef) error {
 	present := make(map[string]bool, 0)
 	m, ok := ex.Example.(map[string]interface{})
 	if !ok {
@@ -2093,7 +2086,7 @@ func (p *Parser) validateExampleAgainstHttpRequest(hact *sadl.HttpDef, ex *sadl.
 	return nil
 }
 
-func (p *Parser) validateExampleAgainstHttpResponse(hact *sadl.HttpDef, ex *sadl.ExampleDef) error {
+func (p *Parser) validateExampleAgainstHttpResponse(hact *HttpDef, ex *ExampleDef) error {
 	present := make(map[string]bool, 0)
 	m, ok := ex.Example.(map[string]interface{})
 	if !ok {
@@ -2155,7 +2148,7 @@ func (p *Parser) validateHttpPathTemplate(path string) error {
 	return nil
 }
 
-func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
+func (p *Parser) validateHttp(hact *HttpDef) error {
 	err := p.validateHttpPathTemplate(hact.Path)
 	if err != nil {
 		return err
@@ -2171,11 +2164,11 @@ func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
 		if !in.Path && in.Query == "" && in.Header == "" {
 			if needsBody {
 				if bodyParam != "" {
-					return fmt.Errorf("HTTP action cannot have more than one body parameter (%q is already that parameter): %s", bodyParam, util.Pretty(hact))
+					return fmt.Errorf("HTTP action cannot have more than one body parameter (%q is already that parameter): %s", bodyParam, Pretty(hact))
 				}
 				bodyParam = in.Name
 			} else {
-				return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", in.Name, util.Pretty(hact), hact.Method+" "+hact.Path)
+				return fmt.Errorf("Input parameter %q to HTTP action is not a header or a variable in the path: %s - %q", in.Name, Pretty(hact), hact.Method+" "+hact.Path)
 			}
 		}
 	}
@@ -2197,7 +2190,7 @@ func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
 				}
 				bodyParam = out.Name
 			} else {
-				return fmt.Errorf("HTTP action cannot have a body in expected output for status codes 204 or 304: %s", util.Pretty(hact))
+				return fmt.Errorf("HTTP action cannot have a body in expected output for status codes 204 or 304: %s", Pretty(hact))
 			}
 		}
 	}
@@ -2210,7 +2203,7 @@ func (p *Parser) validateHttp(hact *sadl.HttpDef) error {
 	return nil
 }
 
-func (p *Parser) validateAction(action *sadl.ActionDef) error {
+func (p *Parser) validateAction(action *ActionDef) error {
 	if action.Input != "" {
 		t := p.model.FindType(action.Input)
 		if t == nil {
@@ -2232,7 +2225,7 @@ func (p *Parser) validateAction(action *sadl.ActionDef) error {
 	return nil
 }
 
-func (p *Parser) validateStringDef(td *sadl.TypeDef) error {
+func (p *Parser) validateStringDef(td *TypeDef) error {
 	if td.Pattern != "" {
 		if td.Values != nil {
 			return fmt.Errorf("Both 'pattern' and 'values' options cannot coexist in String type %s", td.Name)
@@ -2269,7 +2262,7 @@ func (p *Parser) validateStringDef(td *sadl.TypeDef) error {
 	return p.validateReference(td)
 }
 
-func (p *Parser) validateReference(td *sadl.TypeDef) error {
+func (p *Parser) validateReference(td *TypeDef) error {
 	if td.Reference != "" {
 		t := p.model.FindType(td.Reference)
 		if t == nil {
@@ -2279,7 +2272,7 @@ func (p *Parser) validateReference(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateUnitValue(td *sadl.TypeDef) error {
+func (p *Parser) validateUnitValue(td *TypeDef) error {
 	vt := p.model.FindType(td.Value)
 	if vt == nil {
 		return fmt.Errorf("Undefined value type '%s' for %s UnitValue type", td.Value, td.Name)
@@ -2297,7 +2290,7 @@ func (p *Parser) validateUnitValue(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateStruct(td *sadl.TypeDef) error {
+func (p *Parser) validateStruct(td *TypeDef) error {
 	model := p.model
 	for _, field := range td.Fields {
 		ftd := model.FindType(field.Type)
@@ -2343,7 +2336,7 @@ func (p *Parser) validateStruct(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateArray(td *sadl.TypeDef) error {
+func (p *Parser) validateArray(td *TypeDef) error {
 	model := p.model
 	if td.Items == "Any" {
 		return nil
@@ -2355,7 +2348,7 @@ func (p *Parser) validateArray(td *sadl.TypeDef) error {
 	return nil
 }
 
-func (p *Parser) validateMap(td *sadl.TypeDef) error {
+func (p *Parser) validateMap(td *TypeDef) error {
 	model := p.model
 	if td.Items == "Any" {
 		return nil

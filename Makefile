@@ -7,16 +7,11 @@ install:: all
 
 test::
 	go test github.com/boynton/sadl/test
-	go test github.com/boynton/sadl/io
 	go test github.com/boynton/sadl/openapi
 
 proper::
 	go fmt github.com/boynton/sadl
 	go vet github.com/boynton/sadl
-	go fmt github.com/boynton/sadl/util
-	go vet github.com/boynton/sadl/util
-	go fmt github.com/boynton/sadl/io
-	go vet github.com/boynton/sadl/io
 	go fmt github.com/boynton/sadl/test
 	go vet github.com/boynton/sadl/test
 	go fmt github.com/boynton/sadl/golang

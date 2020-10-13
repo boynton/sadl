@@ -8,7 +8,6 @@ import (
 
 	"github.com/boynton/sadl"
 	"github.com/boynton/sadl/graphql"
-	"github.com/boynton/sadl/io"
 	"github.com/boynton/sadl/openapi"
 	"github.com/boynton/sadl/smithy"
 )
@@ -62,7 +61,7 @@ func ValidImportFileType(path string) string {
 		for _, ftype := range ftypes {
 			switch ftype {
 			case "sadl":
-				if io.IsValidFile(path) {
+				if sadl.IsValidFile(path) {
 					return ftype
 				}
 			case "smithy":
@@ -85,7 +84,7 @@ func ValidImportFileType(path string) string {
 	return ""
 }
 
-func ImportFiles(paths []string, conf map[string]interface{}, extensions ...io.Extension) (*sadl.Model, error) {
+func ImportFiles(paths []string, conf *sadl.Data, extensions ...sadl.Extension) (*sadl.Model, error) {
 	chosenType := ""
 	flatPathList, err := expandPaths(paths)
 	if err != nil {
@@ -111,7 +110,7 @@ func ImportFiles(paths []string, conf map[string]interface{}, extensions ...io.E
 	return importFiles(importPaths, chosenType, conf, extensions)
 }
 
-func importFiles(paths []string, ftype string, conf map[string]interface{}, extensions []io.Extension) (*sadl.Model, error) {
+func importFiles(paths []string, ftype string, conf *sadl.Data, extensions []sadl.Extension) (*sadl.Model, error) {
 	switch ftype {
 	case "sadl":
 		if len(paths) != 1 {
@@ -119,9 +118,9 @@ func importFiles(paths []string, ftype string, conf map[string]interface{}, exte
 			return nil, fmt.Errorf("SADL doesn't support merging models, and more than one file was specified.")
 		}
 		if strings.HasSuffix(paths[0], ".json") {
-			return io.LoadModel(paths[0])
+			return sadl.LoadModel(paths[0])
 		}
-		return io.ParseSadlFile(paths[0], conf, extensions...)
+		return sadl.ParseSadlFile(paths[0], conf, extensions...)
 	case "smithy":
 		return smithy.Import(paths, conf)
 	case "openapi":

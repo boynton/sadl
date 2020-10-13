@@ -9,28 +9,57 @@ import (
 	"text/template"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 type ServerData struct {
-	Name           string
-	Model          *sadl.Model
-	Package        string
-	PackageLine    string
-	Port           int
-	MainClass      string
-	ImplClass      string
-	InterfaceClass string
-	ResourcesClass string
-	RootPath       string
-	Http           []*sadl.HttpDef
-	Inputs         []*sadl.HttpParamSpec
-	Expected       *sadl.HttpExpectedSpec
-	Errors         []*sadl.HttpExceptionSpec
-	Class          string
-	Imports        []string
-	Funcs          template.FuncMap
-	ExtraResources string
+	Name             string
+	Model            *sadl.Model
+	Package          string
+	PackageLine      string
+	Port             int
+	MainClass        string
+	ControllerClass  string
+	ImplClass        string
+	InterfaceClass   string
+	ImplClasses      []string
+	InterfaceClasses []string
+	RootPath         string
+	Http             []*sadl.HttpDef
+	Inputs           []*sadl.HttpParamSpec
+	Expected         *sadl.HttpExpectedSpec
+	Errors           []*sadl.HttpExceptionSpec
+	Class            string
+	Imports          []string
+	Funcs            template.FuncMap
+	Interfaces       map[string][]string
+	ExtraResources   string
+}
+
+type ScopedHttpDef struct {
+	sadl.HttpDef
+	InterfaceName string
+}
+
+func (gen *Generator) CreateServer() {
+	src := gen.SourceDir
+	rez := gen.ResourceDir
+	if gen.Err != nil {
+		return
+	}
+	gen.CreateServerDataAndFuncMap(src, rez)
+	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
+	for _, iface := range gen.serverData.InterfaceClasses {
+		gen.serverData.InterfaceClass = iface
+		gen.serverData.ImplClass = iface + "Impl"
+		gen.CreateJavaFileFromTemplate(iface, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+		gen.CreateJavaFileFromTemplate(iface+"Impl", implTemplate, gen.serverData, gen.serverData.Funcs, "")
+	}
+	gen.CreateJavaFileFromTemplate(gen.serverData.ControllerClass, controllerTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	for _, hact := range gen.Model.Http {
+		gen.CreateRequestPojo(hact)
+		gen.CreateResponsePojo(hact)
+	}
 }
 
 func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
@@ -46,14 +75,29 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		rootPath = "/"
 	}
 	gen.serverData = &ServerData{
-		RootPath:       rootPath,
-		Model:          gen.Model,
-		Name:           serviceName,
-		Port:           8080,
-		MainClass:      "Main",
-		ImplClass:      serviceName + "Impl",
-		InterfaceClass: serviceName + "Service",
-		ResourcesClass: serviceName + "Resources",
+		RootPath:        rootPath,
+		Model:           gen.Model,
+		Name:            serviceName,
+		Port:            8080,
+		MainClass:       "Main",
+		ControllerClass: serviceName + "Controller",
+	}
+	gen.serverData.Interfaces = make(map[string][]string, 0)
+	interfaces := gen.Config.GetMap("java", "interfaces")
+	if interfaces != nil {
+		for k, v := range interfaces {
+			gen.serverData.Interfaces[k] = sadl.AsStringArray(v)
+		}
+	} else {
+		lst := make([]string, 0)
+		for _, v := range gen.Model.Http {
+			lst = append(lst, v.Name)
+		}
+		gen.serverData.Interfaces[serviceName] = lst
+	}
+	for k, _ := range gen.serverData.Interfaces {
+		gen.serverData.InterfaceClasses = append(gen.serverData.InterfaceClasses, k)
+		gen.serverData.ImplClasses = append(gen.serverData.ImplClasses, k+"Impl")
 	}
 	entityNameType := func(hact *sadl.HttpDef) (string, string) {
 		for _, out := range hact.Expected.Outputs {
@@ -67,15 +111,52 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	reqType := func(name string) string {
 		return gen.RequestType(name)
 	}
+	implName := func(base string) string {
+		return sadl.Uncapitalize(base) + "Impl"
+	}
+	implTypeName := func(base string) string {
+		return base + "Impl"
+	}
+
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
-		"methodPath": func(hact *sadl.HttpDef) string {
-			path := hact.Path
+		"implClass": func() string { return "" },
+		"methodPath": func(shact *ScopedHttpDef) string {
+			path := shact.Path
 			i := strings.Index(path, "?")
 			if i >= 0 {
 				path = path[0:i]
 			}
 			return path
+		},
+		"implTypeName": implTypeName,
+		"implName":     implName,
+		"implConstructors": func() string {
+			var lst []string
+			for iname, _ := range gen.serverData.Interfaces {
+				lst = append(lst, "new "+implTypeName(iname)+"()")
+			}
+			return strings.Join(lst, ", ")
+		},
+		"implDecls": func() string {
+			var lst []string
+			for iname, _ := range gen.serverData.Interfaces {
+				lst = append(lst, implTypeName(iname)+" "+implName(iname))
+			}
+			return strings.Join(lst, ", ")
+		},
+		"interfaceName": func(base string) string { return sadl.Uncapitalize(base) },
+		"interfaceHttp": func(interfaceName string) []*ScopedHttpDef {
+			var tmp []*ScopedHttpDef
+			for _, hname := range gen.serverData.Interfaces[interfaceName] {
+				h := gen.Model.FindHttp(hname)
+				h2 := &ScopedHttpDef{
+					HttpDef:       *h,
+					InterfaceName: interfaceName,
+				}
+				tmp = append(tmp, h2)
+			}
+			return tmp
 		},
 		"outtype": func(hact *sadl.HttpDef) string {
 			_, t := gen.ActionInfo(hact)
@@ -89,20 +170,22 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		"resClass": func(hact *sadl.HttpDef) string {
 			return gen.ResponseType(gen.ActionName(hact))
 		},
-		"resEntity": func(hact *sadl.HttpDef) string {
-			resClass := gen.ResponseType(gen.ActionName(hact))
+		"resEntity": func(hact *ScopedHttpDef) string {
+			resClass := gen.ResponseType(gen.ActionName(&hact.HttpDef))
 			if gen.UseImmutable {
 				return resClass + ".builder().build()"
 			} else {
 				return "new " + resClass + "()"
 			}
 		},
-		"handlerSig": func(hact *sadl.HttpDef) string {
+		"handlerSig": func(shact *ScopedHttpDef) string {
+			hact := &shact.HttpDef
 			name := gen.ActionName(hact)
 			resType := gen.ResponseType(gen.ActionName(hact))
 			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
-		"resourceSig": func(hact *sadl.HttpDef) string {
+		"resourceSig": func(shact *ScopedHttpDef) string {
+			hact := &shact.HttpDef
 			name := gen.ActionName(hact) //i.e. "getFoo"
 			var params []string
 			for _, in := range hact.Inputs {
@@ -124,7 +207,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 					case bool:
 						param = fmt.Sprintf("@DefaultValue(\"%v\")", b) + " " + param
 					default:
-						fmt.Println("Whoops:", util.Pretty(in.Default))
+						fmt.Println("Whoops:", sadl.Pretty(in.Default))
 						panic("HERE")
 					}
 				}
@@ -134,7 +217,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			paramlist := strings.Join(params, ", ")
 			return "public " + etype + " " + name + "(" + paramlist + ")"
 		},
-		"resourceBody": func(hact *sadl.HttpDef) string {
+		"resourceBody": func(shact *ScopedHttpDef) string {
+			hact := &shact.HttpDef
+			iname := shact.InterfaceName
 			name := gen.ActionName(hact)
 			reqname := reqType(name)
 			resname := gen.ResponseType(gen.ActionName(hact))
@@ -159,7 +244,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			writer.WriteString(";\n")
 			writer.WriteString("        try {\n")
 			if len(hact.Expected.Outputs) > 0 {
-				writer.WriteString("            " + resname + " res = impl." + name + "(req);\n")
+				writer.WriteString("            " + resname + " res = " + implName(iname) + "." + name + "(req);\n")
 				wrappedResult := ""
 				if ename != "void" && ename != "" {
 					if gen.UseImmutable {
@@ -227,23 +312,6 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	gen.serverData.Funcs = funcMap
 }
 
-func (gen *Generator) CreateServer() {
-	src := gen.SourceDir
-	rez := gen.ResourceDir
-	if gen.Err != nil {
-		return
-	}
-	gen.CreateServerDataAndFuncMap(src, rez)
-	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.serverData.InterfaceClass, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-	for _, hact := range gen.Model.Http {
-		gen.CreateRequestPojo(hact)
-		gen.CreateResponsePojo(hact)
-	}
-}
-
 const mainTemplate = `
 import org.eclipse.jetty.server.Server;
 import org.glassfish.jersey.jetty.JettyHttpContainerFactory;
@@ -260,20 +328,20 @@ public class {{.MainClass}} {
     public static String BASE_URI = "http://localhost:{{.Port}}/";
     public static void main(String[] args) {
         try {
-            Server server = startServer(new {{.ImplClass}}());
+            Server server = startServer({{implConstructors}});
             server.join();
         } catch (Exception e) {
             System.err.println("*** " + e);
         }
     }
-    public static Server startServer({{.ImplClass}} impl) throws Exception {
+    public static Server startServer({{implDecls}}) throws Exception {
         URI baseUri = UriBuilder.fromUri(BASE_URI).build();
-        ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
+        ResourceConfig config = new ResourceConfig({{.ControllerClass}}.class);
         config.registerInstances(new AbstractBinder() {
                 @Override
                 protected void configure() {
-                    bind(impl).to({{.InterfaceClass}}.class);
-                }
+{{range .InterfaceClasses}}                    bind({{implName .}}).to({{.}}.class);
+{{end}}                }
             });
         Server server = JettyHttpContainerFactory.createServer(baseUri, config);
         server.start();
@@ -281,18 +349,10 @@ public class {{.MainClass}} {
         return server;
     }
 
-    // Stubs for an implementation of the service follow
-    static class {{.ImplClass}} implements {{.InterfaceClass}} {
-{{range .Model.Http}}
-        {{handlerSig .}} {{openBrace}}
-            return {{resEntity .}}; //implement me!
-        }
-{{end}}
-    }
 }
 `
 
-const resourcesTemplate = `
+const controllerTemplate = `
 import java.util.*;
 import java.time.Instant;
 import javax.inject.Inject;
@@ -301,10 +361,11 @@ import javax.ws.rs.core.*;
 import static javax.ws.rs.core.Response.Status;
 
 @Path("{{.RootPath}}")
-public class {{.ResourcesClass}} {
+public class {{.ControllerClass}} {
+{{range .InterfaceClasses}}
     @Inject
-    private {{.InterfaceClass}} impl;
-{{range .Model.Http}}
+    private {{.}} {{implName .}};
+{{range interfaceHttp .}}
     
     @{{.Method}}
     @Path("{{methodPath .}}")
@@ -312,14 +373,28 @@ public class {{.ResourcesClass}} {
     {{resourceSig .}} {{openBrace}}
 {{resourceBody .}}    }
 {{end}}
+{{end}}
 {{extraResources}}
 }
 `
 
 const interfaceTemplate = `
 public interface {{.InterfaceClass}} {
-{{range .Model.Http}}
+{{range interfaceHttp .InterfaceClass}}
     {{handlerSig .}};
+{{end}}
+}
+`
+
+const implTemplate = `
+// Stubs for an implementation of the service follow
+{{if .Package}}import {{.Package}}.*;{{end}}
+
+public class {{.ImplClass}} implements {{.InterfaceClass}} {
+{{range interfaceHttp .InterfaceClass}}
+    {{handlerSig .}} {{openBrace}}
+        return {{resEntity .}}; //implement me!
+    }
 {{end}}
 }
 `

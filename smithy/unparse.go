@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 //
@@ -26,7 +25,7 @@ func (ast *AST) IDL(namespace string) string {
 	//	w.Emit("$version: %q\n", ast.Version) //only if a version-specific feature is needed. Could be "1" or "1.0"
 	emitted := make(map[string]bool, 0)
 	for k, v := range ast.Metadata {
-		w.Emit("metadata %s = %s", k, util.Pretty(v))
+		w.Emit("metadata %s = %s", k, sadl.Pretty(v))
 	}
 	w.Emit("\nnamespace %s\n\n", ns)
 	for nsk, shape := range ast.Shapes {
@@ -122,7 +121,7 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 
 func (w *IdlWriter) EmitDocumentation(doc, indent string) {
 	if doc != "" {
-		s := util.FormatComment("", "/// ", doc, 100, true)
+		s := sadl.FormatComment("", "/// ", doc, 100, true)
 		//
 		w.Emit(s)
 		//		w.Emit("%s@documentation(%q)\n", indent, doc)
@@ -146,22 +145,22 @@ func (w *IdlWriter) EmitStringTrait(v, tname, indent string) {
 }
 
 func (w *IdlWriter) EmitLengthTrait(v interface{}, indent string) {
-	l := util.AsStruct(v)
-	min := util.Get(l, "min")
-	max := util.Get(l, "max")
+	l := sadl.AsMap(v)
+	min := sadl.Get(l, "min")
+	max := sadl.Get(l, "max")
 	if min != nil && max != nil {
-		w.Emit("@length(min: %d, max: %d)\n", util.AsInt(min), util.AsInt(max))
+		w.Emit("@length(min: %d, max: %d)\n", sadl.AsInt(min), sadl.AsInt(max))
 	} else if max != nil {
-		w.Emit("@length(max: %d)\n", util.AsInt(max))
+		w.Emit("@length(max: %d)\n", sadl.AsInt(max))
 	} else if min != nil {
-		w.Emit("@length(min: %d)\n", util.AsInt(min))
+		w.Emit("@length(min: %d)\n", sadl.AsInt(min))
 	}
 }
 
 func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
-	l := util.AsStruct(v)
-	min := util.Get(l, "min")
-	max := util.Get(l, "max")
+	l := sadl.AsMap(v)
+	min := sadl.Get(l, "min")
+	max := sadl.Get(l, "max")
 	if min != nil && max != nil {
 		w.Emit("@range(min: %v, max: %v)\n", sadl.AsDecimal(min), sadl.AsDecimal(max))
 	} else if max != nil {
@@ -174,7 +173,7 @@ func (w *IdlWriter) EmitRangeTrait(v interface{}, indent string) {
 func (w *IdlWriter) EmitEnumTrait(v interface{}, indent string) {
 	en := v.([]map[string]interface{})
 	if len(en) > 0 {
-		s := util.Pretty(en)
+		s := sadl.Pretty(en)
 		slen := len(s)
 		if slen > 0 && s[slen-1] == '\n' {
 			s = s[:slen-1]
@@ -212,9 +211,9 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 		uri = v.Uri
 		code = v.Code
 	case map[string]interface{}:
-		method = util.GetString(v, "method")
-		uri = util.GetString(v, "uri")
-		code = util.GetInt(v, "code")
+		method = sadl.GetString(v, "method")
+		uri = sadl.GetString(v, "uri")
+		code = sadl.GetInt(v, "code")
 	default:
 		panic("What?!")
 	}
@@ -317,13 +316,13 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 	for k, v := range traits {
 		switch k {
 		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
-			w.EmitBooleanTrait(util.AsBool(v), stripNamespace(k), indent)
+			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#documentation":
-			w.EmitDocumentation(util.AsString(v), indent)
+			w.EmitDocumentation(sadl.AsString(v), indent)
 		case "smithy.api#httpLabel", "smithy.api#httpPayload":
-			w.EmitBooleanTrait(util.AsBool(v), stripNamespace(k), indent)
+			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader":
-			w.EmitStringTrait(util.AsString(v), stripNamespace(k), indent)
+			w.EmitStringTrait(sadl.AsString(v), stripNamespace(k), indent)
 		case "smithy.api#deprecated":
 			w.EmitDeprecatedTrait(v, indent)
 		case "smithy.api#http":
@@ -337,7 +336,7 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 		case "smithy.api#enum":
 			w.EmitEnumTrait(v, indent)
 		case "smithy.api#pattern", "smithy.api#error":
-			w.EmitStringTrait(util.AsString(v), stripNamespace(k), indent)
+			w.EmitStringTrait(sadl.AsString(v), stripNamespace(k), indent)
 		case "aws.protocols#restJson1":
 			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
 		default:

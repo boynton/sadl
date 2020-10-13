@@ -1,4 +1,4 @@
-package util
+package sadl
 
 import (
 	"bytes"
@@ -33,6 +33,7 @@ func IsSymbolChar(ch rune, first bool) bool {
 	return IsDigit(ch) || ch == '_'
 }
 
+/*
 func IsSymbol(s string) bool {
 	if s == "" {
 		return false
@@ -44,6 +45,7 @@ func IsSymbol(s string) bool {
 	}
 	return true
 }
+*/
 
 func IsWhitespace(ch rune) bool {
 	return ch == ' ' || ch == '\t' || ch == '\n'

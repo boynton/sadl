@@ -1,0 +1,23 @@
+name multi
+
+type Greeting Struct {
+	message String
+}
+
+http GET "/foo/{caller}" (action=getFoo) {
+	caller String (default="Mystery Person")
+
+	expect 200 {
+		greeting Greeting
+	}
+	
+}
+
+http GET "/bar/{caller}" (action=getBar) {
+	caller String (default="Mystery Person")
+
+	expect 200 {
+		greeting Greeting
+	}
+	
+}

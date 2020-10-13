@@ -1,6 +1,7 @@
 package java
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,25 +21,22 @@ type Generator struct {
 	Header        string //the banner to prepend to every generated file. Defaults to something obvious and simple
 	SourceDir     string //the source directory, relative to the project directory. Defaults to "src/main/java"
 	ResourceDir   string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
-	UseLombok     bool   //use the Lombok library for generated POJOs. The default is to not.
-	UseImmutable  bool   //generate immutable POJOs with a builder inner class
-	UseGetters    bool   //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
 	UseInstants   bool   //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
 	UseJsonPretty bool   //generate a toString() method that pretty prints JSON.
-	UseMaven      bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
-	Server        bool   //generate server code, including a default (but empty) implementation of the service interface.
+	UseGradle     bool   //use Gradle defaults, and generate a build.gradle.kts file
+//	Server        bool   //generate server code, including a default (but empty) implementation of the service interface.
 	needTimestamp bool
 	needJson      bool
 	imports       []string
 	serverData    *ServerData
 }
 
-func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
+func Export(model *sadl.Model, dir string, conf map[string]interface{}) error {
 	gen := NewGenerator(model, dir, conf)
 	for _, td := range model.Types {
 		gen.CreatePojoFromDef(td)
 	}
-	if gen.needTimestamp {
+/*	if gen.needTimestamp {
 		gen.CreateTimestamp()
 	} else {
 		gen.CreateInstantJson()
@@ -52,8 +50,9 @@ func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 	if gen.Server {
 		gen.CreateServer()
 	}
-	if gen.UseMaven {
-		gen.CreatePom()
+*/
+	if gen.UseGradle {
+		gen.CreateBuildGradle()
 	}
 	return gen.Err
 }
@@ -87,11 +86,11 @@ func (gen *Generator) AddImport(fullReference string) {
 	gen.imports = append(gen.imports, fullReference)
 }
 
-func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generator {
+func NewGenerator(model *sadl.Model, outdir string, config map[string]interface{}) *Generator {
 	gen := &Generator{}
 	gen.Config = config
-	domain := gen.Config.GetString("domain", "-")
-	if domain == "" {
+	domain := gen.GetConfigString("domain", "-")
+	if domain == "-" {
 		if model.Namespace != "" {
 			domain = strings.Join(reverseStrings(strings.Split(model.Namespace, ".")), ".")
 		} else {
@@ -163,7 +162,7 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	}
 	gen.Begin()
 	if comment != "" {
-		gen.Emit(gen.FormatComment("", comment, 100, false))
+		gen.Emit(gen.FormatComment("", comment, 100))
 	}
 	switch ts.Type {
 	case "Struct":
@@ -237,7 +236,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 	nested := make(map[string]*sadl.TypeSpec, 0)
 	for _, fd := range ts.Fields {
 		if fd.Comment != "" {
-			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100, false))
+			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100))
 		}
 		if !fd.Required {
 			gen.Emit(indent + "    @JsonInclude(JsonInclude.Include.NON_EMPTY) /* Optional field */\n")
@@ -352,7 +351,7 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 		}
 		comment := "\n"
 		if el.Comment != "" {
-			comment = gen.FormatComment(" ", el.Comment, 0, false)
+			comment = gen.FormatComment(" ", el.Comment, 0)
 		}
 		gen.Emit("    " + strings.ToUpper(el.Symbol) + "(\"" + el.Symbol + "\")" + delim + comment)
 	}
@@ -421,7 +420,7 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 		gen.Emit(indent1 + "@JsonInclude(JsonInclude.Include.NON_EMPTY)\n")
 
 		if vd.Comment != "" {
-			gen.Emit(gen.FormatComment(indent1, vd.Comment, 100, false))
+			gen.Emit(gen.FormatComment(indent1, vd.Comment, 100))
 		}
 		tn, tanno, anonymous := gen.TypeName(&vd.TypeSpec, vd.Type, false)
 		if anonymous != nil {
@@ -737,4 +736,52 @@ func primitiveType(name string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func (gen *Generator) FormatComment(indent, comment string, maxcol int) string {
+	prefix := "// "
+	left := len(indent)
+	if maxcol <= left {
+		return indent + prefix + comment + "\n"
+	}
+	tabbytes := make([]byte, 0, left)
+	for i := 0; i < left; i++ {
+		tabbytes = append(tabbytes, ' ')
+	}
+	tab := string(tabbytes)
+	prefixlen := len(prefix)
+	if strings.Index(comment, "\n") >= 0 {
+		lines := strings.Split(comment, "\n")
+		result := ""
+		for _, line := range lines {
+			result = result + tab + prefix + line + "\n"
+		}
+		return result
+	}
+	var buf bytes.Buffer
+	col := 0
+	lines := 1
+	tokens := strings.Split(comment, " ")
+	for _, tok := range tokens {
+		toklen := len(tok)
+		if col+toklen >= maxcol {
+			buf.WriteString("\n")
+			lines++
+			col = 0
+		}
+		if col == 0 {
+			buf.WriteString(tab)
+			buf.WriteString(prefix)
+			buf.WriteString(tok)
+			col = left + prefixlen + toklen
+		} else {
+			buf.WriteString(" ")
+			buf.WriteString(tok)
+			col += toklen + 1
+		}
+	}
+	buf.WriteString("\n")
+	emptyPrefix := strings.Trim(prefix, " ")
+	pad := tab + emptyPrefix + "\n"
+	return pad + buf.String() + pad
 }

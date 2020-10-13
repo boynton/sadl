@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
 // a quick and dirty parser for Smithy 1.0 IDL
@@ -19,7 +18,7 @@ func parse(path string) (*AST, error) {
 	}
 	src := string(b)
 	p := &Parser{
-		scanner: util.NewScanner(strings.NewReader(src)),
+		scanner: sadl.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
 	}
@@ -33,11 +32,11 @@ func parse(path string) (*AST, error) {
 type Parser struct {
 	path           string
 	source         string
-	scanner        *util.Scanner
+	scanner        *sadl.Scanner
 	ast            *AST
-	lastToken      *util.Token
-	prevLastToken  *util.Token
-	ungottenToken  *util.Token
+	lastToken      *sadl.Token
+	prevLastToken  *sadl.Token
+	ungottenToken  *sadl.Token
 	namespace      string
 	name           string
 	currentComment string
@@ -57,7 +56,7 @@ func (p *Parser) Parse() error {
 			break
 		}
 		switch tok.Type {
-		case util.SYMBOL:
+		case sadl.SYMBOL:
 			switch tok.Text {
 			case "namespace":
 				if traits != nil {
@@ -104,18 +103,18 @@ func (p *Parser) Parse() error {
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
 			}
 			comment = ""
-		case util.LINE_COMMENT:
+		case sadl.LINE_COMMENT:
 			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
 				comment = p.MergeComment(comment, tok.Text[1:])
 			}
-		case util.AT:
+		case sadl.AT:
 			traits, err = p.parseTrait(traits)
-		case util.DOLLAR:
+		case sadl.DOLLAR:
 			variable, err := p.ExpectIdentifier()
 			if err != nil {
 				return err
 			}
-			err = p.expect(util.COLON)
+			err = p.expect(sadl.COLON)
 			if err != nil {
 				return err
 			}
@@ -130,7 +129,7 @@ func (p *Parser) Parse() error {
 					return fmt.Errorf("Bad control statement (only version 1 or 1.0 is supported): $%s: %v\n", variable, v)
 				}
 			}
-		case util.SEMICOLON, util.NEWLINE:
+		case sadl.SEMICOLON, sadl.NEWLINE:
 			/* ignore */
 		default:
 			return p.SyntaxError()
@@ -143,34 +142,34 @@ func (p *Parser) Parse() error {
 }
 
 func (p *Parser) UngetToken() {
-	util.Debug("UngetToken() -> ", p.lastToken)
+	sadl.Debug("UngetToken() -> ", p.lastToken)
 	p.ungottenToken = p.lastToken
 	p.lastToken = p.prevLastToken
 }
 
-func (p *Parser) GetToken() *util.Token {
+func (p *Parser) GetToken() *sadl.Token {
 	if p.ungottenToken != nil {
 		p.lastToken = p.ungottenToken
 		p.ungottenToken = nil
-		util.Debug("GetToken() -> ", p.lastToken)
+		sadl.Debug("GetToken() -> ", p.lastToken)
 		return p.lastToken
 	}
 	p.prevLastToken = p.lastToken
 	tok := p.scanner.Scan()
 	for {
-		if tok.Type == util.EOF {
+		if tok.Type == sadl.EOF {
 			return nil //fixme
-		} else if tok.Type != util.BLOCK_COMMENT {
+		} else if tok.Type != sadl.BLOCK_COMMENT {
 			break
 		}
 		tok = p.scanner.Scan()
 	}
 	p.lastToken = &tok
-	util.Debug("GetToken() -> ", p.lastToken)
+	sadl.Debug("GetToken() -> ", p.lastToken)
 	return p.lastToken
 }
 
-func (p *Parser) ignore(toktype util.TokenType) error {
+func (p *Parser) ignore(toktype sadl.TokenType) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.EndOfFileError()
@@ -182,7 +181,7 @@ func (p *Parser) ignore(toktype util.TokenType) error {
 	return nil
 }
 
-func (p *Parser) expect(toktype util.TokenType) error {
+func (p *Parser) expect(toktype sadl.TokenType) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.EndOfFileError()
@@ -204,11 +203,11 @@ func (p *Parser) expectText() (string, error) {
 	return "", fmt.Errorf("Expected symbol or string, found %v", tok.Type)
 }
 
-func (p *Parser) assertIdentifier(tok *util.Token) (string, error) {
+func (p *Parser) assertIdentifier(tok *sadl.Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == util.SYMBOL {
+	if tok.Type == sadl.SYMBOL {
 		return tok.Text, nil
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected symbol, found %v", tok.Type))
@@ -219,14 +218,14 @@ func (p *Parser) ExpectIdentifier() (string, error) {
 	return p.assertIdentifier(tok)
 }
 
-func (p *Parser) assertString(tok *util.Token) (string, error) {
+func (p *Parser) assertString(tok *sadl.Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == util.STRING {
+	if tok.Type == sadl.STRING {
 		return tok.Text, nil
 	}
-	if tok.Type == util.UNDEFINED {
+	if tok.Type == sadl.UNDEFINED {
 		return tok.Text, p.Error(tok.Text)
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected string, found %v", tok.Type))
@@ -265,7 +264,7 @@ func (p *Parser) ExpectStringArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACKET {
+	if tok.Type != sadl.OPEN_BRACKET {
 		return nil, p.SyntaxError()
 	}
 	var items []string
@@ -274,7 +273,7 @@ func (p *Parser) ExpectStringArray() ([]string, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACKET {
+		if tok.Type == sadl.CLOSE_BRACKET {
 			break
 		}
 		s, err := p.assertString(tok)
@@ -282,7 +281,7 @@ func (p *Parser) ExpectStringArray() ([]string, error) {
 			return nil, err
 		}
 		items = append(items, s)
-		p.expect(util.COMMA)
+		p.expect(sadl.COMMA)
 	}
 	return items, nil
 }
@@ -292,7 +291,7 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACKET {
+	if tok.Type != sadl.OPEN_BRACKET {
 		return nil, p.SyntaxError()
 	}
 	var items []string
@@ -301,12 +300,12 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACKET {
+		if tok.Type == sadl.CLOSE_BRACKET {
 			break
 		}
-		if tok.Type == util.SYMBOL {
+		if tok.Type == sadl.SYMBOL {
 			items = append(items, tok.Text)
-		} else if tok.Type == util.COMMA || tok.Type == util.NEWLINE || tok.Type == util.LINE_COMMENT {
+		} else if tok.Type == sadl.COMMA || tok.Type == sadl.NEWLINE || tok.Type == sadl.LINE_COMMENT {
 			//ignore
 		} else {
 			return nil, p.SyntaxError()
@@ -327,8 +326,8 @@ func (p *Parser) MergeComment(comment1 string, comment2 string) string {
 }
 
 func (p *Parser) Error(msg string) error {
-	util.Debug("*** error, last token:", p.lastToken)
-	return fmt.Errorf("*** %s\n", util.FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, util.RED, 5))
+	sadl.Debug("*** error, last token:", p.lastToken)
+	return fmt.Errorf("*** %s\n", sadl.FormattedAnnotation(p.path, p.source, "", msg, p.lastToken, sadl.RED, 5))
 }
 
 func (p *Parser) SyntaxError() error {
@@ -344,7 +343,7 @@ func (p *Parser) parseMetadata() error {
 	if err != nil {
 		return err
 	}
-	err = p.expect(util.EQUALS)
+	err = p.expect(sadl.EQUALS)
 	if err != nil {
 		return err
 	}
@@ -368,7 +367,7 @@ func (p *Parser) expectTarget() (string, error) {
 	if tok == nil {
 		return ident, nil
 	}
-	if tok.Type != util.HASH {
+	if tok.Type != sadl.HASH {
 		p.UngetToken()
 		return ident, nil
 	}
@@ -391,7 +390,7 @@ func (p *Parser) expectNamespacedIdentifier() (string, error) {
 		if tok == nil {
 			break
 		}
-		if tok.Type != util.DOT {
+		if tok.Type != sadl.DOT {
 			p.UngetToken()
 			break
 		}
@@ -416,7 +415,7 @@ func (p *Parser) expectShapeId() (string, error) {
 		if tok == nil {
 			break
 		}
-		if tok.Type != util.DOT {
+		if tok.Type != sadl.DOT {
 			p.UngetToken()
 			break
 		}
@@ -432,7 +431,7 @@ func (p *Parser) expectShapeId() (string, error) {
 		if tok == nil {
 			break
 		}
-		if tok.Type == util.HASH {
+		if tok.Type == sadl.HASH {
 			key, err := p.ExpectIdentifier()
 			if err != nil {
 				return "", err
@@ -485,7 +484,7 @@ func (p *Parser) parseCollection(sname string, traits map[string]interface{}) er
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACE {
+	if tok.Type != sadl.OPEN_BRACE {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
@@ -498,20 +497,20 @@ func (p *Parser) parseCollection(sname string, traits map[string]interface{}) er
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == util.NEWLINE {
+		if tok.Type == sadl.NEWLINE {
 			continue
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			break
 		}
-		if tok.Type == util.AT {
+		if tok.Type == sadl.AT {
 			mtraits, err = p.parseTrait(mtraits)
 			if err != nil {
 				return err
 			}
-		} else if tok.Type == util.SYMBOL {
+		} else if tok.Type == sadl.SYMBOL {
 			fname := tok.Text
-			err = p.expect(util.COLON)
+			err = p.expect(sadl.COLON)
 			if err != nil {
 				return err
 			}
@@ -523,7 +522,7 @@ func (p *Parser) parseCollection(sname string, traits map[string]interface{}) er
 			if err != nil {
 				return err
 			}
-			err = p.ignore(util.COMMA)
+			err = p.ignore(sadl.COMMA)
 			shape.Member = &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
@@ -545,7 +544,7 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACE {
+	if tok.Type != sadl.OPEN_BRACE {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
@@ -559,20 +558,20 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == util.NEWLINE {
+		if tok.Type == sadl.NEWLINE {
 			continue
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			break
 		}
-		if tok.Type == util.AT {
+		if tok.Type == sadl.AT {
 			mtraits, err = p.parseTrait(mtraits)
 			if err != nil {
 				return err
 			}
-		} else if tok.Type == util.SYMBOL {
+		} else if tok.Type == sadl.SYMBOL {
 			fname := tok.Text
-			err = p.expect(util.COLON)
+			err = p.expect(sadl.COLON)
 			if err != nil {
 				return err
 			}
@@ -580,7 +579,7 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.ignore(util.COMMA)
+			err = p.ignore(sadl.COMMA)
 			mems[fname] = &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
@@ -604,7 +603,7 @@ func (p *Parser) parseUnion(traits map[string]interface{}) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACE {
+	if tok.Type != sadl.OPEN_BRACE {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
@@ -618,20 +617,20 @@ func (p *Parser) parseUnion(traits map[string]interface{}) error {
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == util.NEWLINE {
+		if tok.Type == sadl.NEWLINE {
 			continue
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			break
 		}
-		if tok.Type == util.AT {
+		if tok.Type == sadl.AT {
 			mtraits, err = p.parseTrait(mtraits)
 			if err != nil {
 				return err
 			}
-		} else if tok.Type == util.SYMBOL {
+		} else if tok.Type == sadl.SYMBOL {
 			fname := tok.Text
-			err = p.expect(util.COLON)
+			err = p.expect(sadl.COLON)
 			if err != nil {
 				return err
 			}
@@ -639,7 +638,7 @@ func (p *Parser) parseUnion(traits map[string]interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.ignore(util.COMMA)
+			err = p.ignore(sadl.COMMA)
 			mems[fname] = &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
@@ -663,7 +662,7 @@ func (p *Parser) parseOperation(traits map[string]interface{}) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACE {
+	if tok.Type != sadl.OPEN_BRACE {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
@@ -675,20 +674,20 @@ func (p *Parser) parseOperation(traits map[string]interface{}) error {
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == util.NEWLINE {
+		if tok.Type == sadl.NEWLINE {
 			continue
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			break
 		}
-		if tok.Type != util.COLON {
+		if tok.Type != sadl.COLON {
 			p.UngetToken()
 		}
 		fname, err := p.ExpectIdentifier()
 		if err != nil {
 			return err
 		}
-		err = p.expect(util.COLON)
+		err = p.expect(sadl.COLON)
 		if err != nil {
 			return err
 		}
@@ -705,7 +704,7 @@ func (p *Parser) parseOperation(traits map[string]interface{}) error {
 		if err != nil {
 			return err
 		}
-		err = p.ignore(util.COMMA)
+		err = p.ignore(sadl.COMMA)
 	}
 	p.addShapeDefinition(name, shape)
 	return nil
@@ -720,7 +719,7 @@ func (p *Parser) parseService(comment string) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type != util.OPEN_BRACE {
+	if tok.Type != sadl.OPEN_BRACE {
 		return p.SyntaxError()
 	}
 	shape := &Shape{
@@ -731,20 +730,20 @@ func (p *Parser) parseService(comment string) error {
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == util.NEWLINE {
+		if tok.Type == sadl.NEWLINE {
 			continue
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			break
 		}
-		if tok.Type != util.COLON {
+		if tok.Type != sadl.COLON {
 			p.UngetToken()
 		}
 		fname, err := p.ExpectIdentifier()
 		if err != nil {
 			return err
 		}
-		err = p.expect(util.COLON)
+		err = p.expect(sadl.COLON)
 		if err != nil {
 			return err
 		}
@@ -761,7 +760,7 @@ func (p *Parser) parseService(comment string) error {
 		if err != nil {
 			return err
 		}
-		err = p.ignore(util.COMMA)
+		err = p.ignore(sadl.COMMA)
 	}
 	//Traits:
 	//	Operations []*ShapeRef `json:"operations,omitempty"`
@@ -825,17 +824,17 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, interface{}, error) {
 	if tok == nil {
 		return args, nil, nil
 	}
-	if tok.Type == util.OPEN_PAREN {
+	if tok.Type == sadl.OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return nil, nil, p.SyntaxError()
 			}
-			if tok.Type == util.CLOSE_PAREN {
+			if tok.Type == sadl.CLOSE_PAREN {
 				return args, literal, nil
 			}
-			if tok.Type == util.SYMBOL {
-				p.ignore(util.COLON)
+			if tok.Type == sadl.SYMBOL {
+				p.ignore(sadl.COLON)
 				match := tok.Text
 				switch match {
 				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults":
@@ -859,12 +858,12 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, interface{}, error) {
 				if err != nil {
 					return nil, nil, err
 				}
-			} else if tok.Type == util.OPEN_BRACKET {
+			} else if tok.Type == sadl.OPEN_BRACKET {
 				literal, err = p.parseLiteralArray()
 				if err != nil {
 					return nil, nil, err
 				}
-			} else if tok.Type == util.COMMA {
+			} else if tok.Type == sadl.COMMA {
 				//ignore
 			} else {
 				return nil, nil, p.SyntaxError()
@@ -885,7 +884,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 	case "idempotent", "required", "httpLabel", "httpPayload", "readonly": //booleans
 		return withTrait(traits, "smithy.api#"+tname, true), nil
 	case "httpQuery", "httpHeader", "error", "documentation", "pattern", "title": //strings
-		err := p.expect(util.OPEN_PAREN)
+		err := p.expect(sadl.OPEN_PAREN)
 		if err != nil {
 			return traits, err
 		}
@@ -893,7 +892,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		if err != nil {
 			return traits, err
 		}
-		err = p.expect(util.CLOSE_PAREN)
+		err = p.expect(sadl.CLOSE_PAREN)
 		if err != nil {
 			return traits, err
 		}
@@ -902,7 +901,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		_, tags, err := p.parseTraitArgs()
 		return withTrait(traits, "smithy.api#tags", tags), err
 	case "httpError":
-		err := p.expect(util.OPEN_PAREN)
+		err := p.expect(sadl.OPEN_PAREN)
 		if err != nil {
 			return traits, err
 		}
@@ -910,7 +909,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 		if err != nil {
 			return traits, err
 		}
-		err = p.expect(util.CLOSE_PAREN)
+		err = p.expect(sadl.CLOSE_PAREN)
 		if err != nil {
 			return traits, err
 		}
@@ -988,24 +987,24 @@ func (p *Parser) parseLiteralValue() (interface{}, error) {
 	return p.parseLiteral(tok)
 }
 
-func (p *Parser) parseLiteral(tok *util.Token) (interface{}, error) {
+func (p *Parser) parseLiteral(tok *sadl.Token) (interface{}, error) {
 	switch tok.Type {
-	case util.SYMBOL:
+	case sadl.SYMBOL:
 		return p.parseLiteralSymbol(tok)
-	case util.STRING:
+	case sadl.STRING:
 		return p.parseLiteralString(tok)
-	case util.NUMBER:
+	case sadl.NUMBER:
 		return p.parseLiteralNumber(tok)
-	case util.OPEN_BRACKET:
+	case sadl.OPEN_BRACKET:
 		return p.parseLiteralArray()
-	case util.OPEN_BRACE:
+	case sadl.OPEN_BRACE:
 		return p.parseLiteralObject()
 	default:
 		return nil, p.SyntaxError()
 	}
 }
 
-func (p *Parser) parseLiteralSymbol(tok *util.Token) (interface{}, error) {
+func (p *Parser) parseLiteralSymbol(tok *sadl.Token) (interface{}, error) {
 	switch tok.Text {
 	case "true":
 		return true, nil
@@ -1017,7 +1016,7 @@ func (p *Parser) parseLiteralSymbol(tok *util.Token) (interface{}, error) {
 		return nil, fmt.Errorf("Not a valid symbol: %s", tok.Text)
 	}
 }
-func (p *Parser) parseLiteralString(tok *util.Token) (*string, error) {
+func (p *Parser) parseLiteralString(tok *sadl.Token) (*string, error) {
 	s := "\"" + tok.Text + "\""
 	q, err := strconv.Unquote(s)
 	if err != nil {
@@ -1026,7 +1025,7 @@ func (p *Parser) parseLiteralString(tok *util.Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(tok *util.Token) (interface{}, error) {
+func (p *Parser) parseLiteralNumber(tok *sadl.Token) (interface{}, error) {
 	num, err := sadl.ParseDecimal(tok.Text)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
@@ -1041,11 +1040,11 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type != util.NEWLINE {
-			if tok.Type == util.CLOSE_BRACKET {
+		if tok.Type != sadl.NEWLINE {
+			if tok.Type == sadl.CLOSE_BRACKET {
 				return ary, nil
 			}
-			if tok.Type != util.COMMA {
+			if tok.Type != sadl.COMMA {
 				obj, err := p.parseLiteral(tok)
 				if err != nil {
 					return nil, err
@@ -1064,15 +1063,15 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == util.CLOSE_BRACE {
+		if tok.Type == sadl.CLOSE_BRACE {
 			return obj, nil
 		}
-		if tok.Type == util.STRING {
+		if tok.Type == sadl.STRING {
 			pkey, err := p.parseLiteralString(tok)
 			if err != nil {
 				return nil, err
 			}
-			err = p.expect(util.COLON)
+			err = p.expect(sadl.COLON)
 			if err != nil {
 				return nil, err
 			}
@@ -1081,7 +1080,7 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 				return nil, err
 			}
 			obj[*pkey] = val
-		} else if tok.Type == util.SYMBOL {
+		} else if tok.Type == sadl.SYMBOL {
 			return nil, p.Error("Expected String key for JSON object, found symbol '" + tok.Text + "'")
 		} else {
 			//fmt.Println("ignoring this token:", tok)

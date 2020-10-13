@@ -6,30 +6,28 @@ import (
 	"strings"
 
 	"github.com/boynton/sadl"
-	"github.com/boynton/sadl/util"
 )
 
-func Export(model *sadl.Model, conf map[string]interface{}) error {
+func Export(model *sadl.Model, conf *sadl.Data) error {
 	gen := NewGenerator(model, conf)
 	doc, err := gen.ExportToOAS3()
 	if err != nil {
 		return err
 	}
-	fmt.Println(util.Pretty(doc))
+	fmt.Println(sadl.Pretty(doc))
 	return nil
 }
 
 type Generator struct {
-	util.Generator
+	sadl.Generator
 	Model *sadl.Model
-	Conf  map[string]interface{}
 }
 
-func NewGenerator(model *sadl.Model, conf map[string]interface{}) *Generator {
-	return &Generator{
-		Model: model,
-		Conf:  conf, //todo: use this
-	}
+func NewGenerator(model *sadl.Model, conf *sadl.Data) *Generator {
+	gen := &Generator{}
+	gen.Config = conf
+	gen.Model = model
+	return gen
 }
 
 func (gen *Generator) ExportToOAS3() (*Model, error) {
@@ -255,7 +253,7 @@ func (gen *Generator) ExportToOAS3() (*Model, error) {
 			//   -> seems like I could use it in the API somehow. It really is what you need to abstract from the transport. Like RPC.
 			//todo: walk the compound name, install at the element if supported.
 			if strings.HasSuffix(ed.Target, "Request") {
-				hdefName := util.Uncapitalize(ed.Target[:len(ed.Target)-7])
+				hdefName := sadl.Uncapitalize(ed.Target[:len(ed.Target)-7])
 				op := gen.FindOperation(oas, hdefName)
 				if op != nil {
 					for k, v := range ed.Example.(map[string]interface{}) {
@@ -290,7 +288,7 @@ func (gen *Generator) ExportToOAS3() (*Model, error) {
 					}
 				}
 			} else if strings.HasSuffix(ed.Target, "Response") {
-				hdefName := util.Uncapitalize(ed.Target[:len(ed.Target)-8])
+				hdefName := sadl.Uncapitalize(ed.Target[:len(ed.Target)-8])
 				op := gen.FindOperation(oas, hdefName)
 				if op != nil {
 					for k, v := range ed.Example.(map[string]interface{}) {
@@ -544,7 +542,7 @@ func (gen *Generator) oasSchema(td *sadl.TypeSpec, name string) (*Schema, error)
 		return sch, nil
 	case "Int32", "Int16", "Int8", "Int64", "Float32", "Float64", "Decimal":
 		if td.Type == "Float64" && name != "" {
-			panic("here? " + name + " -> " + util.Pretty(td))
+			panic("here? " + name + " -> " + sadl.Pretty(td))
 		}
 		stype, sformat, scomment := oasNumericEquivalent(td.Type)
 		sch := &Schema{

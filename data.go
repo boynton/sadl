@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/boynton/sadl/util"
 	"github.com/ghodss/yaml"
 )
 
@@ -13,8 +12,12 @@ type Data struct {
 	value interface{}
 }
 
+func NewData() *Data {
+	return &Data{}
+}
+
 func (data *Data) String() string {
-	return util.Pretty(data.value)
+	return Pretty(data.value)
 }
 
 func DataToFile(data *Data, path string) error {
@@ -23,35 +26,27 @@ func DataToFile(data *Data, path string) error {
 }
 
 func DataFromFile(path string) (*Data, error) {
+	var data *Data
 	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		ext := filepath.Ext(path)
+		var value map[string]interface{}
+		if ext == ".yaml" {
+			err = yaml.Unmarshal(raw, &value)
+		} else {
+			err = json.Unmarshal(raw, &value)
+		}
+		if err == nil {
+			data = &Data{value: value}
+		}
 	}
-	ext := filepath.Ext(path)
-	var value map[string]interface{}
-	if ext == ".yaml" {
-		err = yaml.Unmarshal(raw, &value)
-	} else {
-		err = json.Unmarshal(raw, &value)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &Data{value: value}, nil
-}
-
-func AsDecimal(v interface{}) *Decimal {
-	switch n := v.(type) {
-	case Decimal:
-		return &n
-	case *Decimal:
-		return n
-	default:
-		return nil
-	}
+	return data, err
 }
 
 func (data *Data) Put(key string, value interface{}) {
+	if data.value == nil {
+		data.value = make(map[string]interface{}, 0)
+	}
 	m := data.AsMap()
 	if m != nil {
 		m[key] = value
@@ -59,7 +54,7 @@ func (data *Data) Put(key string, value interface{}) {
 }
 
 func (data *Data) AsMap() map[string]interface{} {
-	if data != nil {
+	if data.value != nil {
 		if m, ok := data.value.(map[string]interface{}); ok {
 			return m
 		}
@@ -103,29 +98,29 @@ func (data *Data) Has(keys ...string) bool {
 }
 
 func (data *Data) GetString(keys ...string) string {
-	return util.AsString(data.get(keys))
+	return AsString(data.get(keys))
 }
 
 func (data *Data) GetBool(keys ...string) bool {
-	return util.AsBool(data.get(keys))
+	return AsBool(data.get(keys))
 }
 
-func (data *Data) GetArray(key string) []interface{} {
-	return util.AsArray(data.Get(key))
+func (data *Data) GetInt(keys ...string) int {
+	return AsInt(data.get(keys))
 }
 
-func (data *Data) GetStruct(key string) map[string]interface{} {
-	return util.AsStruct(data.Get(key))
+func (data *Data) GetArray(keys ...string) []interface{} {
+	return AsArray(data.get(keys))
 }
 
-func (data *Data) GetData(key string) *Data {
-	v := data.Get(key)
-	if v == nil {
-		return nil
-	}
-	return &Data{value: v}
+func (data *Data) GetMap(keys ...string) map[string]interface{} {
+	return AsMap(data.get(keys))
 }
 
-func GetDecimal(m map[string]interface{}, key string) *Decimal {
-	return AsDecimal(m[key])
+func (data *Data) GetData(keys ...string) *Data {
+	return &Data{value: data.get(keys)}
+}
+
+func (data *Data) GetDecimal(keys ...string) *Decimal {
+	return AsDecimal(data.get(keys))
 }
