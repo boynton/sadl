@@ -228,6 +228,16 @@ func (model *Model) ToSadl(conf *sadl.Data) (*sadl.Model, error) {
 		schema.Version = ""
 	}
 
+	haveService := true
+	for _, shapeDef := range model.shapes {
+		if shapeDef.Type == "service" {
+			if haveService {
+				return nil, fmt.Errorf("SADL only supports one service per model")
+			}
+			haveService = true
+		}
+	}
+
 	//	fmt.Println("shapes in our namespace:", sadl.Pretty(model.shapes))
 	for k, v := range model.shapes {
 		model.importShape(schema, k, v)
