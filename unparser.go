@@ -149,6 +149,18 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
 		return fmt.Sprintf("Array<%s>%s", ts.Items, sopts)
+	case "Map":
+		if ts.MinSize != nil {
+			opts = append(opts, fmt.Sprintf("minsize=%d", *ts.MinSize))
+		}
+		if ts.MaxSize != nil {
+			opts = append(opts, fmt.Sprintf("maxsize=%d", *ts.MaxSize))
+		}
+		sopts := ""
+		if len(opts) > 0 {
+			sopts = " (" + strings.Join(opts, ", ") + ")"
+		}
+		return fmt.Sprintf("Map<%s,%s>%s", ts.Keys, ts.Items, sopts)
 	case "Struct":
 		sopt := ""
 		if len(ts.Fields) > 0 {

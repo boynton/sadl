@@ -275,7 +275,7 @@ func (w *IdlWriter) EmitCollectionShape(shapeName, name string, shape *Shape) {
 
 func (w *IdlWriter) EmitMapShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
-	w.Emit("map %s {\n    key: %s,\n    value: %s\n}\n", name, shape.Key.Target, shape.Value.Target)
+	w.Emit("map %s {\n    key: %s,\n    value: %s\n}\n", name, w.stripLocalNamespace(shape.Key.Target), w.stripLocalNamespace(shape.Value.Target))
 }
 
 func (w *IdlWriter) EmitUnionShape(name string, shape *Shape) {

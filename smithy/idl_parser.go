@@ -86,6 +86,10 @@ func (p *Parser) Parse() error {
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseCollection(tok.Text, traits)
 				traits = nil
+			case "map":
+				traits, comment = withCommentTrait(traits, comment)
+				err = p.parseMap(tok.Text, traits)
+				traits = nil
 			case "operation":
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseOperation(traits)
@@ -530,6 +534,82 @@ func (p *Parser) parseCollection(sname string, traits map[string]interface{}) er
 		} else {
 			return p.SyntaxError()
 		}
+	}
+	if shape.Member == nil {
+		return p.Error("expected 'member' attribute, found none")
+	}
+	p.addShapeDefinition(name, shape)
+	return nil
+}
+
+func (p *Parser) parseMap(sname string, traits map[string]interface{}) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	tok := p.GetToken()
+	if tok == nil {
+		return p.EndOfFileError()
+	}
+	if tok.Type != sadl.OPEN_BRACE {
+		return p.SyntaxError()
+	}
+	shape := &Shape{
+		Type:   sname,
+		Traits: traits,
+	}
+	var mtraits map[string]interface{}
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return p.EndOfFileError()
+		}
+		if tok.Type == sadl.NEWLINE {
+			continue
+		}
+		if tok.Type == sadl.CLOSE_BRACE {
+			break
+		}
+		if tok.Type == sadl.AT {
+			mtraits, err = p.parseTrait(mtraits)
+			if err != nil {
+				return err
+			}
+		} else if tok.Type == sadl.SYMBOL {
+			fname := tok.Text
+			err = p.expect(sadl.COLON)
+			if err != nil {
+				return err
+			}
+			ftype, err := p.ExpectIdentifier()
+			if err != nil {
+				return err
+			}
+			err = p.ignore(sadl.COMMA)
+			if fname == "key" {
+				shape.Key = &Member{
+					Target: p.ensureNamespaced(ftype),
+					Traits: mtraits,
+				}
+				mtraits = nil
+			} else if fname == "value" {
+				shape.Value = &Member{
+					Target: p.ensureNamespaced(ftype),
+					Traits: mtraits,
+				}
+				mtraits = nil
+			} else {
+				return p.SyntaxError()
+			}
+		} else {
+			return p.SyntaxError()
+		}
+	}
+	if shape.Key == nil {
+		return p.Error("expected 'key' attribute, found none")
+	}
+	if shape.Value == nil {
+		return p.Error("expected 'value' attribute, found none")
 	}
 	p.addShapeDefinition(name, shape)
 	return nil
