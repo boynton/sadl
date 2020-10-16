@@ -83,17 +83,27 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		ControllerClass: serviceName + "Controller",
 	}
 	gen.serverData.Interfaces = make(map[string][]string, 0)
+	//fix: *default* to the serviceName interface, and "lift out" the operations mentioned in the config
+
 	interfaces := gen.Config.GetMap("java", "interfaces")
+	lifted := make(map[string]string, 0)
 	if interfaces != nil {
 		for k, v := range interfaces {
-			gen.serverData.Interfaces[k] = sadl.AsStringArray(v)
+			lstOpNames := sadl.AsStringArray(v)
+			gen.serverData.Interfaces[k] = lstOpNames
+			for _, s := range lstOpNames {
+				lifted[s] = k
+			}
 		}
-	} else {
-		lst := make([]string, 0)
-		for _, v := range gen.Model.Http {
-			lst = append(lst, v.Name)
+	}
+	defaultInterfaceOperations := make([]string, 0)
+	for _, v := range gen.Model.Http {
+		if _, ok := lifted[v.Name]; !ok {
+			defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
 		}
-		gen.serverData.Interfaces[serviceName] = lst
+	}
+	if len(defaultInterfaceOperations) > 0 {
+		gen.serverData.Interfaces[serviceName] = defaultInterfaceOperations
 	}
 	for k, _ := range gen.serverData.Interfaces {
 		gen.serverData.InterfaceClasses = append(gen.serverData.InterfaceClasses, k)

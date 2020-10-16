@@ -21,3 +21,12 @@ http GET "/bar/{caller}" (action=getBar) {
 	}
 	
 }
+
+http GET "/glorp/{caller}" (action=getGlorp) {
+	caller String (default="Mystery Person")
+
+	expect 200 {
+		greeting Greeting
+	}
+	
+}
