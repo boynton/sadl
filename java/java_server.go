@@ -55,11 +55,25 @@ func (gen *Generator) CreateServer() {
 		gen.CreateJavaFileFromTemplate(iface+"Impl", implTemplate, gen.serverData, gen.serverData.Funcs, "")
 	}
 	gen.CreateJavaFileFromTemplate(gen.serverData.ControllerClass, controllerTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-	gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+
+	if gen.Config.GetBool("service-exception") {
+		gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	}
 	for _, hact := range gen.Model.Http {
 		gen.CreateRequestPojo(hact)
 		gen.CreateResponsePojo(hact)
 	}
+}
+
+func (gen *Generator) ExceptionTypes() map[string]string {
+	exceptions := make(map[string]string, 0)
+   for _, hact := range gen.Model.Http {
+		for _, resp := range hact.Exceptions {
+			tn, _, _ := gen.TypeName(nil, resp.Type, true)
+			exceptions[tn] = resp.Type
+		}
+	}
+	return exceptions
 }
 
 func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
@@ -277,38 +291,48 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				writer.WriteString("            impl." + name + "(req);\n")
 				writer.WriteString(fmt.Sprintf("            return Response.status(%d).build();\n", hact.Expected.Status))
 			}
-			writer.WriteString("        } catch (ServiceException se) {\n")
-			writer.WriteString("            Object entity = se.entity == null? se : se.entity;\n")
-			writer.WriteString("            int status = 500;\n")
-			first := true
-			any := false
-			anyNull := false
-			for _, resp := range hact.Exceptions {
-				tn, _, _ := gen.TypeName(nil, resp.Type, true)
-				if tn != "ServiceException" {
-					any = true
-					if first {
-						writer.WriteString("            if (entity instanceof " + tn + ") {\n")
-						first = false
-					} else {
-						writer.WriteString("            } else if (entity instanceof " + tn + ") {\n")
-					}
-					writer.WriteString(fmt.Sprintf("                status = %d;\n", resp.Status))
-					if resp.Status == 204 || resp.Status == 304 {
-						writer.WriteString("                entity = null;\n")
-						anyNull = true
+
+			if gen.Config.GetBool("service-exception") {
+				writer.WriteString("        } catch (ServiceException se) {\n")
+				writer.WriteString("            Object entity = se.entity == null? se : se.entity;\n")
+				writer.WriteString("            int status = 500;\n")
+				first := true
+				any := false
+				anyNull := false
+				for _, resp := range hact.Exceptions {
+					tn, _, _ := gen.TypeName(nil, resp.Type, true)
+					if tn != "ServiceException" {
+						any = true
+						if first {
+							writer.WriteString("            if (entity instanceof " + tn + ") {\n")
+							first = false
+						} else {
+							writer.WriteString("            } else if (entity instanceof " + tn + ") {\n")
+						}
+						writer.WriteString(fmt.Sprintf("                status = %d;\n", resp.Status))
+						if resp.Status == 204 || resp.Status == 304 {
+							writer.WriteString("                entity = null;\n")
+							anyNull = true
+						}
 					}
 				}
+				if any {
+					writer.WriteString("            }\n")
+				}
+				if anyNull {
+					writer.WriteString("            if (entity == null) {\n")
+					writer.WriteString("                throw new WebApplicationException(status);\n")
+					writer.WriteString("            }\n")
+				}
+				writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n")
+			} else {
+				for _, resp := range hact.Exceptions {
+					status := fmt.Sprint(resp.Status)
+					tn, _, _ := gen.TypeName(nil, resp.Type, true)
+					writer.WriteString("        } catch (" + tn + " e) {\n")
+					writer.WriteString("                throw new WebApplicationException(Response.status(" + status + ").entity(e).build());\n")
+				}
 			}
-			if any {
-				writer.WriteString("            }\n")
-			}
-			if anyNull {
-				writer.WriteString("            if (entity == null) {\n")
-				writer.WriteString("                throw new WebApplicationException(status);\n")
-				writer.WriteString("            }\n")
-			}
-			writer.WriteString("            throw new WebApplicationException(Response.status(status).entity(entity).build());\n")
 			writer.WriteString("        }\n")
 			writer.Flush()
 			return b.String()
@@ -471,7 +495,7 @@ func (gen *Generator) CreateRequestPojo(hact *sadl.HttpDef) {
 		ts.Fields = append(ts.Fields, &in.StructFieldDef)
 	}
 	className := gen.RequestType(gen.ActionName(hact))
-	gen.CreatePojo(ts, className, "")
+	gen.CreatePojo(ts, className, "", nil)
 }
 
 func (gen *Generator) responsePojoName(hact *sadl.HttpDef) (string, bool) {
@@ -495,7 +519,7 @@ func (gen *Generator) CreateResponsePojo(hact *sadl.HttpDef) {
 	for _, spec := range hact.Expected.Outputs {
 		ts.Fields = append(ts.Fields, &spec.StructFieldDef)
 	}
-	gen.CreatePojo(ts, className, "")
+	gen.CreatePojo(ts, className, "", nil)
 }
 
 func (gen *Generator) ActionInfo(hact *sadl.HttpDef) (string, string) {

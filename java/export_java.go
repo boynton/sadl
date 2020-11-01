@@ -27,7 +27,9 @@ type Generator struct {
 	UseJsonPretty bool   //generate a toString() method that pretty prints JSON.
 	UseMaven      bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
 	Server        bool   //generate server code, including a default (but empty) implementation of the service interface.
+	ServiceException bool //generate a generic ServiceException instead of making POJOs used as action errors throawable
 	needTimestamp bool
+	needInstant   bool
 	needJson      bool
 	imports       []string
 	serverData    *ServerData
@@ -35,12 +37,17 @@ type Generator struct {
 
 func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 	gen := NewGenerator(model, dir, conf)
+	var exceptions map[string]string
+	if !gen.Config.GetBool("service-exception") {
+		//generate all the pojo types that need to be exceptions
+		exceptions = gen.ExceptionTypes()
+	}
 	for _, td := range model.Types {
-		gen.CreatePojoFromDef(td)
+		gen.CreatePojoFromDef(td, exceptions)
 	}
 	if gen.needTimestamp {
 		gen.CreateTimestamp()
-	} else {
+	} else if gen.needInstant {
 		gen.CreateInstantJson()
 	}
 	if gen.needJson {
@@ -110,12 +117,13 @@ func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generato
 	gen.SourceDir = gen.GetConfigString("source", "src/main/java")
 	gen.ResourceDir = gen.GetConfigString("resource", "src/main/resources")
 	gen.Server = gen.GetConfigBool("server", false)
+	gen.ServiceException = gen.GetConfigBool("service-exception", false)
 	gen.UseLombok = gen.GetConfigBool("lombok", false)
 	gen.UseGetters = gen.GetConfigBool("getters", false)
 	gen.UseImmutable = gen.GetConfigBool("immutable", true)
 	gen.UseInstants = gen.GetConfigBool("instants", true)
 	gen.UseMaven = gen.GetConfigBool("maven", true)
-	gen.UseJsonPretty = gen.GetConfigBool("json", true)
+	gen.UseJsonPretty = gen.GetConfigBool("json", false)
 	gen.Model = model
 	gen.OutDir = outdir
 	srcpath := filepath.Join(outdir, gen.SourceDir)
@@ -144,6 +152,7 @@ func (gen *Generator) WriteJavaFile(name string, content string, pkg string) {
 }
 
 func (gen *Generator) CreateJavaFileFromTemplate(name string, tmpl string, data interface{}, funcMap template.FuncMap, pkg string) {
+	
 	gen.Begin()
 	gen.EmitTemplate(name, tmpl, data, funcMap)
 	content := gen.End()
@@ -152,12 +161,12 @@ func (gen *Generator) CreateJavaFileFromTemplate(name string, tmpl string, data 
 	}
 }
 
-func (gen *Generator) CreatePojoFromDef(td *sadl.TypeDef) {
+func (gen *Generator) CreatePojoFromDef(td *sadl.TypeDef, exceptions map[string]string) {
 	className := gen.Capitalize(td.Name)
-	gen.CreatePojo(&td.TypeSpec, className, td.Comment)
+	gen.CreatePojo(&td.TypeSpec, className, td.Comment, exceptions)
 }
 
-func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
+func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string, exceptions map[string]string) {
 	if gen.Err != nil {
 		return
 	}
@@ -167,7 +176,7 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	}
 	switch ts.Type {
 	case "Struct":
-		gen.CreateStructPojo(ts, className, "")
+		gen.CreateStructPojo(ts, className, "", exceptions)
 	case "UnitValue":
 		gen.CreateUnitValuePojo(ts, className)
 	case "Enum":
@@ -198,7 +207,7 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string) {
 	}
 }
 
-func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, indent string) {
+func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, indent string, exceptions map[string]string) {
 	optional := false
 	for _, fd := range ts.Fields {
 		if !fd.Required {
@@ -212,10 +221,27 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 		gen.AddImport("javax.validation.constraints.NotNull")
 	}
 	extends := ""
+	if exceptions != nil {
+		if _, ok := exceptions[className]; ok {
+			extends = " extends RuntimeException"
+		}
+	}
 	if gen.UseImmutable {
 		gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 		gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder")
 		gen.Emit(indent + "@JsonDeserialize(builder = " + className + "." + className + "Builder.class)\n")
+	}
+	if extends != "" {
+		var ignoreFields []string
+		for _, f := range []string{ "message", "stackTrace", "cause", "localizedMessage", "suppressed"} {
+		   for _, fd := range ts.Fields {
+				if fd.Name != f {
+					ignoreFields = append(ignoreFields, fmt.Sprintf("%q", f))
+				}
+			}
+		}
+		gen.AddImport("com.fasterxml.jackson.annotation.JsonIgnoreProperties")
+			gen.Emit(indent + "@JsonIgnoreProperties({" + strings.Join(ignoreFields, ", ") + "})\n")
 	}
 	if indent == "" {
 		if gen.UseLombok {
@@ -284,7 +310,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 		}
 		if len(nested) > 0 {
 			for iname, ispec := range nested {
-				gen.CreateStructPojo(ispec, iname, indent+"    ")
+				gen.CreateStructPojo(ispec, iname, indent+"    ", nil)
 			}
 		}
 	}
@@ -489,7 +515,7 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	}
 	if len(nested) > 0 {
 		for iname, ispec := range nested {
-			gen.CreateStructPojo(ispec, iname, indent1)
+			gen.CreateStructPojo(ispec, iname, indent1, nil)
 		}
 	}
 	gen.Emit("}\n")
@@ -641,6 +667,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.Deserializer.class)"))
 			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.Serializer.class)"))
+			gen.needInstant = true
 			return "Instant", annotations, nil
 		}
 		gen.needTimestamp = true
@@ -704,6 +731,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.InstantDeserializer.class)"))
 					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.InstantSerializer.class)"))
+					gen.needInstant = true
 					return "Instant", annotations, nil
 				}
 				gen.needTimestamp = true
