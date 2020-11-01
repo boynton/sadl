@@ -43,6 +43,16 @@ func DataFromFile(path string) (*Data, error) {
 	return data, err
 }
 
+func DataFromJsonString(raw string) (*Data, error) {
+	var data *Data
+	var value map[string]interface{}
+	err := json.Unmarshal([]byte(raw), &value)
+	if err == nil {
+		data = &Data{value: value}
+	}
+	return data, err
+}
+
 func (data *Data) Put(key string, value interface{}) {
 	if data.value == nil {
 		data.value = make(map[string]interface{}, 0)
