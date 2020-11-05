@@ -228,13 +228,13 @@ func (model *Model) ToSadl(conf *sadl.Data) (*sadl.Model, error) {
 		schema.Version = ""
 	}
 
-	haveService := true
-	for _, shapeDef := range model.shapes {
+	haveService := ""
+	for shapeName, shapeDef := range model.shapes {
 		if shapeDef.Type == "service" {
-			if haveService {
-				return nil, fmt.Errorf("SADL only supports one service per model")
+			if haveService != "" {
+				return nil, fmt.Errorf("SADL only supports one service per model (%s, %s)", haveService, shapeName)
 			}
-			haveService = true
+			haveService = shapeName
 		}
 	}
 
