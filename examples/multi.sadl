@@ -4,7 +4,7 @@ type Greeting Struct {
 	message String
 }
 
-http GET "/foo/{caller}" (action=getFoo) {
+http GET "/foo/{caller}" (action=getFoo, x_tags="FooService") {
 	caller String (default="Mystery Person")
 
 	expect 200 {
@@ -13,7 +13,7 @@ http GET "/foo/{caller}" (action=getFoo) {
 	
 }
 
-http GET "/bar/{caller}" (action=getBar) {
+http GET "/bar/{caller}" (action=getBar, x_tags="BarService") {
 	caller String (default="Mystery Person")
 
 	expect 200 {

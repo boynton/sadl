@@ -481,7 +481,7 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 		case "smithy.api#tags":
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), strings.Join(sadl.AsStringArray(v), ","))
 		case "smithy.api#readonly", "smithy.api#idempotent":
-			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
+//			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
 		case "smithy.api#timestampFormat":

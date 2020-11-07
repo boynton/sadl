@@ -80,8 +80,8 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		Metadata: make(map[string]interface{}, 0),
 	}
 	//	ast.Metadata["imported_from_sadl_version"] = sadl.Version
-	ast.Metadata["name"] = model.Name
-
+//	ast.Metadata["name"] = model.Name
+	
 	refs := AllTypeRefs(model)
 	if _, ok := refs["UUID"]; ok {
 		ast.Shapes[ns+"#UUID"] = uuidShape()
@@ -115,6 +115,11 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		}
 		ensureShapeTraits(&shape)["smithy.api#documentation"] = hd.Comment
 		ensureShapeTraits(&shape)["smithy.api#http"] = httpTrait(path, hd.Method, expectedCode)
+		if hd.Annotations != nil {
+			if tags, ok := hd.Annotations["x_tags"]; ok {
+				ensureShapeTraits(&shape)["smithy.api#tags"] = strings.Split(tags, ",")
+			}
+		}
 		switch hd.Method {
 		case "GET":
 			ensureShapeTraits(&shape)["smithy.api#readonly"] = true
@@ -351,6 +356,8 @@ func defineShapeFromTypeSpec(model *sadl.Model, ns string, shapes map[string]*Sh
 	if annos != nil {
 		for k, v := range annos {
 			switch k {
+			case "x_tags":
+				ensureShapeTraits(&shape)["smithy.api#tags"] = strings.Split(v, ",")
 			case "x_sensitive":
 				ensureShapeTraits(&shape)["smithy.api#sensitive"] = true
 			case "x_deprecated":

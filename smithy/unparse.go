@@ -182,6 +182,12 @@ func (w *IdlWriter) EmitEnumTrait(v interface{}, indent string) {
 	}
 }
 
+func (w *IdlWriter) EmitTagsTrait(v interface{}, indent string) {
+	if sa, ok := v.([]string); ok {
+		w.Emit("@tags(%v)\n", listOfStrings("", "%q", sa))
+	}
+}
+
 func (w *IdlWriter) EmitDeprecatedTrait(v interface{}, indent string) {
 	/*
 		if dep != nil {
@@ -335,6 +341,8 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 			w.EmitRangeTrait(v, indent)
 		case "smithy.api#enum":
 			w.EmitEnumTrait(v, indent)
+		case "smithy.api#tags":
+			w.EmitTagsTrait(v, indent)
 		case "smithy.api#pattern", "smithy.api#error":
 			w.EmitStringTrait(sadl.AsString(v), stripNamespace(k), indent)
 		case "aws.protocols#restJson1":
@@ -379,7 +387,10 @@ func listOfShapeRefs(label string, format string, lst []*ShapeRef, absolute bool
 func listOfStrings(label string, format string, lst []string) string {
 	s := ""
 	if len(lst) > 0 {
-		s = label + ": ["
+		if label != "" {
+			s = label + ": "
+		}
+		s = s + "["
 		for n, a := range lst {
 			if n > 0 {
 				s = s + ", "
