@@ -13,26 +13,26 @@ import (
 
 type Generator struct {
 	sadl.Generator
-	Model         *sadl.Model
-	Domain        string //the default DNS domain. Used when generating a POM, defaults to getenv("DOMAIN")
-	Name          string //the name of the service, if not in the model
-	Package       string //the package of the service. Defaults to the reverse domain name
-	Header        string //the banner to prepend to every generated file. Defaults to something obvious and simple
-	SourceDir     string //the source directory, relative to the project directory. Defaults to "src/main/java"
-	ResourceDir   string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
-	UseLombok     bool   //use the Lombok library for generated POJOs. The default is to not.
-	UseImmutable  bool   //generate immutable POJOs with a builder inner class
-	UseGetters    bool   //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
-	UseInstants   bool   //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
-	UseJsonPretty bool   //generate a toString() method that pretty prints JSON.
-	UseMaven      bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
-	Server        bool   //generate server code, including a default (but empty) implementation of the service interface.
-	ServiceException bool //generate a generic ServiceException instead of making POJOs used as action errors throawable
-	needTimestamp bool
-	needInstant   bool
-	needJson      bool
-	imports       []string
-	serverData    *ServerData
+	Model            *sadl.Model
+	Domain           string //the default DNS domain. Used when generating a POM, defaults to getenv("DOMAIN")
+	Name             string //the name of the service, if not in the model
+	Package          string //the package of the service. Defaults to the reverse domain name
+	Header           string //the banner to prepend to every generated file. Defaults to something obvious and simple
+	SourceDir        string //the source directory, relative to the project directory. Defaults to "src/main/java"
+	ResourceDir      string //the resource directory, relative to the project directory. Defaults to "src/main/resource"
+	UseLombok        bool   //use the Lombok library for generated POJOs. The default is to not.
+	UseImmutable     bool   //generate immutable POJOs with a builder inner class
+	UseGetters       bool   //generate getters and setters for POJOs. By default, a fluid-style setter and public members are used
+	UseInstants      bool   //use java.time.Instant for Timestamp implementation. By default, a Timestamp class is generated
+	UseJsonPretty    bool   //generate a toString() method that pretty prints JSON.
+	UseMaven         bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
+	Server           bool   //generate server code, including a default (but empty) implementation of the service interface.
+	ServiceException bool   //generate a generic ServiceException instead of making POJOs used as action errors throawable
+	needTimestamp    bool
+	needInstant      bool
+	needJson         bool
+	imports          []string
+	serverData       *ServerData
 }
 
 func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
@@ -152,7 +152,7 @@ func (gen *Generator) WriteJavaFile(name string, content string, pkg string) {
 }
 
 func (gen *Generator) CreateJavaFileFromTemplate(name string, tmpl string, data interface{}, funcMap template.FuncMap, pkg string) {
-	
+
 	gen.Begin()
 	gen.EmitTemplate(name, tmpl, data, funcMap)
 	content := gen.End()
@@ -233,15 +233,15 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 	}
 	if extends != "" {
 		var ignoreFields []string
-		for _, f := range []string{ "message", "stackTrace", "cause", "localizedMessage", "suppressed"} {
-		   for _, fd := range ts.Fields {
+		for _, f := range []string{"message", "stackTrace", "cause", "localizedMessage", "suppressed"} {
+			for _, fd := range ts.Fields {
 				if fd.Name != f {
 					ignoreFields = append(ignoreFields, fmt.Sprintf("%q", f))
 				}
 			}
 		}
 		gen.AddImport("com.fasterxml.jackson.annotation.JsonIgnoreProperties")
-			gen.Emit(indent + "@JsonIgnoreProperties({" + strings.Join(ignoreFields, ", ") + "})\n")
+		gen.Emit(indent + "@JsonIgnoreProperties({" + strings.Join(ignoreFields, ", ") + "})\n")
 	}
 	if indent == "" {
 		if gen.UseLombok {

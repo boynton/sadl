@@ -80,8 +80,8 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		Metadata: make(map[string]interface{}, 0),
 	}
 	//	ast.Metadata["imported_from_sadl_version"] = sadl.Version
-//	ast.Metadata["name"] = model.Name
-	
+	//	ast.Metadata["name"] = model.Name
+
 	refs := AllTypeRefs(model)
 	if _, ok := refs["UUID"]; ok {
 		ast.Shapes[ns+"#UUID"] = uuidShape()

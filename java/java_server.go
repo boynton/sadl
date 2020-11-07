@@ -67,13 +67,20 @@ func (gen *Generator) CreateServer() {
 
 func (gen *Generator) ExceptionTypes() map[string]string {
 	exceptions := make(map[string]string, 0)
-   for _, hact := range gen.Model.Http {
+	for _, hact := range gen.Model.Http {
 		for _, resp := range hact.Exceptions {
 			tn, _, _ := gen.TypeName(nil, resp.Type, true)
 			exceptions[tn] = resp.Type
 		}
 	}
 	return exceptions
+}
+
+func firstTag(annos map[string]string) string {
+	if csv, ok := annos["x_tags"]; ok {
+		return strings.Split(csv, ",")[0]
+	}
+	return ""
 }
 
 func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
@@ -100,8 +107,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	//fix: *default* to the serviceName interface, and "lift out" the operations mentioned in the config
 
 	interfaces := gen.Config.GetMap("java", "interfaces")
-	lifted := make(map[string]string, 0)
+	defaultInterfaceOperations := make([]string, 0)
 	if interfaces != nil {
+		lifted := make(map[string]string, 0)
 		for k, v := range interfaces {
 			lstOpNames := sadl.AsStringArray(v)
 			gen.serverData.Interfaces[k] = lstOpNames
@@ -109,11 +117,19 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				lifted[s] = k
 			}
 		}
-	}
-	defaultInterfaceOperations := make([]string, 0)
-	for _, v := range gen.Model.Http {
-		if _, ok := lifted[v.Name]; !ok {
-			defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
+		for _, v := range gen.Model.Http {
+			if _, ok := lifted[v.Name]; !ok {
+				defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
+			}
+		}
+	} else {
+		for _, v := range gen.Model.Http {
+			tag := firstTag(v.Annotations)
+			if tag == "" {
+				defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
+			} else {
+				gen.serverData.Interfaces[tag] = append(gen.serverData.Interfaces[tag], v.Name)
+			}
 		}
 	}
 	if len(defaultInterfaceOperations) > 0 {
@@ -333,6 +349,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 					writer.WriteString("                throw new WebApplicationException(Response.status(" + status + ").entity(e).build());\n")
 				}
 			}
+			writer.WriteString("        } catch (Throwable th) {\n")
+			writer.WriteString("            return Response.status(500).build();\n")
 			writer.WriteString("        }\n")
 			writer.Flush()
 			return b.String()
