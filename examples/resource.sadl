@@ -1,0 +1,61 @@
+//Minimal REST CRUDL thing.
+name test
+
+type Item Struct {
+	id String
+	descr String
+}
+
+type ItemListing Struct {
+	items Array<Item>
+	next String
+}
+
+type NotFound Struct {
+	code String
+	message String
+}
+
+http POST "/items/" (action=createItem) {
+	item Item //with no id yet assigned
+
+	expect 201 {
+		item Item //with the id added
+	}
+	except 404 NotFound
+}
+
+http GET "/items/{id}" (action=readItem) {
+	id String
+
+	expect 200 {
+		item Item
+	}
+	except 404 NotFound
+}
+
+http PUT "/items/{id}" (action=updateItem) {
+	id String
+	item Item
+
+	expect 200 {
+		item Item
+	}
+	except 404 NotFound
+}
+
+http DELETE "/items/{id}" (action=deleteItem) {
+	id String
+
+	expect 204 
+	except 404 NotFound
+}
+
+http GET "/items?skip={skip}&limit={limit}" (action=listItems) {
+	skip String
+	limit Int32
+
+	expect 200 {
+		items ItemListing
+	}
+}
