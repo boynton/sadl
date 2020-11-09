@@ -57,8 +57,11 @@ func AsStringArray(v interface{}) []string {
 
 func AsString(v interface{}) string {
 	if v != nil {
-		if s, ok := v.(string); ok {
+		switch s := v.(type) {
+		case string:
 			return s
+		case *string:
+			return *s
 		}
 	}
 	return ""
@@ -121,26 +124,26 @@ func Get(m map[string]interface{}, key string) interface{} {
 }
 
 func GetString(m map[string]interface{}, key string) string {
-	return AsString(m[key])
+	return AsString(Get(m, key))
 }
 func GetStringArray(m map[string]interface{}, key string) []string {
-	return AsStringArray(m[key])
+	return AsStringArray(Get(m, key))
 }
 func GetBool(m map[string]interface{}, key string) bool {
-	return AsBool(m[key])
+	return AsBool(Get(m, key))
 }
 func GetInt(m map[string]interface{}, key string) int {
-	return AsInt(m[key])
+	return AsInt(Get(m, key))
 }
 func GetInt64(m map[string]interface{}, key string) int64 {
-	return AsInt64(m[key])
+	return AsInt64(Get(m, key))
 }
 func GetArray(m map[string]interface{}, key string) []interface{} {
-	return AsArray(m[key])
+	return AsArray(Get(m, key))
 }
 func GetMap(m map[string]interface{}, key string) map[string]interface{} {
-	return AsMap(m[key])
+	return AsMap(Get(m, key))
 }
 func GetDecimal(m map[string]interface{}, key string) *Decimal {
-	return AsDecimal(m[key])
+	return AsDecimal(Get(m, key))
 }

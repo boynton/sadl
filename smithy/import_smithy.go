@@ -401,7 +401,6 @@ func (model *Model) importEnum(schema *sadl.Schema, shapeName string, shape *Sha
 				return false
 			}
 			sym = sadl.GetString(m, "value")
-			//if !sadl.IsSymbol(sym) {
 			if !isSmithyRecommendedEnumName(sym) {
 				return false
 			}
