@@ -30,7 +30,7 @@ type Generator struct {
 	ServiceException bool   //generate a generic ServiceException instead of making POJOs used as action errors throawable
 	needTimestamp    bool
 	needInstant      bool
-	needJson         bool
+	needUtil         bool
 	imports          []string
 	serverData       *ServerData
 }
@@ -48,10 +48,10 @@ func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 	if gen.needTimestamp {
 		gen.CreateTimestamp()
 	} else if gen.needInstant {
-		gen.CreateInstantJson()
+		gen.needUtil = true
 	}
-	if gen.needJson {
-		gen.CreateJsonUtil()
+	if gen.needUtil {
+		gen.CreateUtil()
 	}
 	if gen.Err != nil {
 		return gen.Err
@@ -301,10 +301,10 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 			}
 		}
 		if gen.UseJsonPretty {
-			gen.needJson = true
+			gen.needUtil = true
 			gen.Emit(`    @Override
     public String toString() {
-        return Json.pretty(this);
+        return Util.pretty(this);
     }
 `)
 		}
@@ -506,10 +506,10 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	}
 	gen.Emit("\n")
 	if gen.UseJsonPretty {
-		gen.needJson = true
+		gen.needUtil = true
 		gen.Emit(`    @Override
     public String toString() {
-        return Json.pretty(this);
+        return Util.pretty(this);
     }
 `)
 	}
@@ -665,8 +665,8 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			gen.AddImport("java.time.Instant")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
-			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.Deserializer.class)"))
-			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.Serializer.class)"))
+			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Util.InstantDeserializer.class)"))
+			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
 			gen.needInstant = true
 			return "Instant", annotations, nil
 		}
@@ -729,8 +729,8 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 					gen.AddImport("java.time.Instant")
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
-					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = InstantJson.InstantDeserializer.class)"))
-					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = InstantJson.InstantSerializer.class)"))
+					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Util.InstantDeserializer.class)"))
+					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
 					gen.needInstant = true
 					return "Instant", annotations, nil
 				}

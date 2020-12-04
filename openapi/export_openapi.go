@@ -88,16 +88,18 @@ func (gen *Generator) ExportToOAS3() (*Model, error) {
 			}
 			oas.Paths[p] = pi
 		}
-		//note: the first tag is always the resource name for the action
 		op := &Operation{
 			OperationId: hdef.Name,
 			Summary:     hdef.Comment,
-			Tags:        []string{hdef.Resource},
 			//Parameters
 			//Body
 			//Responses
 			//Callbacks
 			//Security
+		}
+		if hdef.Resource != "" {
+			//note: the first tag is always the resource name for the action
+			op.Tags = append(op.Tags, hdef.Resource)
 		}
 		if len(hdef.Annotations) > 0 {
 			for k, v := range hdef.Annotations {

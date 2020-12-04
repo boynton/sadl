@@ -18,7 +18,7 @@ type ServerData struct {
 	PackageLine      string
 	Port             int
 	MainClass        string
-	ControllerClass  string
+	ResourcesClass   string
 	ImplClass        string
 	InterfaceClass   string
 	ImplClasses      []string
@@ -50,11 +50,11 @@ func (gen *Generator) CreateServer() {
 	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
 	for _, iface := range gen.serverData.InterfaceClasses {
 		gen.serverData.InterfaceClass = iface
-		gen.serverData.ImplClass = iface + "Impl"
+		gen.serverData.ImplClass = iface + "Controller"
 		gen.CreateJavaFileFromTemplate(iface, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-		gen.CreateJavaFileFromTemplate(iface+"Impl", implTemplate, gen.serverData, gen.serverData.Funcs, "")
+		gen.CreateJavaFileFromTemplate(gen.serverData.ImplClass, implTemplate, gen.serverData, gen.serverData.Funcs, "")
 	}
-	gen.CreateJavaFileFromTemplate(gen.serverData.ControllerClass, controllerTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
 
 	if gen.Config.GetBool("service-exception") {
 		gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
@@ -96,12 +96,12 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		rootPath = "/"
 	}
 	gen.serverData = &ServerData{
-		RootPath:        rootPath,
-		Model:           gen.Model,
-		Name:            serviceName,
-		Port:            8080,
-		MainClass:       "Main",
-		ControllerClass: serviceName + "Controller",
+		RootPath:       rootPath,
+		Model:          gen.Model,
+		Name:           serviceName,
+		Port:           8080,
+		MainClass:      "Main",
+		ResourcesClass: serviceName + "Resources",
 	}
 	gen.serverData.Interfaces = make(map[string][]string, 0)
 	//fix: *default* to the serviceName interface, and "lift out" the operations mentioned in the config
@@ -137,7 +137,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	}
 	for k, _ := range gen.serverData.Interfaces {
 		gen.serverData.InterfaceClasses = append(gen.serverData.InterfaceClasses, k)
-		gen.serverData.ImplClasses = append(gen.serverData.ImplClasses, k+"Impl")
+		gen.serverData.ImplClasses = append(gen.serverData.ImplClasses, k+"Controller")
 	}
 	entityNameType := func(hact *sadl.HttpDef) (string, string) {
 		for _, out := range hact.Expected.Outputs {
@@ -152,10 +152,10 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		return gen.RequestType(name)
 	}
 	implName := func(base string) string {
-		return sadl.Uncapitalize(base) + "Impl"
+		return sadl.Uncapitalize(base) + "Controller"
 	}
 	implTypeName := func(base string) string {
-		return base + "Impl"
+		return base + "Controller"
 	}
 
 	funcMap := template.FuncMap{
@@ -304,7 +304,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				}
 				writer.WriteString("            return " + ret + ".build();\n")
 			} else {
-				writer.WriteString("            impl." + name + "(req);\n")
+				writer.WriteString("            " + implName(iname) + "." + name + "(req);\n")
 				writer.WriteString(fmt.Sprintf("            return Response.status(%d).build();\n", hact.Expected.Status))
 			}
 
@@ -388,7 +388,8 @@ public class {{.MainClass}} {
     }
     public static Server startServer({{implDecls}}) throws Exception {
         URI baseUri = UriBuilder.fromUri(BASE_URI).build();
-        ResourceConfig config = new ResourceConfig({{.ControllerClass}}.class);
+        ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
+        config.register(Util.InstantConverterProvider.class);
         config.registerInstances(new AbstractBinder() {
                 @Override
                 protected void configure() {
@@ -404,16 +405,21 @@ public class {{.MainClass}} {
 }
 `
 
-const controllerTemplate = `
+const resourcesTemplate = `
 import java.util.*;
 import java.time.Instant;
 import javax.inject.Inject;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 import static javax.ws.rs.core.Response.Status;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 
 @Path("{{.RootPath}}")
-public class {{.ControllerClass}} {
+public class {{.ResourcesClass}} {
 {{range .InterfaceClasses}}
     @Inject
     private {{.}} {{implName .}};
@@ -581,7 +587,7 @@ func (gen *Generator) ResponseType(name string) string {
 func jsonWrapper(etype string, val string) string {
 	switch etype {
 	case "String":
-		return "Json.string(" + val + ")"
+		return "Util.toJson(" + val + ")"
 	default:
 		return val //these are already valid JSON objects
 	}
