@@ -1,22 +1,16 @@
 # Java implementation of the crudl service
 
-Assuming you generate java code for [examples/crudl.sadl](https://github.com/boynton/sadl/blob/master/examples/crudl.sadl) like this:
+    This is a simple implementation in Java for the server side of  [examples/crudl.sadl](https://github.com/boynton/sadl/blob/master/examples/crudl.sadl). To build and run the server:
 
-    sadl2java -jsonutil -dir gen -package model -pom -server examples/crudl.sadl
-
-Then, the Main.java file that gets generated can be replaced with the one in this directory, to demonstrate a simple memory-based implementation
-of the service.
-
-To build and run the generated service:
-
-    $ cd gen
-    $ mvn exec:java
+    $ make
 
 Then you can test it. This session uses a "json" utility to pretty-print the results. To get it:
 
     $ go get github.com/boynton/hacks/json
 
-A session against the server launched as above follows. Note the test of conditional get based on modified time.
+Or you can just omit the `| json` for each example and parse the one-line JSON yourself.
+    
+Here is an example session against the server launched as above. Note the test of conditional get based on modified time.
 
     $ curl -s 'http://localhost:8080/items' | json
     {

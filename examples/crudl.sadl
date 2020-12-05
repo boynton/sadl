@@ -2,7 +2,7 @@
 // A CRUDL storage service as an example HTTP Web Service defined in SADL.
 //
 name Crudl
-namespace example.crudl
+namespace example
 version "1"
 
 //
@@ -51,7 +51,7 @@ http POST "/items" (action=CreateItem) {
 
    // The response if the item or the id is malformed in any way. Each except type can only occur
    // once, but multiple types can have that code.
-   except 400 BadRequest
+	except 400 BadRequest
 }
 
 //
