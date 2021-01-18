@@ -228,11 +228,11 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 
 func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 	var opts []string
-	if hact.Name != "" {
-		if hact.Name != actionName(hact) {
-			opts = append(opts, "action="+hact.Name)
-		}
-	}
+//	if hact.Name != "" {
+//		if hact.Name != actionName(hact) {
+//			opts = append(opts, "action="+hact.Name)
+//		}
+//	}
 	if len(hact.Annotations) > 0 {
 		for k, v := range hact.Annotations {
 			opts = append(opts, fmt.Sprintf("%s=%q", k, v))
@@ -242,7 +242,12 @@ func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 	if len(opts) > 0 {
 		opt = " (" + strings.Join(opts, ", ") + ")"
 	}
-	s := fmt.Sprintf("http %s %q%s {\n", hact.Method, hact.Path, opt)
+	var s string
+	if hact.Name == "" {
+		s = fmt.Sprintf("http %s %q%s {\n", hact.Method, hact.Path, opt)
+	} else {
+		s = fmt.Sprintf("action %s %s %q%s {\n", hact.Name, hact.Method, hact.Path, opt)
+	}
 	for _, in := range hact.Inputs {
 		s += indentAmount + g.sadlParamSpec(in)
 	}

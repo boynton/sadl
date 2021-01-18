@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.UUID;
 import java.time.Instant;
 
 //
@@ -15,11 +14,11 @@ import java.time.Instant;
 //
 public class CrudlController implements Crudl {
    
-    Map<UUID,Item> storage = new HashMap<UUID,Item>();
+    Map<String,Item> storage = new HashMap<String,Item>();
     
     public CreateItemResponse createItem(CreateItemRequest req) {
         Item item = req.getItem();
-        UUID key = item.getId();
+        String key = item.getId();
         synchronized (storage) {
             if (storage.containsKey(key)) {
                 throw new BadRequest("Already exists: " + key);
@@ -31,7 +30,7 @@ public class CrudlController implements Crudl {
     }
     
     public GetItemResponse getItem(GetItemRequest req) {
-        UUID key = req.getId();
+        String key = req.getId();
         synchronized (storage) {
             if (!storage.containsKey(key)) {
                 throw new NotFound("Item not found: " + key);
@@ -41,7 +40,7 @@ public class CrudlController implements Crudl {
             Instant since = req.getIfNewer();
             if (since != null) {
                 if (modified.isBefore(since)) {
-                    throw new NotModified();
+                    throw new NotModified("Item has not been modified");
                 }
             }
             return GetItemResponse.builder().item(item).modified(item.getModified()).build();
@@ -50,7 +49,7 @@ public class CrudlController implements Crudl {
     
     public PutItemResponse putItem(PutItemRequest req) {
         Item item = req.getItem();
-        UUID key = item.getId();
+        String key = item.getId();
         synchronized (storage) {
             if (!storage.containsKey(key)) {
                 throw new NotFound("Item not found: " + key);
@@ -62,7 +61,7 @@ public class CrudlController implements Crudl {
     }
     
     public DeleteItemResponse deleteItem(DeleteItemRequest req) {
-        UUID key = req.getId();
+        String key = req.getId();
         synchronized (storage) {
             if (!storage.containsKey(key)) {
                 throw new NotFound("Item not found: " + key);
@@ -74,12 +73,12 @@ public class CrudlController implements Crudl {
     
     public ListItemsResponse listItems(ListItemsRequest req) {
         List<Item> lst = new ArrayList<Item>();
-        UUID next = null;
+        String next = null;
         int count = 0;
         int limit = req.getLimit();
-        UUID skip = req.getSkip();
-        for (Map.Entry<UUID,Item> e : storage.entrySet()) {
-            UUID key = e.getKey();
+        String skip = req.getSkip();
+        for (Map.Entry<String,Item> e : storage.entrySet()) {
+            String key = e.getKey();
             if (skip != null) {
                 if (!skip.equals(key)) {
                     continue;
@@ -93,7 +92,7 @@ public class CrudlController implements Crudl {
             }
             lst.add(e.getValue());
         }
-        return ListItemsResponse.builder().items(ItemList.builder().items(lst).next(next).build()).build();
+        return ListItemsResponse.builder().items(ItemListing.builder().items(lst).next(next).build()).build();
     }
     
 }

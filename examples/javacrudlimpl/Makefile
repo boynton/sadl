@@ -12,7 +12,7 @@ generated/src/main/java/CrudlController.java: CrudlController.java
 	cp -p CrudlController.java generated/src/main/java/CrudlController.java
 
 generated/src/main/java/Main.java: ../crudl.sadl
-	sadl -g java-server -o generated ../crudl.sadl
+	../../bin/sadl -g java-server -o generated ../crudl.sadl
 
 generated:
 	mkdir -p generated/src/main/java

@@ -47,7 +47,7 @@ type NotFound Struct {
 //
 // Create the item. The item with the updated modified time is returned.
 //
-http POST "/items" (action=CreateItem) {
+action CreateItem POST "/items" {
 	item Item // The new item
 	
 	// The expected response upon creation of the item in the store
@@ -64,7 +64,7 @@ http POST "/items" (action=CreateItem) {
 // Get the item with the specified id. Conditional response is provided to avoid sending the item
 // over the wire if it has not changed.
 //
-http GET "/items/{id}" (action=GetItem) {
+action GetItem GET "/items/{id}" {
 	id ItemId
 	ifNewer Timestamp (header="If-Modified-Since")
 	
@@ -84,7 +84,7 @@ http GET "/items/{id}" (action=GetItem) {
 //
 // Update the item. The item with the updated modified time is returned.
 //
-http PUT "/items/{id}" (action=PutItem) {
+action PutItem PUT "/items/{id}" {
 	id ItemId
 	item Item // The new item
 	
@@ -100,7 +100,7 @@ http PUT "/items/{id}" (action=PutItem) {
 //
 // Delete the item from the store.
 //
-http DELETE "/items/{id}" (action=DeleteItem) {
+action DeleteItem DELETE "/items/{id}" {
 	id ItemId // The id of the item
 	
 	// The expected response has no content
@@ -116,7 +116,7 @@ http DELETE "/items/{id}" (action=DeleteItem) {
 // parameter. If more items are available than the limit, then a "next" token is returned, which can
 // be provided with a subsequent call as the "skip" query parameter.
 //
-http GET "/items?limit={limit}&skip={skip}" (action=ListItems) {
+action ListItems GET "/items?limit={limit}&skip={skip}" {
 	limit Int32 (default=10)
 	skip ItemId
 	

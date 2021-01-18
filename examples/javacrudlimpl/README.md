@@ -16,26 +16,26 @@ Here is an example session against the server launched as above. Note the test o
     {
        "items": []
     }
-    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f8","data":"Hi there!"}' 'http://localhost:8080/items' | json
+    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"item1","data":"Hi there!"}' 'http://localhost:8080/items' | json
     {
        "data": "Hi there!",
-       "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+       "id": "item1",
        "modified": "2019-02-16T23:14:21.103Z"
     }
-    $ curl -s 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f8' | json
+    $ curl -s 'http://localhost:8080/items/item1' | json
     {
        "data": "Hi there!",
-       "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+       "id": "item1",
        "modified": "2019-02-16T23:14:21.103Z"
     }
-    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f8","data":"Hi there!"}' 'http://localhost:8080/items' | json
+    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"item1","data":"Hi there!"}' 'http://localhost:8080/items' | json
     {
-       "error": "Already exists: 1ce437b0-1dd2-11b2-beb7-003ee1be85f8"
+       "error": "Already exists: item1"
     }
-    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f9","data":"Hi there again"}' 'http://localhost:8080/items' | json
+    $ curl -s -X POST -H "Content-type: application/json" -d '{"id":"item2","data":"Hi there again"}' 'http://localhost:8080/items' | json
     {
        "data": "Hi there again",
-       "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
+       "id": "item2",
        "modified": "2019-02-16T23:15:55.894Z"
     }
     $ curl -s 'http://localhost:8080/items' | json
@@ -43,12 +43,12 @@ Here is an example session against the server launched as above. Note the test o
        "items": [
           {
              "data": "Hi there again",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
+             "id": "item2",
              "modified": "2019-02-16T23:15:55.894Z"
           },
           {
              "data": "Hi there!",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+             "id": "item1",
              "modified": "2019-02-16T23:14:21.103Z"
           }
        ]
@@ -58,25 +58,25 @@ Here is an example session against the server launched as above. Note the test o
        "items": [
           {
              "data": "Hi there again",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
+             "id": "item2",
              "modified": "2019-02-16T23:15:55.894Z"
           }
        ],
-       "next": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8"
+       "next": "item1"
     }
-    $ curl -s 'http://localhost:8080/items?limit=1&skip=1ce437b0-1dd2-11b2-beb7-003ee1be85f8' | json
+    $ curl -s 'http://localhost:8080/items?limit=1&skip=item1' | json
     {
        "items": [
           {
              "data": "Hi there!",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+             "id": "item1",
              "modified": "2019-02-16T23:14:21.103Z"
           }
        ]
     }
-    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9'
+    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/item2'
      to localhost (::1) port 8080 (#0)
-    > GET /items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9 HTTP/1.1
+    > GET /items/item2 HTTP/1.1
     > Host: localhost:8080
     > User-Agent: curl/7.54.0
     > Accept: */*
@@ -87,17 +87,17 @@ Here is an example session against the server launched as above. Note the test o
     < Server: Jetty(9.4.7.v20170914)
     < 
     * Connection #0 to host localhost left intact
-    $ curl -s -X PUT -H "Content-type: application/json" -d '{"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f9","data":"Hi there again!!!!!"}' 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9' | json
+    $ curl -s -X PUT -H "Content-type: application/json" -d '{"id":"item2","data":"Hi there again!!!!!"}' 'http://localhost:8080/items/item2' | json
     {
        "data": "Hi there again!!!!!",
-       "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
+       "id": "item2",
        "modified": "2019-02-16T23:21:52.614Z"
     }
-    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9' && echo
+    $ curl -v -H 'If-Modified-Since: 2019-02-16T23:14:21.103Z' -s 'http://localhost:8080/items/item2' && echo
     *   Trying ::1...
     * TCP_NODELAY set
     * Connected to localhost (::1) port 8080 (#0)
-    > GET /items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9 HTTP/1.1
+    > GET /items/item2 HTTP/1.1
     > Host: localhost:8080
     > User-Agent: curl/7.54.0
     > Accept: */*
@@ -110,27 +110,27 @@ Here is an example session against the server launched as above. Note the test o
     < Server: Jetty(9.4.7.v20170914)
     < 
     * Connection #0 to host localhost left intact
-    {"id":"1ce437b0-1dd2-11b2-beb7-003ee1be85f9","modified":"2019-02-16T23:21:52.614Z","data":"Hi there again!!!!!"}
+    {"id":"item2","modified":"2019-02-16T23:21:52.614Z","data":"Hi there again!!!!!"}
     $ curl -s 'http://localhost:8080/items' | json
     {
        "items": [
           {
              "data": "Hi there again!!!!!",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f9",
+             "id": "item2",
              "modified": "2019-02-16T23:21:52.614Z"
           },
           {
              "data": "Hi there!",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+             "id": "item1",
              "modified": "2019-02-16T23:14:21.103Z"
           }
        ]
     }
-    $ curl -v -X DELETE 'http://localhost:8080/items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9'
+    $ curl -v -X DELETE 'http://localhost:8080/items/item2'
     *   Trying ::1...
     * TCP_NODELAY set
     * Connected to localhost (::1) port 8080 (#0)
-    > DELETE /items/1ce437b0-1dd2-11b2-beb7-003ee1be85f9 HTTP/1.1
+    > DELETE /items/item2 HTTP/1.1
     > Host: localhost:8080
     > User-Agent: curl/7.54.0
     > Accept: */*
@@ -145,7 +145,7 @@ Here is an example session against the server launched as above. Note the test o
        "items": [
           {
              "data": "Hi there!",
-             "id": "1ce437b0-1dd2-11b2-beb7-003ee1be85f8",
+             "id": "item1",
              "modified": "2019-02-16T23:14:21.103Z"
           }
        ]

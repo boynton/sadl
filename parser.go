@@ -205,7 +205,7 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 			case "rpc", "action", "operation":
 				err = p.parseActionDirective(comment)
 			case "http":
-				err = p.parseHttpDirective(comment)
+				err = p.parseHttpDirective("", comment)
 			case "include":
 				err = p.parseIncludeDirective(comment)
 			default:
@@ -368,6 +368,8 @@ func (p *Parser) parseActionDirective(comment string) error {
 	if err != nil {
 		return err
 	}
+	return p.parseHttpDirective(name, comment)
+/*
 	err = p.expect(OPEN_PAREN)
 	if err != nil {
 		return err
@@ -435,8 +437,9 @@ func (p *Parser) parseActionDirective(comment string) error {
 	}
 	p.schema.Actions = append(p.schema.Actions, action)
 	return nil
+*/
 }
-
+	
 func (p *Parser) getIdentifier() string {
 	tok := p.GetToken()
 	if tok == nil {
@@ -453,7 +456,7 @@ func (p *Parser) getIdentifier() string {
 	return ""
 }
 
-func (p *Parser) parseHttpDirective(comment string) error {
+func (p *Parser) parseHttpDirective(name, comment string) error {
 	sym, err := p.ExpectIdentifier()
 	if err != nil {
 		return err
@@ -474,10 +477,13 @@ func (p *Parser) parseHttpDirective(comment string) error {
 	if err != nil {
 		return err
 	}
+	if options.Action != "" { //todo: get rid of this
+		name = options.Action
+	}
 	op := &HttpDef{
 		Method:      method,
 		Path:        pathTemplate,
-		Name:        options.Action,
+		Name:        name,
 		Resource:    options.Resource,
 		Annotations: options.Annotations,
 	}
