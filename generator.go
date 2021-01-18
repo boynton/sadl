@@ -157,5 +157,5 @@ func (gen *Generator) FileExists(path string) bool {
 }
 
 func (gen *Generator) FormatComment(indent, comment string, maxcol int, extraPad bool) string {
-	return FormatComment(indent, "//", comment, maxcol, extraPad)
+	return FormatComment(indent, "// ", comment, maxcol, extraPad)
 }
