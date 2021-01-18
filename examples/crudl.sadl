@@ -1,25 +1,30 @@
 //
-// A CRUDL storage service as an example HTTP Web Service defined in SADL.
+// A CRUDL storage service as an example HTTP Web Service
 //
 name Crudl
 namespace example
 version "1"
 
 //
+// Items use this restricted string as an identifier
+//
+type ItemId String (pattern="^[a-zA-Z_][a-zA-Z_0-9]*$")
+
+//
 // The items to be stored.
 //
 type Item Struct {
-   id UUID (required) // The id is always provided by the client
-   modified Timestamp // The modified time is managed by the server
-   data String // Other fields are arbitrary, this services just preserves them, but otherwise doesn't use them
+	id ItemId (required) // The id is always provided by the client
+	modified Timestamp   // The modified time is managed by the server
+	data String          // Other fields like this are not used by the server, but preserved.
 }
 
 //
 // A paginated list of items
 //
-type ItemList Struct {
-   items Array<Item> (required) // The array is always returned, even if empty.
-   next UUID // The token to skip to the next batch is returned only if there are more.
+type ItemListing Struct {
+	items Array<Item> (required) // The array is always returned, even if empty.
+	next ItemId                  // The token to skip to the next batch is returned only if there are more.
 }
 
 //
@@ -27,14 +32,15 @@ type ItemList Struct {
 // throw the exception. i.e. in Java: throw new ServiceException(new NotModified())
 //
 type NotModified Struct {
+	message String
 }
 
 type BadRequest Struct {
-   error String
+	message String
 }
 
 type NotFound Struct {
-   error String
+	message String
 }
 
 
@@ -42,15 +48,15 @@ type NotFound Struct {
 // Create the item. The item with the updated modified time is returned.
 //
 http POST "/items" (action=CreateItem) {
-   item Item // The new item
-
-   // The expected response upon creation of the item in the store
-   expect 201 {
-      item Item
-   }
-
-   // The response if the item or the id is malformed in any way. Each except type can only occur
-   // once, but multiple types can have that code.
+	item Item // The new item
+	
+	// The expected response upon creation of the item in the store
+	expect 201 {
+		item Item
+	}
+	
+	// The response if the item or the id is malformed in any way. Each except type can only occur
+	// once, but multiple types can have that code.
 	except 400 BadRequest
 }
 
@@ -59,50 +65,50 @@ http POST "/items" (action=CreateItem) {
 // over the wire if it has not changed.
 //
 http GET "/items/{id}" (action=GetItem) {
-   id UUID
-   ifNewer Timestamp (header="If-Modified-Since")
-
-   // The expected response with the item
-   expect 200 {
-      item Item
-      modified Timestamp (header="Modified") // Just an example of output headers
-   }
-
+	id ItemId
+	ifNewer Timestamp (header="If-Modified-Since")
+	
+	// The expected response with the item
+	expect 200 {
+		item Item
+		modified Timestamp (header="Modified") // Just an example of output headers
+	}
+	
 	//no content if the modified time has not changed
-   except 304 NotModified
-
+	except 304 NotModified
+	
 	//not found
-   except 404 NotFound
+	except 404 NotFound
 }
 
 //
 // Update the item. The item with the updated modified time is returned.
 //
 http PUT "/items/{id}" (action=PutItem) {
-   id UUID
-   item Item // The new item
-
-   // The expected response if the item exists and was updated
-   expect 200 {
-      item Item
-   }
-
-   // The response if the item or the id is malformed in any way
-   except 400 BadRequest
+	id ItemId
+	item Item // The new item
+	
+	// The expected response if the item exists and was updated
+	expect 200 {
+		item Item
+	}
+	
+	// The response if the item or the id is malformed in any way
+	except 400 BadRequest
 }
 
 //
 // Delete the item from the store.
 //
 http DELETE "/items/{id}" (action=DeleteItem) {
-   id UUID // The id of the item
-
-   // The expected response has no content
-   expect 204 {
-   }
-
-   // The response if the id is not found in the store
-   except 404 NotFound
+	id ItemId // The id of the item
+	
+	// The expected response has no content
+	expect 204 {
+	}
+	
+	// The response if the id is not found in the store
+	except 404 NotFound
 }
 
 //
@@ -111,12 +117,12 @@ http DELETE "/items/{id}" (action=DeleteItem) {
 // be provided with a subsequent call as the "skip" query parameter.
 //
 http GET "/items?limit={limit}&skip={skip}" (action=ListItems) {
-   limit Int32 (default=10)
-   skip UUID
-
+	limit Int32 (default=10)
+	skip ItemId
+	
 	//return a list
-   expect 200 {
-      items ItemList
-   }
+	expect 200 {
+		items ItemListing
+	}
 }
 

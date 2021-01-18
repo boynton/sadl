@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-const indentAmount = "  "
+const indentAmount = "    "
 
 type SadlGenerator struct {
 	Generator

@@ -321,10 +321,16 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 	//note: documentation has an alternate for ("///"+comment), but then must be before other traits.
 	for k, v := range traits {
 		switch k {
-		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
-			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#documentation":
 			w.EmitDocumentation(sadl.AsString(v), indent)
+		}
+	}
+	for k, v := range traits {
+		switch k {
+		case "smithy.api#documentation":
+			//do nothing
+		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
+			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#httpLabel", "smithy.api#httpPayload":
 			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
 		case "smithy.api#httpQuery", "smithy.api#httpHeader":
@@ -357,7 +363,7 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 func (w *IdlWriter) EmitStructureShape(name string, shape *Shape) {
 	w.EmitTraits(shape.Traits, "")
 	w.Emit("structure %s {\n", name)
-	indent := "    "
+	indent := "  "
 	for k, v := range shape.Members { //this order is not deterministic, because map
 		w.EmitTraits(v.Traits, indent)
 		w.Emit("%s%s: %s,\n", indent, k, v.Target)

@@ -94,6 +94,10 @@ func (p *Parser) Parse() error {
 				traits, comment = withCommentTrait(traits, comment)
 				err = p.parseOperation(traits)
 				traits = nil
+			case "resource":
+				traits, comment = withCommentTrait(traits, comment)
+				err = p.parseResource(traits)
+				traits = nil
 			case "use":
 				use, err := p.expectShapeId()
 				if err == nil {
@@ -309,6 +313,54 @@ func (p *Parser) ExpectIdentifierArray() ([]string, error) {
 		}
 		if tok.Type == sadl.SYMBOL {
 			items = append(items, tok.Text)
+		} else if tok.Type == sadl.COMMA || tok.Type == sadl.NEWLINE || tok.Type == sadl.LINE_COMMENT {
+			//ignore
+		} else {
+			return nil, p.SyntaxError()
+		}
+	}
+	return items, nil
+}
+
+func (p *Parser) ExpectIdentifierMap() (map[string]string, error) {
+	tok := p.GetToken()
+	if tok == nil {
+		return nil, p.EndOfFileError()
+	}
+	if tok.Type != sadl.OPEN_BRACE {
+		return nil, p.SyntaxError()
+	}
+	items := make(map[string]string, 0)
+	for {
+		tok := p.GetToken()
+		var key string
+		if tok == nil {
+			return nil, p.EndOfFileError()
+		}
+		if tok.Type == sadl.CLOSE_BRACE {
+			break
+		}
+		if tok.Type == sadl.SYMBOL {
+			key = tok.Text
+		} else if tok.Type == sadl.COMMA || tok.Type == sadl.NEWLINE || tok.Type == sadl.LINE_COMMENT {
+			//ignore
+			continue
+		} else {
+			return nil, p.SyntaxError()
+		}
+		err := p.expect(sadl.COLON)
+		if err != nil {
+			return nil, err
+		}
+		tok = p.GetToken()
+		if tok == nil {
+			return nil, p.EndOfFileError()
+		}
+		if tok.Type == sadl.CLOSE_BRACE {
+			return nil, p.SyntaxError()
+		}
+		if tok.Type == sadl.SYMBOL {
+			items[key] = tok.Text
 		} else if tok.Type == sadl.COMMA || tok.Type == sadl.NEWLINE || tok.Type == sadl.LINE_COMMENT {
 			//ignore
 		} else {
@@ -632,6 +684,7 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 		Traits: traits,
 	}
 	mems := make(map[string]*Member, 0)
+	comment := ""
 	var mtraits map[string]interface{}
 	for {
 		tok := p.GetToken()
@@ -660,11 +713,19 @@ func (p *Parser) parseStructure(traits map[string]interface{}) error {
 				return err
 			}
 			err = p.ignore(sadl.COMMA)
+			if comment != "" {
+				mtraits, comment = withCommentTrait(mtraits, comment)
+				comment = ""
+			}
 			mems[fname] = &Member{
 				Target: p.ensureNamespaced(ftype),
 				Traits: mtraits,
 			}
 			mtraits = nil
+		} else if tok.Type == sadl.LINE_COMMENT {
+			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
+				comment = p.MergeComment(comment, tok.Text[1:])
+			}
 		} else {
 			return p.SyntaxError()
 		}
@@ -851,6 +912,89 @@ func (p *Parser) parseService(comment string) error {
 	return nil
 }
 
+func (p *Parser) parseResource(traits map[string]interface{}) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+	tok := p.GetToken()
+	if tok == nil {
+		return p.EndOfFileError()
+	}
+	if tok.Type != sadl.OPEN_BRACE {
+		return p.SyntaxError()
+	}
+	shape := &Shape{
+		Type:   "resource",
+		Traits: traits,
+	}
+	var comment string
+	traits, comment = withCommentTrait(traits, comment)
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return p.EndOfFileError()
+		}
+		if tok.Type == sadl.NEWLINE {
+			continue
+		}
+		if tok.Type == sadl.CLOSE_BRACE {
+			break
+		}
+		if tok.Type == sadl.LINE_COMMENT {
+			if strings.HasPrefix(tok.Text, "/") { //a triple slash means doc comment
+				comment = p.MergeComment(comment, tok.Text[1:])
+			}
+			continue
+		} else {
+			p.UngetToken()
+		}
+		fname, err := p.ExpectIdentifier()
+		if err != nil {
+			return err
+		}
+		err = p.expect(sadl.COLON)
+		if err != nil {
+			return err
+		}
+		switch fname {
+		case "identifiers":
+			shape.Identifiers, err = p.expectNamedShapeRefs()
+		case "create":
+			shape.Create, err = p.expectShapeRef()
+		case "put":
+			shape.Put, err = p.expectShapeRef()
+		case "read":
+			shape.Read, err = p.expectShapeRef()
+		case "update":
+			shape.Update, err = p.expectShapeRef()
+		case "delete":
+			shape.Delete, err = p.expectShapeRef()
+		case "list":
+			shape.Delete, err = p.expectShapeRef()
+		case "operations":
+			shape.Operations, err = p.expectShapeRefs()
+		case "collectionOperations":
+			shape.CollectionOperations, err = p.expectShapeRefs()
+		case "Resources":
+			shape.Resources, err = p.expectShapeRefs()
+		default:
+			return p.SyntaxError()
+		}
+		if err != nil {
+			return err
+		}
+		err = p.ignore(sadl.COMMA)
+	}
+	//Traits:
+	//	Operations []*ShapeRef `json:"operations,omitempty"`
+	//	Resources []*ShapeRef `json:"resources,omitempty"`
+	//	Version string `json:"version,omitempty"`
+
+	p.addShapeDefinition(name, shape)
+	return nil
+}
+
 func EnsureNamespaced(ns, name string) string {
 	switch name {
 	case "Boolean", "Byte", "Short", "Integer", "Long", "Float", "Double", "BigInteger", "BigDecimal":
@@ -868,6 +1012,21 @@ func EnsureNamespaced(ns, name string) string {
 
 func (p *Parser) ensureNamespaced(name string) string {
 	return EnsureNamespaced(p.namespace, name)
+}
+
+func (p *Parser) expectNamedShapeRefs() (map[string]*ShapeRef, error) {
+	targets, err := p.ExpectIdentifierMap()
+	if err != nil {
+		return nil, err
+	}
+	refs := make(map[string]*ShapeRef, 0)
+	for k, target := range targets {
+		ref := &ShapeRef{
+			Target: p.ensureNamespaced(target),
+		}
+		refs[k] = ref
+	}
+	return refs, nil
 }
 
 func (p *Parser) expectShapeRefs() ([]*ShapeRef, error) {
@@ -963,7 +1122,7 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 	switch tname {
 	case "idempotent", "required", "httpLabel", "httpPayload", "readonly": //booleans
 		return withTrait(traits, "smithy.api#"+tname, true), nil
-	case "httpQuery", "httpHeader", "error", "documentation", "pattern", "title": //strings
+	case "httpQuery", "httpHeader", "error", "documentation", "pattern", "title", "timestampFormat": //strings
 		err := p.expect(sadl.OPEN_PAREN)
 		if err != nil {
 			return traits, err
@@ -1054,6 +1213,11 @@ func withTrait(traits map[string]interface{}, key string, val interface{}) map[s
 
 func withCommentTrait(traits map[string]interface{}, val string) (map[string]interface{}, string) {
 	if val != "" {
+		if strings.HasSuffix(val, "\n") {
+			if !strings.HasPrefix(val, "\n") {
+				val = "\n" + val
+			}
+		}
 		traits = withTrait(traits, "smithy.api#documentation", val)
 	}
 	return traits, ""

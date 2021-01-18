@@ -271,6 +271,8 @@ func (model *Model) importShape(schema *sadl.Schema, shapeName string, shapeDef 
 		schema.Name = shapeName
 	case "operation":
 		model.importOperationShape(schema, shapeName, shapeDef)
+	case "resource":
+		model.importResourceShape(schema, shapeName, shapeDef)
 	default:
 		fmt.Println("fix me, unhandled shape type: " + shapeDef.Type)
 		panic("whoa")
@@ -669,6 +671,10 @@ func (model *Model) shapeRefToTypeRef(schema *sadl.Schema, shapeRef string) stri
 		typeRef = ltype
 	}
 	return typeRef
+}
+
+func (model *Model) importResourceShape(schema *sadl.Schema, shapeName string, shape *Shape) {
+	//to do: preserve the resource info as tags on the operations
 }
 
 func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, shape *Shape) {
