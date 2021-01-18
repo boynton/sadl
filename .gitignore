@@ -1,11 +1,5 @@
 _*
 *~
 .#*
-.idea
-.vscode
 \#*
-.classpath
 bin
-sadl-mode.el
-*.zip
-doc
