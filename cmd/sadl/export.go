@@ -39,6 +39,9 @@ func ExportFiles(model *sadl.Model, generator, dir string, conf *sadl.Data) erro
 	case "java-server":
 		conf.Put("server", true)
 		return java.Export(model, dir, conf)
+	case "java-client":
+		conf.Put("client", true)
+		return java.Export(model, dir, conf)
 	case "openapi":
 		return openapi.Export(model, conf)
 	case "graphql":

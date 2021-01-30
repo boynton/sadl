@@ -27,12 +27,14 @@ type Generator struct {
 	UseJsonPretty    bool   //generate a toString() method that pretty prints JSON.
 	UseMaven         bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
 	Server           bool   //generate server code, including a default (but empty) implementation of the service interface.
+	Client           bool   //generate client code
 	ServiceException bool   //generate a generic ServiceException instead of making POJOs used as action errors throawable
 	needTimestamp    bool
 	needInstant      bool
 	needUtil         bool
 	imports          []string
 	serverData       *ServerData
+	clientData       *ClientData
 }
 
 func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
@@ -58,6 +60,9 @@ func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 	}
 	if gen.Server {
 		gen.CreateServer()
+	}
+	if gen.Client {
+		gen.CreateClient()
 	}
 	if gen.UseMaven {
 		gen.CreatePom()
@@ -117,6 +122,7 @@ func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generato
 	gen.SourceDir = gen.GetConfigString("source", "src/main/java")
 	gen.ResourceDir = gen.GetConfigString("resource", "src/main/resources")
 	gen.Server = gen.GetConfigBool("server", false)
+	gen.Client = gen.GetConfigBool("client", false)
 	gen.ServiceException = gen.GetConfigBool("service-exception", false)
 	gen.UseLombok = gen.GetConfigBool("lombok", false)
 	gen.UseGetters = gen.GetConfigBool("getters", false)
@@ -339,6 +345,9 @@ func (gen *Generator) EmitGetter(className string, ts *sadl.TypeSpec, fd *sadl.S
 
 func (gen *Generator) EmitBuilder(className string, ts *sadl.TypeSpec, indent string) {
 	builderClass := className + "Builder"
+	gen.Emit(indent + "public " + builderClass + " toBuilder() {\n")
+	gen.Emit(indent + "    return new " + builderClass + "(this);\n")
+	gen.Emit(indent + "}\n\n")
 	gen.Emit(indent + "public static " + builderClass + " builder() {\n")
 	gen.Emit(indent + "    return new " + builderClass + "();\n")
 	gen.Emit(indent + "}\n\n")
@@ -349,9 +358,19 @@ func (gen *Generator) EmitBuilder(className string, ts *sadl.TypeSpec, indent st
 		gen.Emit(indent + "    private " + tn + " " + fd.Name + ";\n")
 	}
 	gen.Emit("\n")
+	gen.Emit(indent + "    public " + builderClass + "() {\n")
+	gen.Emit(indent + "    }\n\n")
+	gen.Emit(indent + "    public " + builderClass + "(" + className + " copy) {\n")
+	for _, fd := range ts.Fields {
+		gen.Emit(indent + "        this." + fd.Name + " = copy.get" + gen.Capitalize(fd.Name) + "();\n")
+	}
+	gen.Emit(indent + "    }\n\n")
 	var args []string
 	for _, fd := range ts.Fields {
 		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
+		if fd.Type == "Timestamp" {
+			gen.Emit(indent + "    @JsonDeserialize(using = Util.InstantDeserializer.class)\n")
+		}
 		gen.Emit(indent + "    public " + builderClass + " " + fd.Name + "(" + tn + " " + fd.Name + ") {\n")
 		gen.Emit(indent + "        this." + fd.Name + " = " + fd.Name + ";\n")
 		gen.Emit(indent + "        return this;\n")
@@ -665,7 +684,6 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			gen.AddImport("java.time.Instant")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
-			annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Util.InstantDeserializer.class)"))
 			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
 			gen.needInstant = true
 			return "Instant", annotations, nil
