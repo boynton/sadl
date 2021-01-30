@@ -80,6 +80,10 @@ const jerseyDepends = `    <dependency>
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-jackson</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-common</artifactId>
+    </dependency>
 <!-- the following is needed to compile with java11 -->
     <dependency>
       <groupId>javax.activation</groupId>

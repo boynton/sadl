@@ -368,11 +368,14 @@ const mainTemplate = `
 import org.eclipse.jetty.server.Server;
 import org.glassfish.jersey.jetty.JettyHttpContainerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.logging.LoggingFeature;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.net.URI;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 {{if .Package}}import {{.Package}}.*;{{end}}
 
 // A placeholder implementation and launcher for the service
@@ -389,6 +392,8 @@ public class {{.MainClass}} {
     public static Server startServer({{implDecls}}) throws Exception {
         URI baseUri = UriBuilder.fromUri(BASE_URI).build();
         ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
+        config.register(new LoggingFeature(Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
+                                           Level.INFO, LoggingFeature.Verbosity.PAYLOAD_ANY, 10000));
         config.register(Util.InstantConverterProvider.class);
         config.registerInstances(new AbstractBinder() {
                 @Override

@@ -228,11 +228,11 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 
 func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 	var opts []string
-//	if hact.Name != "" {
-//		if hact.Name != actionName(hact) {
-//			opts = append(opts, "action="+hact.Name)
-//		}
-//	}
+	//	if hact.Name != "" {
+	//		if hact.Name != actionName(hact) {
+	//			opts = append(opts, "action="+hact.Name)
+	//		}
+	//	}
 	if len(hact.Annotations) > 0 {
 		for k, v := range hact.Annotations {
 			opts = append(opts, fmt.Sprintf("%s=%q", k, v))

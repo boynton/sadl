@@ -369,77 +369,77 @@ func (p *Parser) parseActionDirective(comment string) error {
 		return err
 	}
 	return p.parseHttpDirective(name, comment)
-/*
-	err = p.expect(OPEN_PAREN)
-	if err != nil {
-		return err
-	}
-	tok := p.GetToken()
-	if tok == nil {
-		return p.EndOfFileError()
-	}
-	input := ""
-	if tok.Type == SYMBOL {
-		input = tok.Text
-		tok = p.GetToken()
+	/*
+		err = p.expect(OPEN_PAREN)
+		if err != nil {
+			return err
+		}
+		tok := p.GetToken()
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-	}
-	if tok.Type != CLOSE_PAREN {
-		return p.SyntaxError()
-	}
-	output := ""
-	var options *Options
-	var etypes []string
-	tok = p.GetToken()
-	if tok != nil {
+		input := ""
 		if tok.Type == SYMBOL {
-			if tok.Text != "except" {
-				output = tok.Text
-				tok = p.GetToken()
+			input = tok.Text
+			tok = p.GetToken()
+			if tok == nil {
+				return p.EndOfFileError()
 			}
-			if tok != nil && tok.Type == SYMBOL && tok.Text == "except" {
-				for {
-					etype := p.getIdentifier()
-					if etype == "" {
-						if len(etypes) == 0 {
+		}
+		if tok.Type != CLOSE_PAREN {
+			return p.SyntaxError()
+		}
+		output := ""
+		var options *Options
+		var etypes []string
+		tok = p.GetToken()
+		if tok != nil {
+			if tok.Type == SYMBOL {
+				if tok.Text != "except" {
+					output = tok.Text
+					tok = p.GetToken()
+				}
+				if tok != nil && tok.Type == SYMBOL && tok.Text == "except" {
+					for {
+						etype := p.getIdentifier()
+						if etype == "" {
+							if len(etypes) == 0 {
+								return p.SyntaxError()
+							}
+							break
+						}
+						etypes = append(etypes, etype)
+					}
+				} else {
+					if tok != nil {
+						if tok.Type == SYMBOL {
 							return p.SyntaxError()
 						}
-						break
+						p.UngetToken()
 					}
-					etypes = append(etypes, etype)
 				}
 			} else {
-				if tok != nil {
-					if tok.Type == SYMBOL {
-						return p.SyntaxError()
-					}
-					p.UngetToken()
-				}
+				p.UngetToken()
 			}
-		} else {
-			p.UngetToken()
 		}
-	}
-	options, err = p.ParseOptions("action", []string{})
-	if err != nil {
-		return err
-	}
-	comment, err = p.EndOfStatement(comment)
-	action := &ActionDef{
-		Name:        name,
-		Input:       input,
-		Output:      output,
-		Exceptions:  etypes,
-		Comment:     comment,
-		Annotations: options.Annotations,
-	}
-	p.schema.Actions = append(p.schema.Actions, action)
-	return nil
-*/
+		options, err = p.ParseOptions("action", []string{})
+		if err != nil {
+			return err
+		}
+		comment, err = p.EndOfStatement(comment)
+		action := &ActionDef{
+			Name:        name,
+			Input:       input,
+			Output:      output,
+			Exceptions:  etypes,
+			Comment:     comment,
+			Annotations: options.Annotations,
+		}
+		p.schema.Actions = append(p.schema.Actions, action)
+		return nil
+	*/
 }
-	
+
 func (p *Parser) getIdentifier() string {
 	tok := p.GetToken()
 	if tok == nil {
@@ -668,7 +668,7 @@ func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 	} else if tok.Type == SYMBOL {
 		output := &HttpParamSpec{
 			StructFieldDef: StructFieldDef{
-				Name: "body",
+				Name: "entity",
 				TypeSpec: TypeSpec{
 					Type: tok.Text,
 				},

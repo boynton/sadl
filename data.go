@@ -16,6 +16,14 @@ func NewData() *Data {
 	return &Data{}
 }
 
+func (d Data) MarshalJSON() ([]byte, error) {
+	return []byte(d.String()), nil
+}
+
+func (d *Data) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &d.value)
+}
+
 func (data *Data) String() string {
 	return Pretty(data.value)
 }
