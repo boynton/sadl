@@ -8,7 +8,7 @@ func (gen *Generator) CreateUtil() {
 	gen.Emit(javaUtil)
 	result := gen.End()
 	if gen.Err == nil {
-		gen.WriteJavaFile("Util", result, gen.Package)
+		gen.WriteJavaFile("Util", result, gen.ModelPackage)
 	}
 }
 

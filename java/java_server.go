@@ -13,7 +13,8 @@ import (
 type ServerData struct {
 	Name           string
 	Model          *sadl.Model
-	Package        string
+	ModelPackage   string
+	ServerPackage  string
 	PackageLine    string
 	Port           int
 	MainClass      string
@@ -32,10 +33,10 @@ type ServerData struct {
 	ExtraResources string
 }
 
-type ScopedHttpDef struct {
-	sadl.HttpDef
-	InterfaceName string
-}
+//type ScopedHttpDef struct {
+//	sadl.HttpDef
+//	InterfaceName string
+//}
 
 func (gen *Generator) CreateServer() {
 	src := gen.SourceDir
@@ -45,17 +46,9 @@ func (gen *Generator) CreateServer() {
 	}
 	gen.CreateServerDataAndFuncMap(src, rez)
 	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.serverData.InterfaceClass, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
 	gen.CreateJavaFileFromTemplate(gen.serverData.ImplClass, implTemplate, gen.serverData, gen.serverData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.ServerPackage)
 
-	if gen.Config.GetBool("service-exception") {
-		gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-	}
-	for _, hact := range gen.Model.Http {
-		gen.CreateRequestPojo(hact)
-		gen.CreateResponsePojo(hact)
-	}
 }
 
 func (gen *Generator) ExceptionTypes() map[string]string {
@@ -92,6 +85,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		RootPath:       rootPath,
 		Model:          gen.Model,
 		Name:           serviceName,
+		ModelPackage:   gen.ModelPackage,
+		ServerPackage:  gen.ServerPackage,
 		Port:           8080,
 		MainClass:      "Main",
 		ResourcesClass: serviceName + "Resources",
@@ -120,9 +115,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
-		"implClass": func() string { return "" },
-		"methodPath": func(shact *ScopedHttpDef) string {
-			path := shact.Path
+		"methodPath": func(hact *sadl.HttpDef) string {
+			path := hact.Path
 			i := strings.Index(path, "?")
 			if i >= 0 {
 				path = path[0:i]
@@ -146,18 +140,18 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			return strings.Join(lst, ", ")
 		},
 		"interfaceName": func(base string) string { return sadl.Uncapitalize(base) },
-		"interfaceHttp": func(interfaceName string) []*ScopedHttpDef {
-			var tmp []*ScopedHttpDef
-			for _, hname := range gen.serverData.Interfaces[interfaceName] {
-				h := gen.Model.FindHttp(hname)
-				h2 := &ScopedHttpDef{
-					HttpDef:       *h,
-					InterfaceName: interfaceName,
+		/*		"interfaceHttp": func() []*ScopedxxxHttpDef {
+				var tmp []*ScopedHttpDef
+				for _, hname := range gen.serverData.Interfaces[interfaceName] {
+					h := gen.Model.FindHttp(hname)
+					h2 := &ScopedHttpDef{
+						HttpDef:       *h,
+						InterfaceName: interfaceName,
+					}
+					tmp = append(tmp, h2)
 				}
-				tmp = append(tmp, h2)
-			}
-			return tmp
-		},
+				return tmp
+			},*/
 		"outtype": func(hact *sadl.HttpDef) string {
 			_, t := gen.ActionInfo(hact)
 			return t
@@ -170,22 +164,20 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		"resClass": func(hact *sadl.HttpDef) string {
 			return gen.ResponseType(gen.ActionName(hact))
 		},
-		"resEntity": func(hact *ScopedHttpDef) string {
-			resClass := gen.ResponseType(gen.ActionName(&hact.HttpDef))
+		"resEntity": func(hact *sadl.HttpDef) string {
+			resClass := gen.ResponseType(gen.ActionName(hact))
 			if gen.UseImmutable {
 				return resClass + ".builder().build()"
 			} else {
 				return "new " + resClass + "()"
 			}
 		},
-		"handlerSig": func(shact *ScopedHttpDef) string {
-			hact := &shact.HttpDef
+		"handlerSig": func(hact *sadl.HttpDef) string {
 			name := gen.ActionName(hact)
 			resType := gen.ResponseType(gen.ActionName(hact))
 			return "public " + resType + " " + name + "(" + reqType(name) + " req)"
 		},
-		"resourceSig": func(shact *ScopedHttpDef) string {
-			hact := &shact.HttpDef
+		"resourceSig": func(hact *sadl.HttpDef) string {
 			name := gen.ActionName(hact) //i.e. "getFoo"
 			var params []string
 			for _, in := range hact.Inputs {
@@ -217,9 +209,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			paramlist := strings.Join(params, ", ")
 			return "public " + etype + " " + name + "(" + paramlist + ")"
 		},
-		"resourceBody": func(shact *ScopedHttpDef) string {
-			hact := &shact.HttpDef
-			iname := shact.InterfaceName
+		"resourceBody": func(hact *sadl.HttpDef) string {
+			iname := gen.Name
 			name := gen.ActionName(hact)
 			reqname := reqType(name)
 			resname := gen.ResponseType(gen.ActionName(hact))
@@ -317,9 +308,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		},
 		"extraResources": func() string { return gen.serverData.ExtraResources },
 	}
-	gen.serverData.Package = gen.Package
-	if gen.Package != "" {
-		gen.serverData.PackageLine = "package " + gen.Package + ";\n"
+	if gen.ServerPackage != "" {
+		gen.serverData.PackageLine = "package " + gen.ServerPackage + ";\n"
 	}
 	gen.serverData.Funcs = funcMap
 }
@@ -336,7 +326,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-{{if .Package}}import {{.Package}}.*;{{end}}
+{{if .ModelPackage}}import {{.ModelPackage}}.*;{{end}}
+{{if .ServerPackage}}import {{.ServerPackage}}.*;{{end}}
 
 // A placeholder implementation and launcher for the service
 public class {{.MainClass}} {
@@ -358,8 +349,8 @@ public class {{.MainClass}} {
         config.registerInstances(new AbstractBinder() {
                 @Override
                 protected void configure() {
-{{range .InterfaceClasses}}                    bind({{implName .}}).to({{.}}.class);
-{{end}}                }
+                    bind({{.ImplClass}}.class).to({{.InterfaceClass}}.class);
+                }
             });
         Server server = JettyHttpContainerFactory.createServer(baseUri, config);
         server.start();
@@ -371,6 +362,7 @@ public class {{.MainClass}} {
 `
 
 const resourcesTemplate = `
+{{if .ModelPackage}}import {{.ModelPackage}}.*;{{end}}
 import java.util.*;
 import java.time.Instant;
 import javax.inject.Inject;
@@ -385,10 +377,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 
 @Path("{{.RootPath}}")
 public class {{.ResourcesClass}} {
-{{range .InterfaceClasses}}
     @Inject
-    private {{.}} {{implName .}};
-{{range interfaceHttp .}}
+    private {{.InterfaceClass}} {{implName .Name}};
+{{range .Model.Http}}
     
     @{{.Method}}
     @Path("{{methodPath .}}")
@@ -396,80 +387,20 @@ public class {{.ResourcesClass}} {
     {{resourceSig .}} {{openBrace}}
 {{resourceBody .}}    }
 {{end}}
-{{end}}
 {{extraResources}}
-}
-`
-
-const interfaceTemplate = `
-public interface {{.InterfaceClass}} {
-{{range interfaceHttp .InterfaceClass}}
-    {{handlerSig .}};
-{{end}}
 }
 `
 
 const implTemplate = `
 // Stubs for an implementation of the service follow
-{{if .Package}}import {{.Package}}.*;{{end}}
+{{if .ModelPackage}}import {{.ModelPackage}}.*;{{end}}
 
 public class {{.ImplClass}} implements {{.InterfaceClass}} {
-{{range interfaceHttp .InterfaceClass}}
+{{range .Model.Http}}
     {{handlerSig .}} {{openBrace}}
         return {{resEntity .}}; //implement me!
     }
 {{end}}
-}
-`
-
-const exceptionTemplate = `
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import java.io.IOException;
-
-@JsonSerialize(using = ServiceException.JSONSerializer.class)
-@JsonDeserialize(using = ServiceException.JSONDeserializer.class)
-public class ServiceException extends RuntimeException {
-    public Object entity;
-
-    public ServiceException() { super(); }
-    public ServiceException(String message) { super(message); }
-    public ServiceException(String message, Throwable cause) { super(message, cause); }
-    public ServiceException(Throwable cause) { super(cause); }
-
-    public ServiceException entity(Object entity) { this.entity = entity; return this; }
-
-    public static class ErrorObject {
-        public String error;
-        public ErrorObject(String error) { this.error = error; }
-    }
-
-    public static class JSONSerializer extends JsonSerializer<ServiceException> {
-        @Override
-        public void serialize(ServiceException value, JsonGenerator jgen, SerializerProvider provider) throws IOException, JsonProcessingException {
-            Object tmp = value.entity;
-            if (tmp == null) {
-                tmp = new ErrorObject(value.getMessage());
-            }
-            jgen.writeObject(tmp);
-        }
-    }
-
-    public static class JSONDeserializer extends JsonDeserializer<ServiceException> {
-        @Override
-        public ServiceException deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-            ErrorObject tmp = jp.readValueAs(ErrorObject.class);
-            return new ServiceException(tmp.error);
-        }
-    }
-
 }
 `
 

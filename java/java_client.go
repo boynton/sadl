@@ -13,7 +13,8 @@ import (
 type ClientData struct {
 	Name           string
 	Model          *sadl.Model
-	Package        string
+	ModelPackage   string
+	ClientPackage  string
 	PackageLine    string
 	Port           int
 	RootPath       string
@@ -29,14 +30,7 @@ func (gen *Generator) CreateClient() {
 	}
 	gen.CreateClientDataAndFuncMap(src, rez)
 	gen.CreateClientConfig()
-	gen.CreateJavaFileFromTemplate(gen.clientData.Name, clientTemplate, gen.clientData, gen.clientData.Funcs, gen.Package)
-
-	//the following should just be part of the model, if the model has any actions
-	gen.CreateJavaFileFromTemplate(gen.clientData.InterfaceClass, interfaceTemplate, gen.clientData, gen.clientData.Funcs, gen.Package)
-	for _, hact := range gen.Model.Http {
-		gen.CreateRequestPojo(hact)
-		gen.CreateResponsePojo(hact)
-	}
+	gen.CreateJavaFileFromTemplate(gen.clientData.Name, clientTemplate, gen.clientData, gen.clientData.Funcs, gen.ClientPackage)
 }
 
 func (gen *Generator) CreateClientDataAndFuncMap(src, rez string) {
@@ -51,6 +45,8 @@ func (gen *Generator) CreateClientDataAndFuncMap(src, rez string) {
 	gen.clientData = &ClientData{
 		RootPath:       rootPath,
 		Model:          gen.Model,
+		ModelPackage:   gen.ModelPackage,
+		ClientPackage:  gen.ClientPackage,
 		Name:           serviceName + "Client",
 		Port:           8080,
 		InterfaceClass: serviceName,
@@ -175,7 +171,7 @@ func (gen *Generator) CreateClientConfig() {
 	gen.Emit(clientConfig)
 	result := gen.End()
 	if gen.Err == nil {
-		gen.WriteJavaFile("ClientConfig", result, gen.Package)
+		gen.WriteJavaFile("ClientConfig", result, gen.clientData.ClientPackage)
 	}
 }
 
@@ -186,7 +182,7 @@ public interface ClientConfig {
 `
 
 const clientTemplate = `
-{{if .Package}}import {{.Package}}.*;{{end}}
+{{if .ModelPackage}}import {{.ModelPackage}}.*;{{end}}
 import java.time.Instant;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
