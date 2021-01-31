@@ -86,8 +86,7 @@ func reverseStrings(ary []string) []string {
 }
 
 func defaultPackage(domainName, name string) string {
-	rev := strings.Join(reverseStrings(strings.Split(domainName, ".")), ".")
-	return rev + "." + strings.ToLower(name)
+	return strings.Join(reverseStrings(strings.Split(domainName, ".")), ".")
 }
 
 func (gen *Generator) AddImport(fullReference string) {

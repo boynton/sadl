@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	//	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -12,27 +11,25 @@ import (
 )
 
 type ServerData struct {
-	Name             string
-	Model            *sadl.Model
-	Package          string
-	PackageLine      string
-	Port             int
-	MainClass        string
-	ResourcesClass   string
-	ImplClass        string
-	InterfaceClass   string
-	ImplClasses      []string
-	InterfaceClasses []string
-	RootPath         string
-	Http             []*sadl.HttpDef
-	Inputs           []*sadl.HttpParamSpec
-	Expected         *sadl.HttpExpectedSpec
-	Errors           []*sadl.HttpExceptionSpec
-	Class            string
-	Imports          []string
-	Funcs            template.FuncMap
-	Interfaces       map[string][]string
-	ExtraResources   string
+	Name           string
+	Model          *sadl.Model
+	Package        string
+	PackageLine    string
+	Port           int
+	MainClass      string
+	ResourcesClass string
+	ImplClass      string
+	InterfaceClass string
+	RootPath       string
+	Http           []*sadl.HttpDef
+	Inputs         []*sadl.HttpParamSpec
+	Expected       *sadl.HttpExpectedSpec
+	Errors         []*sadl.HttpExceptionSpec
+	Class          string
+	Imports        []string
+	Funcs          template.FuncMap
+	Interfaces     map[string][]string
+	ExtraResources string
 }
 
 type ScopedHttpDef struct {
@@ -48,12 +45,8 @@ func (gen *Generator) CreateServer() {
 	}
 	gen.CreateServerDataAndFuncMap(src, rez)
 	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
-	for _, iface := range gen.serverData.InterfaceClasses {
-		gen.serverData.InterfaceClass = iface
-		gen.serverData.ImplClass = iface + "Controller"
-		gen.CreateJavaFileFromTemplate(iface, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
-		gen.CreateJavaFileFromTemplate(gen.serverData.ImplClass, implTemplate, gen.serverData, gen.serverData.Funcs, "")
-	}
+	gen.CreateJavaFileFromTemplate(gen.serverData.InterfaceClass, interfaceTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
+	gen.CreateJavaFileFromTemplate(gen.serverData.ImplClass, implTemplate, gen.serverData, gen.serverData.Funcs, "")
 	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.Package)
 
 	if gen.Config.GetBool("service-exception") {
@@ -103,42 +96,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		MainClass:      "Main",
 		ResourcesClass: serviceName + "Resources",
 	}
-	gen.serverData.Interfaces = make(map[string][]string, 0)
-	//fix: *default* to the serviceName interface, and "lift out" the operations mentioned in the config
 
-	interfaces := gen.Config.GetMap("java", "interfaces")
-	defaultInterfaceOperations := make([]string, 0)
-	if interfaces != nil {
-		lifted := make(map[string]string, 0)
-		for k, v := range interfaces {
-			lstOpNames := sadl.AsStringArray(v)
-			gen.serverData.Interfaces[k] = lstOpNames
-			for _, s := range lstOpNames {
-				lifted[s] = k
-			}
-		}
-		for _, v := range gen.Model.Http {
-			if _, ok := lifted[v.Name]; !ok {
-				defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
-			}
-		}
-	} else {
-		for _, v := range gen.Model.Http {
-			tag := firstTag(v.Annotations)
-			if tag == "" {
-				defaultInterfaceOperations = append(defaultInterfaceOperations, v.Name)
-			} else {
-				gen.serverData.Interfaces[tag] = append(gen.serverData.Interfaces[tag], v.Name)
-			}
-		}
-	}
-	if len(defaultInterfaceOperations) > 0 {
-		gen.serverData.Interfaces[serviceName] = defaultInterfaceOperations
-	}
-	for k, _ := range gen.serverData.Interfaces {
-		gen.serverData.InterfaceClasses = append(gen.serverData.InterfaceClasses, k)
-		gen.serverData.ImplClasses = append(gen.serverData.ImplClasses, k+"Controller")
-	}
+	gen.serverData.InterfaceClass = serviceName
+	gen.serverData.ImplClass = serviceName + "Controller"
 	entityNameType := func(hact *sadl.HttpDef) (string, string) {
 		for _, out := range hact.Expected.Outputs {
 			if out.Header == "" {
