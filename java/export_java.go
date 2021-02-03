@@ -59,7 +59,14 @@ func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 }
 
 func defaultDomain() string {
-	return os.Getenv("DOMAIN")
+	s := os.Getenv("DOMAIN")
+	if s == "" {
+		s = os.Getenv("HOSTNAME")
+		if s == "" {
+			s = "example"
+		}
+	}
+	return s
 }
 
 func reverseStrings(ary []string) []string {
