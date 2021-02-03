@@ -195,10 +195,10 @@ import javax.ws.rs.WebApplicationException;
 
 public class {{.Name}} implements {{.InterfaceClass}} {
     private static Client client = ClientBuilder.newClient();
-    private static final String base = "/crudl";
+    private static final String base = "{{.RootPath}}";
     private ClientConfig config;
 
-    public CrudlClient(ClientConfig conf) {
+    public {{.Name}}(ClientConfig conf) {
         config = conf;
     }
 {{range .Model.Http}}
