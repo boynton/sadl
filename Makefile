@@ -29,3 +29,20 @@ proper::
 
 clean::
 	rm -rf bin
+
+release:: sadl_darwin_amd64.zip sadl_darwin_arm64.zip
+
+sadl_darwin_amd64.zip::
+	rm -rf darwin_amd64
+	mkdir -p darwin_amd64
+	env GOOS=darwin GOARCH=amd64 go build -o darwin_amd64/sadl github.com/boynton/sadl/cmd/sadl
+	(cd darwin_amd64; zip -rp ../sadl_darwin_amd64.zip sadl)
+	rm -rf darwin_amd64
+
+sadl_darwin_arm64.zip::
+	rm -rf darwin_arm64
+	mkdir -p darwin_arm64
+	env GOOS=darwin GOARCH=arm64 go build -o darwin_arm64/sadl github.com/boynton/sadl/cmd/sadl
+	(cd darwin_arm64; zip -rp ../sadl_darwin_arm64.zip sadl)
+	rm -rf darwin_arm64
+
