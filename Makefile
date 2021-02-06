@@ -28,7 +28,7 @@ proper::
 	go vet github.com/boynton/sadl/cmd/sadl
 
 clean::
-	rm -rf bin
+	rm -rf bin sadl_darwin_amd64.zip sadl_darwin_arm64.zip
 
 release:: sadl_darwin_amd64.zip sadl_darwin_arm64.zip
 
