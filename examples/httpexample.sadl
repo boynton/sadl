@@ -35,7 +35,7 @@ http GET "/people/{id}" (action=getPerson) { /* generates a GetPersonRequest typ
     }
 
     //exceptional response
-	except 404 NotFound; /* TODO: currently, this generates nothing. You pass a NotFound object to generated ServiceError type.
+    except 404 NotFound; /* TODO: currently, this generates nothing. You pass a NotFound object to generated ServiceError type.
                             But: I would prefer the consistency of wrapping it, so I could specify headers, and be consistent
                             with "expect". Then, generating mocks and docs with examples is possible for errors, too. */
 }
@@ -50,17 +50,15 @@ example GetPersonResponse (name=getPersonExample) {
         "name": "Lee Boynton",
         "email": "lee@boynton.com"
     },
-   "etag": "fe4c4350480c2233ca3d6354d3b44b4e"
+    "etag": "fe4c4350480c2233ca3d6354d3b44b4e"
 }
 
-/*
+
 example GetPersonRequest (name=getPersonNotFoundExample) {
     "id": "bf938428-f04c-11e9-a280-8c8590216cf8"
 }
 
-example GetPersonExcept404 (name=getPersonNotFoundExample) {
-	"body": {
-		"message": "Person not found: bf938428-f04c-11e9-a280-8c8590216cf8"
-	},
+example NotFound (name=getPersonNotFoundExample) {
+	"message": "Person not found: bf938428-f04c-11e9-a280-8c8590216cf8"
 }
-*/
+

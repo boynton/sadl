@@ -32,35 +32,46 @@ func stringExample(ex interface{}) string {
 	return ""
 }
 
+type exampleData struct {
+	req map[string]interface{}
+	exc *sadl.HttpExceptionSpec
+	res map[string]interface{}
+}
+
 func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 	examples := model.Examples
 	reqType := sadl.Capitalize(hdef.Name) + "Request"
 	resType := sadl.Capitalize(hdef.Name) + "Response"
-	namedExamples := make(map[string][]map[string]interface{}, 0)
+	namedExamples := make(map[string]*exampleData, 0)
 	var reqExample, resExample map[string]interface{}
 
-	//exception examples?
-	//each named example should be a pair of req/res
+	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range examples {
 		if ex.Target == reqType {
-			namedExamples[ex.Name] = []map[string]interface{}{ex.Example.(map[string]interface{})}
+			tmp := ex.Example.(map[string]interface{})
+			namedExamples[ex.Name] = &exampleData{req: tmp}
 		}
 	}
 	for _, ex := range examples {
-		if ex.Target == resType {
-			namedExamples[ex.Name] = append(namedExamples[ex.Name], ex.Example.(map[string]interface{}))
+		if ex.Target != reqType {
+			if data, ok := namedExamples[ex.Name]; ok {
+				if ex.Target == resType {
+					data.res = ex.Example.(map[string]interface{})
+				} else {
+					for _, exc := range hdef.Exceptions {
+						if exc.Type == ex.Target {
+							data.res = ex.Example.(map[string]interface{})
+							data.exc = exc
+						}
+					}
+				}
+			}
 		}
 	}
 	body := ""
-	for exName, exlist := range namedExamples {
-		if len(exlist) != 2 {
-			continue
-		}
-		reqExample = exlist[0]
-		resExample = exlist[1]
-		if resExample == nil {
-			panic("whoops, no matching response")
-		}
+	for exName, data := range namedExamples {
+		reqExample = data.req
+		resExample = data.res
 		body = body + "#\n# " + exName + " (action=" + hdef.Name + ")\n#\n"
 		if reqExample != nil {
 			body = body + "#   Request:"
@@ -92,22 +103,30 @@ func generateHttpTrace(model *sadl.Model, hdef *sadl.HttpDef) (string, error) {
 			
 			if resExample != nil {
 				body = body + "#   Response:"
-				
+				status := hdef.Expected.Status
 				bodyExample := ""
 				headers := "Content-Type: application/json; charset=utf-8\n"
-				
-				for _, out := range hdef.Expected.Outputs {
-					ex := resExample[out.Name]
-					if out.Header != "" {
-						sex := stringExample(ex)
-						headers = headers + out.Header + ": " + sex + "\n"
-					} else { //body
-						bodyExample = sadl.Pretty(ex)
+
+
+				if data.exc == nil {
+					for _, out := range hdef.Expected.Outputs {
+						ex := resExample[out.Name]
+						if out.Header != "" {
+							sex := stringExample(ex)
+							headers = headers + out.Header + ": " + sex + "\n"
+						} else { //body
+							if status != 204 {
+								bodyExample = sadl.Pretty(ex)
+							}
+						}
 					}
+				} else {
+					status = data.exc.Status
+					bodyExample = sadl.Pretty(resExample)
 				}
 				headers = headers + "Date: " + dateHeader() + "\n"
 				headers = fmt.Sprintf("Content-Length: %d\n", len(bodyExample)) + headers
-				respMessage := fmt.Sprintf("HTTP/1.1 %d %s\n", hdef.Expected.Status, http.StatusText(int(hdef.Expected.Status)))
+				respMessage := fmt.Sprintf("HTTP/1.1 %d %s\n", status, http.StatusText(int(status)))
 				s := respMessage + headers + "\n" + bodyExample
 				body = body + "\n" + s + "\n"
 			}
