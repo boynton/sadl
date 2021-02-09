@@ -39,7 +39,7 @@ output directory, conversions to other API description formats just output to st
 
 Supported generators and options used from config if present
    sadl: Prints the SADL representation to stdout. This is the default.
-   json: Prints the SADL data representation in JSON to stdout
+   json: Prints the parsed SADL data representation in JSON to stdout
    smithy: Prints the Smithy IDL representation to stdout. Options:
       name: supply this value as the name for a service for inputs that do not have a name
       namespace: supply this value as the namespace for inputs that do not have a namespace
@@ -63,7 +63,7 @@ Supported generators and options used from config if present
 
 `
 	var genOpts ArrayOption
-	pType := flag.String("t", "sadl", "Only read files of this type. By default, any valid input file type is accepted.")
+	pType := flag.String("t", "", "Only read files of this type. By default, any valid input file type is accepted.")
 	pOut := flag.String("o", "/tmp/generated", "The output file or directory.")
 	pName := flag.String("n", "", "The name of the model, overrides any name present in the source")
 	pNamespace := flag.String("ns", "", "The namespace of the model, overrides any namespace present in the source")
@@ -72,7 +72,7 @@ Supported generators and options used from config if present
 	pForce := flag.Bool("f", false, "Force overwrite of existing files")
 	flag.Var(&genOpts, "x", "An option to pass to the generator")
 	pVersion := flag.Bool("v", false, "Show SADL version and exit")
-	pHelp := flag.Bool("help", false, "Show more helpful information")
+	pHelp := flag.Bool("h", false, "Show more helpful information")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sadl [options] file ...\n\nOptions:\n")
 		flag.PrintDefaults()
@@ -145,8 +145,6 @@ Supported generators and options used from config if present
 			v = kvs[1]
 		}
 		genConf.Put(k, v)
-		//to do: set up generator option based on this string key/value pair
-		fmt.Printf("[setting a generator option: %q => %v]\n", k, v)
 	}
 	err = ExportFiles(model, gen, out, genConf)
 	if err != nil {

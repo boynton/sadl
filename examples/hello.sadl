@@ -8,8 +8,8 @@ http GET "/hello?caller={caller}" (action=hello) {
 	caller String (default="Mystery Person")
 
 	expect 200 {
-		greeting String		
-	}	
+		greeting String
+	}
 }
 
 
