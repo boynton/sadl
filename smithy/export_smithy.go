@@ -215,24 +215,17 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	return ast, nil
 }
 
-type exampleData struct {
-	Title         string                 `json:"title"`
-	Documentation string                 `json:"documentation,omitempty"`
-	Input         map[string]interface{} `json:"input,omitempty"`
-	Output        map[string]interface{} `json:"output,omitempty"`
-}
-
-func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*exampleData {
+func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) ExamplesTrait {
 	reqType := sadl.Capitalize(hdef.Name) + "Request"
 	resType := sadl.Capitalize(hdef.Name) + "Response"
-	namedExamples := make(map[string]*exampleData, 0)
+	namedExamples := make(map[string]*ExampleTrait, 0)
 
 	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range model.Examples {
 		if ex.Target == reqType {
 			tmp := ex.Example.(map[string]interface{})
 			c := ex.Comment
-			namedExamples[ex.Name] = &exampleData{Input: tmp, Documentation: c}
+			namedExamples[ex.Name] = &ExampleTrait{Input: tmp, Documentation: c}
 		}
 	}
 	for _, ex := range model.Examples {
@@ -251,7 +244,7 @@ func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*exampleData
 			}
 		}
 	}
-	result := make([]*exampleData, 0)
+	result := make(ExamplesTrait, 0)
 	for k, v := range namedExamples {
 		v.Title = k
 		result = append(result, v)

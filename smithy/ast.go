@@ -183,4 +183,13 @@ type HttpErrorTrait int
 // endpoint
 // hostLabel
 
-//--------------
+//-------------- examples
+
+type ExampleTrait struct {
+	Title         string                 `json:"title"`
+	Documentation string                 `json:"documentation,omitempty"`
+	Input         map[string]interface{} `json:"input,omitempty"`
+	Output        map[string]interface{} `json:"output,omitempty"`
+}
+
+type ExamplesTrait []*ExampleTrait

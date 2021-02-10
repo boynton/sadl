@@ -72,7 +72,7 @@ func (ast *AST) IDL(namespace string) string {
 		if shape.Type == "operation" {
 			if d, ok := shape.Traits["smithy.api#examples"]; ok {
 				switch v := d.(type) {
-				case []*exampleData:
+				case []*ExampleTrait:
 					w.EmitExamplesTrait(nsk, v)
 				}
 			}
@@ -372,7 +372,7 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 
 func (w *IdlWriter) EmitExamplesTrait(opname string, raw interface{}) {
 	switch data := raw.(type) {
-	case []*exampleData:
+	case []*ExampleTrait:
 		target := stripNamespace(opname)
 		formatted := sadl.Pretty(data)
 		if strings.HasSuffix(formatted, "\n") {

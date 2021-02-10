@@ -185,7 +185,6 @@ func NewModel(ast *AST) *Model {
 	for k, v := range ast.Shapes {
 		model.addShape(k, v)
 	}
-	//	fmt.Println(sadl.Pretty(model.ioParams))
 	return model
 }
 
@@ -238,7 +237,6 @@ func (model *Model) ToSadl(conf *sadl.Data) (*sadl.Model, error) {
 		}
 	}
 
-	//	fmt.Println("shapes in our namespace:", sadl.Pretty(model.shapes))
 	for k, v := range model.shapes {
 		model.importShape(schema, k, v)
 	}
@@ -502,6 +500,8 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 			}
 		case "aws.protocols#restJson1":
 			//ignore
+		case "smithy.api#examples":
+			//ignore
 		default:
 			fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
 			panic("here: " + k)
@@ -693,11 +693,47 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 	if method == "" {
 		panic("non-http actions NYI")
 	}
+	var inType string
+	if shape.Input != nil {
+		inType = model.shapeRefToTypeRef(schema, shape.Input.Target)
+	}
+	var outType string
+	if shape.Output != nil {
+		outType = model.shapeRefToTypeRef(schema, shape.Output.Target)
+	}
+	reqType := sadl.Capitalize(shapeName) + "Request"
+	resType := sadl.Capitalize(shapeName) + "Response"
+	if t, ok := shape.Traits["smithy.api#examples"]; ok {
+		if opexes, ok := t.([]interface{}); ok {
+			for _, opexr := range opexes {
+				if opex, ok := opexr.(map[string]interface{}); ok {
+					title := sadl.GetString(opex, "title")
+					if input, ok := opex["input"]; ok {
+						ex := &sadl.ExampleDef{
+							Target:  reqType,
+							Name:    title,
+							Comment: sadl.GetString(opex, "documentation"),
+							Example: input,
+						}
+						schema.Examples = append(schema.Examples, ex)
+					}
+					if output, ok := opex["output"]; ok {
+						ex := &sadl.ExampleDef{
+							Target:  resType,
+							Name:    title,
+							Example: output,
+						}
+						schema.Examples = append(schema.Examples, ex)
+					}
+				}
+			}
+		}
+	}
 
 	hdef := &sadl.HttpDef{
 		Method:      method,
 		Path:        uri,
-		Name:        shapeName,
+		Name:        sadl.Uncapitalize(shapeName),
 		Comment:     model.escapeComment(sadl.GetString(shape.Traits, "smithy.api#documentation")),
 		Annotations: model.importTraitsAsAnnotations(nil, shape.Traits),
 	}
@@ -705,7 +741,6 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		code = 200
 	}
 	if shape.Input != nil {
-		inType := model.shapeRefToTypeRef(schema, shape.Input.Target)
 		inStruct := model.shapes[inType]
 		qs := ""
 		payloadMember := ""
@@ -754,7 +789,6 @@ func (model *Model) importOperationShape(schema *sadl.Schema, shapeName string, 
 		Status: int32(code),
 	}
 	if shape.Output != nil {
-		outType := model.shapeRefToTypeRef(schema, shape.Output.Target)
 		outStruct := model.shapes[outType]
 		//SADL: each output is a header or a (singular) payload.
 		//Smithy: the output struct is the result payload, unless a field is marked as payload, which allows other fields

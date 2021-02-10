@@ -107,6 +107,19 @@ func (p *Parser) Parse() error {
 					}
 					p.useTraits[shortName] = use
 				}
+			case "apply":
+				var ftype string
+				ftype, err = p.expectTarget()
+				tok := p.GetToken()
+				if tok == nil {
+					return p.SyntaxError()
+				}
+				if tok.Type != sadl.AT {
+					return p.SyntaxError()
+				}
+				if shape, ok := p.ast.Shapes[p.ensureNamespaced(ftype)]; ok {
+					shape.Traits, err = p.parseTrait(shape.Traits)
+				}
 			default:
 				err = p.Error(fmt.Sprintf("Unknown shape: %s", tok.Text))
 			}
@@ -1186,6 +1199,15 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 			return traits, p.SyntaxError()
 		}
 		return withTrait(traits, "smithy.api#enum", lit), nil
+	case "examples":
+		_, lit, err := p.parseTraitArgs()
+		if err != nil {
+			return traits, err
+		}
+		if lit == nil {
+			return traits, p.SyntaxError()
+		}
+		return withTrait(traits, "smithy.api#examples", lit), nil
 	default:
 		if ctrait, ok := p.useTraits[tname]; ok {
 			args, lit, err := p.parseTraitArgs()
