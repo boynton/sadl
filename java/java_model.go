@@ -15,19 +15,29 @@ func (gen *Generator) CreateModel() {
 	for _, td := range gen.Model.Types {
 		gen.CreatePojoFromDef(td, exceptions)
 	}
+	gen.CreateInterface()
+	if gen.needUtil {
+		gen.CreateUtil()
+	}
 	if gen.needTimestamp {
 		gen.CreateTimestamp()
 	} else if gen.needInstant {
 		gen.needUtil = true
 	}
-	if gen.needUtil {
-		gen.CreateUtil()
-	}
 	if gen.Config.GetBool("service-exception") {
 		funcMap := template.FuncMap{}
 		gen.CreateJavaFileFromTemplate("ServiceException", exceptionTemplate, gen, funcMap, gen.ModelPackage)
 	}
-	gen.CreateInterface()
+}
+
+func (gen *Generator) entityNameType(hact *sadl.HttpDef) (string, string) {
+	for _, out := range hact.Expected.Outputs {
+		if out.Header == "" {
+			tn, _, _ := gen.TypeName(nil, out.Type, true)
+			return out.Name, tn
+		}
+	}
+	return "", "void"
 }
 
 func (gen *Generator) CreateInterface() {
@@ -46,6 +56,10 @@ func (gen *Generator) CreateInterface() {
 	for _, hact := range gen.Model.Http {
 		gen.CreateRequestPojo(hact)
 		gen.CreateResponsePojo(hact)
+		_, etype := gen.entityNameType(hact)
+		if etype == "String" {
+			gen.needUtil = true
+		}
 	}
 }
 

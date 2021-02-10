@@ -378,7 +378,10 @@ func (gen *Generator) EmitBuilder(className string, ts *sadl.TypeSpec, indent st
 	for _, fd := range ts.Fields {
 		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
 		if fd.Type == "Timestamp" {
-			gen.Emit(indent + "    @JsonDeserialize(using = Util.InstantDeserializer.class)\n")
+			if gen.UseInstants {
+				gen.needUtil = true
+				gen.Emit(indent + "    @JsonDeserialize(using = Util.InstantDeserializer.class)\n")
+			}
 		}
 		gen.Emit(indent + "    public " + builderClass + " " + fd.Name + "(" + tn + " " + fd.Name + ") {\n")
 		gen.Emit(indent + "        this." + fd.Name + " = " + fd.Name + ";\n")
@@ -694,6 +697,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
+			gen.needUtil = true
 			gen.needInstant = true
 			return "Instant", annotations, nil
 		}
@@ -758,6 +762,7 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Util.InstantDeserializer.class)"))
 					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
+					gen.needUtil = true
 					gen.needInstant = true
 					return "Instant", annotations, nil
 				}

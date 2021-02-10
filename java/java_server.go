@@ -156,6 +156,12 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			_, t := gen.ActionInfo(hact)
 			return t
 		},
+		"instantProvider": func() string {
+			if !gen.needInstant {
+				return ""
+			}
+			return "config.register(Util.InstantConverterProvider.class);\n        "
+		},
 		"outname": func(hact *sadl.HttpDef) string {
 			n, _ := gen.ActionInfo(hact)
 			return n
@@ -239,9 +245,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 				wrappedResult := ""
 				if ename != "void" && ename != "" {
 					if gen.UseImmutable {
-						wrappedResult = jsonWrapper(etype, "res.get"+gen.Capitalize(ename)+"()")
+						wrappedResult = gen.jsonWrapper(etype, "res.get"+gen.Capitalize(ename)+"()")
 					} else {
-						wrappedResult = jsonWrapper(etype, "res."+ename)
+						wrappedResult = gen.jsonWrapper(etype, "res."+ename)
 					}
 				}
 				ret := fmt.Sprintf("Response.status(%d)", +hact.Expected.Status)
@@ -345,8 +351,7 @@ public class {{.MainClass}} {
         ResourceConfig config = new ResourceConfig({{.ResourcesClass}}.class);
         config.register(new LoggingFeature(Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
                                            Level.INFO, LoggingFeature.Verbosity.PAYLOAD_ANY, 10000));
-        config.register(Util.InstantConverterProvider.class);
-        config.registerInstances(new AbstractBinder() {
+        {{instantProvider}}config.registerInstances(new AbstractBinder() {
                 @Override
                 protected void configure() {
                     bind({{.ImplClass}}.class).to({{.InterfaceClass}}.class);
@@ -480,9 +485,10 @@ func (gen *Generator) ResponseType(name string) string {
 	return gen.Capitalize(name) + "Response"
 }
 
-func jsonWrapper(etype string, val string) string {
+func (gen *Generator) jsonWrapper(etype string, val string) string {
 	switch etype {
 	case "String":
+		gen.needUtil = true
 		return "Util.toJson(" + val + ")"
 	default:
 		return val //these are already valid JSON objects
