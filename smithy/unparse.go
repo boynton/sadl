@@ -68,6 +68,16 @@ func (ast *AST) IDL(namespace string) string {
 			w.EmitShape(k, v)
 		}
 	}
+	for nsk, shape := range ast.Shapes {
+		if shape.Type == "operation" {
+			if d, ok := shape.Traits["smithy.api#examples"]; ok {
+				switch v := d.(type) {
+				case []*exampleData:
+					w.EmitExamplesTrait(nsk, v)
+				}
+			}
+		}
+	}
 	return w.End()
 }
 
@@ -327,7 +337,7 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 	}
 	for k, v := range traits {
 		switch k {
-		case "smithy.api#documentation":
+		case "smithy.api#documentation", "smithy.api#examples":
 			//do nothing
 		case "smithy.api#sensitive", "smithy.api#required", "smithy.api#readonly", "smithy.api#idempotent":
 			w.EmitBooleanTrait(sadl.AsBool(v), stripNamespace(k), indent)
@@ -357,6 +367,20 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 			//fixme "smithy.api#paginated"
 			panic("fix me: emit trait " + k)
 		}
+	}
+}
+
+func (w *IdlWriter) EmitExamplesTrait(opname string, raw interface{}) {
+	switch data := raw.(type) {
+	case []*exampleData:
+		target := stripNamespace(opname)
+		formatted := sadl.Pretty(data)
+		if strings.HasSuffix(formatted, "\n") {
+			formatted = formatted[:len(formatted)-1]
+		}
+		w.Emit("apply "+target+" @examples(%s)\n", formatted)
+	default:
+		panic("FIX ME!")
 	}
 }
 

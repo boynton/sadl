@@ -12,11 +12,10 @@ http GET "/hello?caller={caller}" (action=hello) {
 	}
 }
 
-
+//An example of the Hello operation
 example HelloRequest (name=helloExample) {
 	"caller": "Lee"
 }
-
 example HelloResponse (name=helloExample) {
 	"greeting": "Hello, Lee"
 }

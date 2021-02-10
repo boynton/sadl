@@ -209,7 +209,72 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		}
 		ast.Shapes[prefix+model.Name] = service
 	}
+	if len(model.Examples) > 0 {
+		examplesFromSADL(ast, model)
+	}
 	return ast, nil
+}
+
+type exampleData struct {
+	Title         string                 `json:"title"`
+	Documentation string                 `json:"documentation,omitempty"`
+	Input         map[string]interface{} `json:"input,omitempty"`
+	Output        map[string]interface{} `json:"output,omitempty"`
+}
+
+func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*exampleData {
+	reqType := sadl.Capitalize(hdef.Name) + "Request"
+	resType := sadl.Capitalize(hdef.Name) + "Response"
+	namedExamples := make(map[string]*exampleData, 0)
+
+	//each named example should be a pair of req/res, or req/exc
+	for _, ex := range model.Examples {
+		if ex.Target == reqType {
+			tmp := ex.Example.(map[string]interface{})
+			c := ex.Comment
+			namedExamples[ex.Name] = &exampleData{Input: tmp, Documentation: c}
+		}
+	}
+	for _, ex := range model.Examples {
+		if ex.Target != reqType {
+			if data, ok := namedExamples[ex.Name]; ok {
+				if ex.Target == resType {
+					data.Output = ex.Example.(map[string]interface{})
+				} else {
+					for _, exc := range hdef.Exceptions {
+						if exc.Type == ex.Target {
+							data.Output = ex.Example.(map[string]interface{})
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	result := make([]*exampleData, 0)
+	for k, v := range namedExamples {
+		v.Title = k
+		result = append(result, v)
+	}
+	return result
+}
+
+func examplesFromSADL(ast *AST, model *sadl.Model) {
+	for _, hact := range model.Http {
+		name := capitalize(hact.Name)
+		if model.Namespace != "" {
+			name = model.Namespace + "#" + name
+		}
+		shape := ast.Shapes[name]
+		if shape == nil {
+			fmt.Println("Whoops, cannot find shape", name)
+			continue
+		}
+		examples := sadlExamplesForAction(model, hact)
+		if len(examples) > 0 {
+			ensureShapeTraits(shape)["smithy.api#examples"] = examples
+		}
+	}
 }
 
 func typeReference(ts *sadl.TypeSpec) string {
