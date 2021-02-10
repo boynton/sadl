@@ -215,7 +215,7 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	return ast, nil
 }
 
-func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) ExamplesTrait {
+func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*ExampleTrait {
 	reqType := sadl.Capitalize(hdef.Name) + "Request"
 	resType := sadl.Capitalize(hdef.Name) + "Response"
 	namedExamples := make(map[string]*ExampleTrait, 0)
@@ -244,7 +244,7 @@ func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) ExamplesTrait 
 			}
 		}
 	}
-	result := make(ExamplesTrait, 0)
+	result := make([]*ExampleTrait, 0)
 	for k, v := range namedExamples {
 		v.Title = k
 		result = append(result, v)

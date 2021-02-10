@@ -192,4 +192,3 @@ type ExampleTrait struct {
 	Output        map[string]interface{} `json:"output,omitempty"`
 }
 
-type ExamplesTrait []*ExampleTrait
