@@ -1,4 +1,4 @@
-namespace example
+namespace crudl
 
 ///
 /// A CRUDL storage service as an example HTTP Web Service

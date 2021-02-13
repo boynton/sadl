@@ -2,7 +2,7 @@
 // A CRUDL storage service as an example HTTP Web Service
 //
 name Crudl
-namespace example
+namespace crudl
 version "1"
 
 //
