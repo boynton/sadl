@@ -72,7 +72,7 @@ func (data *Data) Put(key string, value interface{}) {
 }
 
 func (data *Data) AsMap() map[string]interface{} {
-	if data.value != nil {
+	if data != nil && data.value != nil {
 		if m, ok := data.value.(map[string]interface{}); ok {
 			return m
 		}
@@ -107,7 +107,7 @@ func (data *Data) get(keys []string) interface{} {
 				}
 			}
 		}
-	}
+	}		
 	return nil
 }
 
