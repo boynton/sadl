@@ -1,9 +1,9 @@
-all bin/sadl:: 
+all bin/sadl: go.mod
 	mkdir -p bin
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
 install:: all
-	cp -p bin/* $(HOME)/bin/
+	cp -p bin/sadl $(HOME)/bin/sadl
 
 test::
 	go test github.com/boynton/sadl/test
@@ -31,6 +31,9 @@ clean::
 	rm -rf bin sadl_darwin_amd64.zip sadl_darwin_arm64.zip
 
 release:: sadl_darwin_amd64.zip sadl_darwin_arm64.zip
+
+go.mod:
+	go mod init github.com/boynton/sadl && go mod tidy
 
 sadl_darwin_amd64.zip::
 	rm -rf darwin_amd64

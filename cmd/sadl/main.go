@@ -59,6 +59,10 @@ Supported generators and options used from config if present
       domain: The domain name for the project, for use in things like the maven pom.xml file.
       instants: use java.time.Instant for Timestamp impl, else generate a Timestamp class.
    java-server: a shorthand for specifying the "server" option to the "java" generator. Same options.
+   go: Generate Go code for the model
+      header: a string to include at the top of every generated java file
+      server: include server plumbing code, using Gorilla for HTTP router implementation.
+   go-server: a shorthand for specifying the "server" option to the "go" generator. Same options.
    http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
 
 `
