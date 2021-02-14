@@ -3,6 +3,7 @@ all bin/sadl: go.mod
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
 install:: all
+	rm -f $(HOME)/bin/sadl
 	cp -p bin/sadl $(HOME)/bin/sadl
 
 test::
