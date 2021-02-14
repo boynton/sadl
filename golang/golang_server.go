@@ -248,7 +248,7 @@ func InitServer(impl {{serviceName}}, baseURL string) http.Handler {
    b := u.Path
 	r := mux.NewRouter()
 {{range .Model.Http}}
-	r.HandleFunc("{{routePath .}}", func (w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc(b+"{{routePath .}}", func (w http.ResponseWriter, r *http.Request) {
       adaptor.{{methodName .}}Handler(w, r)
 	}).Methods("{{.Method}}"){{end}}
 

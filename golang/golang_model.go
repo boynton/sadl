@@ -113,12 +113,19 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.Emit("type " + td.Name + " string\n")
 	case "Decimal":
 		gen.Emit("type " + td.Name + " Decimal\n")
+	case "Array":
+		gen.EmitArrayType(td)
 	default:
 		fmt.Println(td.Type)
 		panic("Check this")
 		//do nothing, i.e. a String subclass
 	}
 
+}
+
+func (gen *Generator) EmitArrayType(td *sadl.TypeDef) {
+	itemType := gen.nativeTypeName(&td.TypeSpec, td.Items)
+	gen.Emit("type " + td.Name + " []" + itemType + "\n")
 }
 
 func (gen *Generator) EmitStructType(td *sadl.TypeDef, errors map[string]bool) {
