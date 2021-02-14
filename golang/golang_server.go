@@ -197,23 +197,12 @@ func timestampDefault(any interface{}) string {
 func intDefault(v interface{}) int64 {
 	if v != nil {
 		switch n := v.(type) {
-		case int8:
-			return int64(n)
-		case int16:
-			return int64(n)
-		case int:
-			return int64(n)
-		case int32:
-			return int64(n)
-		case int64:
-			return n
+		case *sadl.Decimal:
+			return n.AsInt64()
 		}
 	}
 	return 0
 }
-
-//   fmt.Println("User-Agent:", r.Header.Get("User-Agent"))
-//   w.Header().Add("Bletch", "Yeah, an output header")
 
 var serverTemplate = `
 type {{adaptorName}} struct {

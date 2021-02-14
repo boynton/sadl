@@ -117,7 +117,7 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.EmitArrayType(td)
 	default:
 		fmt.Println(td.Type)
-		panic("Check this")
+		panic("EmitType NYI: " + td.Type)
 		//do nothing, i.e. a String subclass
 	}
 
