@@ -30,6 +30,10 @@ descriptions, optimized for simplicity and speed.
 TBD. For now, see some examples in the [examples](https://github.com/boynton/sadl/tree/master/examples) directory. Or
 take a file in a know format and just parse it to output the SADL representation of it.
 
+See also two example implementations of the `crudl` example, in Java and Go, in the following two repos:
+- https://github.com/boynton/java-crudl
+- https://github.com/boynton/go-crudl
+
 ## Usage
 
 To get SADL and shoiw basic usage:
