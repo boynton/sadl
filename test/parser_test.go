@@ -281,6 +281,7 @@ type Foo Struct {
 	}
 }
 
+/*
 func TestActionCombos(test *testing.T) {
 	header := `
 type BarRequest Struct {
@@ -311,6 +312,7 @@ type GenericError Struct {
 	testParse(test, false, header+"action Bar(BarResponse\n")
 	testParse(test, false, header+"action Bar(BarResponse) BarResponse BadRequestError\n")
 }
+*/
 
 func TestPathTemplateSyntax(test *testing.T) {
 	v, err := parseString(`http GET "/one/{two}" { }`)

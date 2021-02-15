@@ -115,6 +115,10 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.Emit("type " + td.Name + " Decimal\n")
 	case "Array":
 		gen.EmitArrayType(td)
+	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64":
+		gen.Emit("type " + td.Name + " " + sadl.Uncapitalize(td.Type) + "\n")
+		//	case "Int32":
+		//		gen.Emit("type " + td.Name + " int\n")
 	default:
 		fmt.Println(td.Type)
 		panic("EmitType NYI: " + td.Type)

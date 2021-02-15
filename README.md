@@ -36,7 +36,7 @@ See also two example implementations of the `crudl` example, in Java and Go, in 
 
 ## Usage
 
-To get SADL and shoiw basic usage:
+To get SADL and show basic usage:
 
     go get github.com/boynton/sadl/...
     $(GOPATH)/bin/sadl
