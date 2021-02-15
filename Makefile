@@ -1,7 +1,6 @@
-_debug:: bin/sadl
-	./bin/sadl -g go examples/basictypes.sadl
+all:: bin/sadl
 
-all bin/sadl:: go.mod
+bin/sadl::
 	mkdir -p bin
 	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
