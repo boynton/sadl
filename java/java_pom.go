@@ -145,13 +145,14 @@ const pomTemplate = `<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xs
           </execution>
         </executions>
         <configuration>
-          <mainClass>Main</mainClass>
+          <mainClass>${my.mainClass}</mainClass>
         </configuration>
       </plugin>
     </plugins>
   </build>
   
   <properties>
+    <my.mainClass>Main</my.mainClass>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 {{versions}}
   </properties>
