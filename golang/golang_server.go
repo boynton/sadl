@@ -76,7 +76,7 @@ func (gen *Generator) EmitServerAdaptor() {
 			}
 			s := ""
 			if form {
-				s = "\terr = r.ParseForm()\n\tif err != nil {\n\t\terrorResponse(w, 400, fmt.Sprint(err))\n\t\treturn\n\t}\n"
+				s = "\terr := r.ParseForm()\n\tif err != nil {\n\t\terrorResponse(w, 400, fmt.Sprint(err))\n\t\treturn\n\t}\n"
 			}
 			for _, in := range hd.Inputs {
 				name := sadl.Capitalize(in.Name)
@@ -87,7 +87,7 @@ func (gen *Generator) EmitServerAdaptor() {
 				} else if in.Path {
 					s = s + "\treq." + name + " = " + gen.paramAccessor(in, fmt.Sprintf("mux.Vars(r)[%q]", in.Name)) + "\n"
 				} else {
-					s = s + "\terr = json.NewDecoder(r.Body).Decode(&req." + name + ")\n"
+					s = s + "\terr := json.NewDecoder(r.Body).Decode(&req." + name + ")\n"
 					s = s + "\tif err != nil {\n\t\terrorResponse(w, 400, fmt.Sprint(err))\n\t\treturn\n\t}\n"
 				}
 			}
@@ -111,6 +111,23 @@ func (gen *Generator) EmitServerAdaptor() {
 			}
 			return s
 		},
+		"expectedResult": func(hd *sadl.HttpDef) string {
+			switch hd.Expected.Status {
+			case 204, 304:
+				return "_"
+			default:
+				return "res"
+			}
+		},
+		"expectedEntity": func(hd *sadl.HttpDef) string {
+			for _, out := range hd.Expected.Outputs {
+				name := sadl.Capitalize(out.Name)
+				if out.Header == "" {
+					return "res." + name
+				}
+			}
+			return "nil"
+		},
 		"signature": func(hd *sadl.HttpDef) string {
 			name := gen.Capitalize(hd.Name)
 			reqType := gen.RequestTypeName(hd)
@@ -120,8 +137,8 @@ func (gen *Generator) EmitServerAdaptor() {
 		"capitalize": func(s string) string { return gen.Capitalize(s) },
 	}
 	gen.EmitTemplate("server", serverTemplate, gen, funcMap)
-
 }
+
 func (gen *Generator) paramAccessor(in *sadl.HttpParamSpec, v string) string {
 	coerceTo := gen.nativeType(in.Type)
 	if strings.HasPrefix(coerceTo, "*") {
@@ -211,17 +228,17 @@ type {{adaptorName}} struct {
 
 {{range .Model.Http}}
 func (handler *{{adaptorName}}) {{methodName .}}Handler(w http.ResponseWriter, r *http.Request) {
-	var err error
+//	var err error
 	req := new({{reqTypeName .}})
 {{inputs .}}
-	res, err := handler.impl.{{methodName .}}(req)
+	{{expectedResult .}}, err := handler.impl.{{methodName .}}(req)
 	if err != nil {
 		switch err.(type) {
 {{exceptions .}}		default:
 			jsonResponse(w, 500, &serverError{Message: fmt.Sprint(err)})
 		}
 	} else {
-{{outputs .}}		jsonResponse(w, {{.Expected.Status}}, res) //the result *is* the entity.
+{{outputs .}}		jsonResponse(w, {{.Expected.Status}}, {{expectedEntity .}})
 	}
 }
 {{end}}
@@ -282,7 +299,18 @@ func Pretty(obj interface{}) string {
 	return string(buf.String())
 }
 
+func Json(obj interface{}) string {
+   buf := new(bytes.Buffer)
+   enc := json.NewEncoder(buf)
+   enc.SetEscapeHTML(false)
+   if err := enc.Encode(&obj); err != nil {
+      return fmt.Sprint(obj)
+   }
+   return string(buf.String())
+}
+
 func jsonResponse(w http.ResponseWriter, status int, entity interface{}) {
+   w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	io.WriteString(w, Pretty(entity))
 }

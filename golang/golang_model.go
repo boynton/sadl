@@ -113,10 +113,15 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.Emit("type " + td.Name + " string\n")
 	case "Decimal":
 		gen.Emit("type " + td.Name + " Decimal\n")
+		gen.createDecimal = true
 	case "Array":
 		gen.EmitArrayType(td)
 	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64":
-		gen.Emit("type " + td.Name + " " + sadl.Uncapitalize(td.Type) + "\n")
+		name := td.Name
+		gen.Emit("type " + name + " " + sadl.Uncapitalize(td.Type) + "\n")
+		gen.addImport("strconv")
+		gen.Emit("func " + name + "FromString(s string) " + name + "{\n\tn, err := strconv.ParseInt(s, 10, 64)\n\tif err != nil {\n\t\treturn 0\n\t}\n\treturn n\n}\n")
+
 		//	case "Int32":
 		//		gen.Emit("type " + td.Name + " int\n")
 	default:
@@ -244,6 +249,14 @@ func (d *Decimal) UnmarshalJSON(b []byte) error {
 	return fmt.Errorf("Bad Decimal number: %s", string(b))
 }
 
+func DecimalFromString(text string) *Decimal {
+   dec, err := ParseDecimal(text)
+   if err != nil {
+		return nil
+	}
+	return dec
+}
+
 func ParseDecimal(text string) (*Decimal, error) {
 	num, _, err := big.ParseFloat(text, 10, DecimalPrecision, big.ToNearestEven)
 	if err != nil {
@@ -322,6 +335,14 @@ func (ts *Timestamp) UnmarshalJSON(b []byte) error {
 		}
 	}
 	return err
+}
+
+func TimestampFromString(s string) *Timestamp {
+	ts, err := ParseTimestamp(s)
+   if err != nil {
+		return nil
+	}
+	return &ts
 }
 
 func ParseTimestamp(s string) (Timestamp, error) {
