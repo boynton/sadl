@@ -73,7 +73,7 @@ func (g *SadlGenerator) Generate() string {
 			return g.sadlHttpSpec(hact)
 		},
 		"example": func(ed *ExampleDef) string {
-			return fmt.Sprintf("example %s %s\n", ed.Target, Pretty(ed.Example))
+			return fmt.Sprintf("example %s (name=%s) %s\n", ed.Target, ed.Name, Pretty(ed.Example))
 		},
 	}
 	g.Begin()
