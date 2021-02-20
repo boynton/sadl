@@ -228,7 +228,6 @@ type {{adaptorName}} struct {
 
 {{range .Model.Http}}
 func (handler *{{adaptorName}}) {{methodName .}}Handler(w http.ResponseWriter, r *http.Request) {
-//	var err error
 	req := new({{reqTypeName .}})
 {{inputs .}}
 	{{expectedResult .}}, err := handler.impl.{{methodName .}}(req)
@@ -257,7 +256,9 @@ func InitServer(impl {{serviceName}}, baseURL string) http.Handler {
 	r.HandleFunc(b+"{{routePath .}}", func (w http.ResponseWriter, r *http.Request) {
       adaptor.{{methodName .}}Handler(w, r)
 	}).Methods("{{.Method}}"){{end}}
-
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		jsonResponse(w, 404, &serverError{Message: fmt.Sprintf("Not Found: %s", r.URL.Path)})
+	})
 	return r
 }
 
@@ -377,5 +378,9 @@ type serverError struct {
 
 func WebLog(h http.Handler) http.Handler {
 	return handlers.CombinedLoggingHandler(os.Stdout, h)
+}
+
+func AllowCors(next http.Handler, host string) http.Handler {
+   return handlers.CORS(handlers.AllowedOrigins([]string{"*"}), handlers.AllowedHeaders([]string{"Content-Type", "api_key", "Authorization"}), handlers.AllowedMethods([]string{"GET","PUT","DELETE","POST","OPTIONS"}))(next)
 }
 `
