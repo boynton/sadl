@@ -87,7 +87,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		Name:           serviceName,
 		ModelPackage:   gen.ModelPackage,
 		ServerPackage:  gen.ServerPackage,
-		Port:           8080,
+		Port:           8000,
 		MainClass:      "Main",
 		ResourcesClass: serviceName + "Resources",
 	}

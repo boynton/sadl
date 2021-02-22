@@ -35,6 +35,11 @@ func (gen *Generator) ExportToOAS3() (*Model, error) {
 	oas := &Model{
 		OpenAPI: "3.0.0",
 		Info:    &Info{},
+		Servers: []*Server{
+			&Server{
+				URL: "http://localhost:8000",
+			},
+		},
 	}
 	comment := model.Comment
 	oas.Info.Description = comment
