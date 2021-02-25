@@ -199,6 +199,7 @@ func (model *Model) ToSadl(conf *sadl.Data) (*sadl.Model, error) {
 			delete(model.ast.Metadata, "name")
 		}
 	}
+	service := conf.GetString("service")
 	namespace := conf.GetString("namespace")
 	if namespace != UnspecifiedNamespace {
 		model.namespace = namespace
@@ -230,15 +231,23 @@ func (model *Model) ToSadl(conf *sadl.Data) (*sadl.Model, error) {
 	haveService := ""
 	for shapeName, shapeDef := range model.shapes {
 		if shapeDef.Type == "service" {
-			if haveService != "" {
-				return nil, fmt.Errorf("SADL only supports one service per model (%s, %s)", haveService, shapeName)
+			if service != "" {
+				if shapeName != service {
+					continue
+				}
+			} else {
+				if haveService != "" {
+					return nil, fmt.Errorf("SADL only supports one service per model (%s, %s)", haveService, shapeName)
+				}
 			}
 			haveService = shapeName
 		}
 	}
 
 	for k, v := range model.shapes {
-		model.importShape(schema, k, v)
+		if v.Type != "service" || k == haveService {
+			model.importShape(schema, k, v)
+		}
 	}
 	return sadl.NewModel(schema)
 }

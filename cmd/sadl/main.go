@@ -71,6 +71,7 @@ Supported generators and options used from config if present
 	pOut := flag.String("o", "/tmp/generated", "The output file or directory.")
 	pName := flag.String("n", "", "The name of the model, overrides any name present in the source")
 	pNamespace := flag.String("ns", "", "The namespace of the model, overrides any namespace present in the source")
+	pService := flag.String("s", "", "The single service to consider in the model. Default is to use the only one present.")
 	pGen := flag.String("g", "sadl", "The generator for output")
 	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.yaml")
 	pForce := flag.Bool("f", false, "Force overwrite of existing files")
@@ -98,6 +99,7 @@ Supported generators and options used from config if present
 	configPath := *pConf
 	force := *pForce
 	formatType := *pType
+	service := *pService
 
 	if len(args) == 0 {
 		flag.Usage()
@@ -106,6 +108,9 @@ Supported generators and options used from config if present
 	importConf := sadl.NewData()
 	if namespace != "" {
 		importConf.Put("namespace", namespace)
+	}
+	if service != "" {
+		importConf.Put("service", service)
 	}
 	if name != "" {
 		importConf.Put("name", name)
