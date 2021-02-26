@@ -105,6 +105,8 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 	switch td.Type {
 	case "Struct":
 		gen.EmitStructType(td, errors)
+	case "Union":
+		gen.EmitUnionType(td, errors)
 	case "UnitValue":
 		gen.EmitUnitValueType(td)
 	case "Enum":
@@ -116,6 +118,8 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.createDecimal = true
 	case "Array":
 		gen.EmitArrayType(td)
+	case "Map":
+		gen.EmitMapType(td)
 	case "Int8", "Int16", "Int32", "Int64", "Float32", "Float64":
 		name := td.Name
 		gen.Emit("type " + name + " " + sadl.Uncapitalize(td.Type) + "\n")
@@ -137,6 +141,12 @@ func (gen *Generator) EmitArrayType(td *sadl.TypeDef) {
 	gen.Emit("type " + td.Name + " []" + itemType + "\n")
 }
 
+func (gen *Generator) EmitMapType(td *sadl.TypeDef) {
+	keyType := gen.nativeTypeName(&td.TypeSpec, td.Keys)
+	itemType := gen.nativeTypeName(&td.TypeSpec, td.Items)
+	gen.Emit("type " + td.Name + " map[" + keyType + "]" + itemType + "\n")
+}
+
 func (gen *Generator) EmitStructType(td *sadl.TypeDef, errors map[string]bool) {
 	gen.Emit("type " + td.Name + " struct {\n")
 	for _, fd := range td.Fields {
@@ -147,6 +157,31 @@ func (gen *Generator) EmitStructType(td *sadl.TypeDef, errors map[string]bool) {
 			anno = anno + ",omitempty"
 		}
 		anno = anno + "\"`"
+		gen.Emit("    " + fname + " " + ftype + anno + "\n")
+	}
+	gen.Emit("}\n\n")
+	if errors != nil {
+		if _, ok := errors[td.Name]; ok {
+			gen.Emit("func (e *" + td.Name + ") Error() string {\n\treturn \"" + td.Name + "\"\n}\n\n")
+		}
+	}
+}
+
+func (gen *Generator) EmitUnionType(td *sadl.TypeDef, errors map[string]bool) {
+	tagType := td.Name + "VariantTag"
+	gen.Emit("type " + tagType + " int\n")
+	gen.Emit("const (\n")
+	gen.Emit("    _ " + tagType + " = iota\n")
+	for _, fd := range td.Variants {
+		gen.Emit("    " + tagType + sadl.Capitalize(fd.Name) + "\n")
+	}
+	gen.Emit(")\n\n")
+	gen.Emit("type " + td.Name + " struct {\n")
+	gen.Emit("    Variant " + tagType + " `json:\"-\"`\n")
+	for _, fd := range td.Variants {
+		fname := capitalize(fd.Name)
+		ftype := gen.nativeTypeName(&fd.TypeSpec, fd.Type)
+		anno := " `json:\"" + fd.Name + ",omitempty\"`"
 		gen.Emit("    " + fname + " " + ftype + anno + "\n")
 	}
 	gen.Emit("}\n\n")
