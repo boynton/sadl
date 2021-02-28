@@ -1,3 +1,3 @@
 package sadl
 
-var Version = "1.6"
+var Version string = "development version"

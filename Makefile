@@ -2,7 +2,7 @@ all:: bin/sadl
 
 bin/sadl::
 	mkdir -p bin
-	go build -o bin/sadl github.com/boynton/sadl/cmd/sadl
+	go build -ldflags "-X github.com/boynton/sadl.Version=`git describe --tag`" -o bin/sadl github.com/boynton/sadl/cmd/sadl
 
 install:: all
 	rm -f $(HOME)/bin/sadl

@@ -88,7 +88,7 @@ Supported generators and options used from config if present
 		os.Exit(1)
 	}
 	if *pVersion {
-		fmt.Printf("SADL v%s\n", sadl.Version)
+		fmt.Printf("SADL %s\n", sadl.Version)
 		os.Exit(0)
 	}
 	args := flag.Args()
