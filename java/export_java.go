@@ -223,6 +223,10 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string, e
 }
 
 func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, indent string, exceptions map[string]string) {
+	lombok := false
+	if _, ok := exceptions[className]; !ok {
+		lombok = gen.UseLombok
+	}
 	optional := false
 	for _, fd := range ts.Fields {
 		if !fd.Required {
@@ -259,7 +263,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 		gen.Emit(indent + "@JsonIgnoreProperties({" + strings.Join(ignoreFields, ", ") + "})\n")
 	}
 	if indent == "" {
-		if gen.UseLombok {
+		if lombok {
 			gen.Emit(indent + "@Data\n")
 			gen.AddImport("lombok.Data")
 			if len(ts.Fields) > 0 {
@@ -268,7 +272,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 			}
 			gen.Emit(indent + "@Builder\n")
 			gen.AddImport("lombok.Builder")
-			gen.Emit(indent + "@NoArgsConstructor\n")
+			gen.Emit(indent + "@NoArgsConstructor(force=true)\n")
 			gen.AddImport("lombok.NoArgsConstructor")
 		}
 		gen.Emit(indent + "public class " + className + extends + " {\n")
@@ -303,7 +307,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 			gen.Emit(indent + "    public " + tn + " " + fd.Name + ";\n\n")
 		}
 	}
-	if !gen.UseLombok {
+	if !lombok {
 		if gen.UseImmutable {
 			gen.EmitAllFieldsConstructor(className, ts, indent)
 			for _, fd := range ts.Fields {
