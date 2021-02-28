@@ -31,10 +31,10 @@ Supported API description formats for each input file extension:
    .yaml     openapi
 
 The 'name' and 'namespace' options allow specifying those attributes for input formats
-that do not require or support them. Otherwise a default is used.
+that do not require or support them. Otherwise a default is used based on the model being parsed.
 
 The '-c' option specifies the name of a YAML config file, the default of which is
-$HOME/.sadl-config.yaml. Code generators generally use the '-o' option to specify the
+$HOME/.sadl-config.yaml. Some code generators use the '-o' option to specify the
 output directory, conversions to other API description formats just output to stdout.
 
 Supported generators and options used from config if present
@@ -55,15 +55,19 @@ Supported generators and options used from config if present
       source: specify the default source directory, default to "src/main/java"
       resource: specify the default resouece directory, default to "src/main/resource"
       server: include server plumbing code, using Jersey for JAX-RS implementation.
+      client: include client plumbing code, using Jersey for the implementation.
       project: "maven" generates a pom.xml file to build the project, others (i.e. gradle) will be added
       domain: The domain name for the project, for use in things like the maven pom.xml file.
       instants: use java.time.Instant for Timestamp impl, else generate a Timestamp class.
    java-server: a shorthand for specifying the "server" option to the "java" generator. Same options.
+   java-client: a shorthand for specifying the "client" option to the "java" generator. Same options.
    go: Generate Go code for the model
       header: a string to include at the top of every generated java file
       server: include server plumbing code, using Gorilla for HTTP router implementation.
+      client: include client plumbing code.
    go-server: a shorthand for specifying the "server" option to the "go" generator. Same options.
-   http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions.
+   go-client: a shorthand for specifying the "client" option to the "go" generator. Same options.
+   http-trace: Generates an HTTP (curl-style) simulation of the API's example HTTP actions, based on examples in the model
 
 `
 	var genOpts ArrayOption
