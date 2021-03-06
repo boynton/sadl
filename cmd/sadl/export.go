@@ -37,6 +37,8 @@ func ExportFiles(model *sadl.Model, generator, dir string, conf *sadl.Data) erro
 		return smithy.Export(model, dir, conf, true)
 	case "openapi":
 		return openapi.Export(model, conf)
+	case "swagger-ui":
+		return serveSwaggerUi(model, conf)
 	case "graphql":
 		return graphql.Export(model, conf)
 	case "java", "java-model":

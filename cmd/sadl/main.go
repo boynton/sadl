@@ -45,6 +45,7 @@ Supported generators and options used from config if present
       namespace: supply this value as the namespace for inputs that do not have a namespace
    smithy-ast: Prints the Smithy AST representation to stdout, same options as 'smithy'
    openapi: Prints the OpenAPI Spec v3 representation to stdout
+   swagger-ui: converts to OpenAPI, then runs an in-memory swagger-ui server for the documentation.
    graphql: Prints the GraphQL representation to stdout. Options:
       custom-scalars: a map of any of ["Int64", "Decimal", "Timestamp", "UUID"] to a custom scalar name.
    java: Generate Java code for the model, server, client plumbing. Options:
