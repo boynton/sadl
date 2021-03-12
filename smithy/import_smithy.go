@@ -350,29 +350,33 @@ func (model *Model) importStringShape(schema *sadl.Schema, shapeName string, sha
 		Name:    shapeName,
 		Comment: model.escapeComment(sadl.GetString(shape.Traits, "smithy.api#documentation")),
 	}
-	td.Type = "String"
-	td.Pattern = sadl.GetString(shape.Traits, "smithy.api#pattern")
-	if l := sadl.GetMap(shape.Traits, "smithy.api#length"); l != nil {
-		tmp := sadl.GetInt64(l, "min")
-		if tmp != 0 {
-			td.MinSize = &tmp
+	pat := sadl.GetString(shape.Traits, "smithy.api#pattern")
+	if pat == "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})" {
+		td.Type = "UUID"
+	} else {
+		td.Type = "String"
+		td.Pattern = pat
+		if l := sadl.GetMap(shape.Traits, "smithy.api#length"); l != nil {
+			tmp := sadl.GetInt64(l, "min")
+			if tmp != 0 {
+				td.MinSize = &tmp
+			}
+			tmp = sadl.GetInt64(l, "max")
+			if tmp != 0 {
+				td.MaxSize = &tmp
+			}
 		}
-		tmp = sadl.GetInt64(l, "max")
-		if tmp != 0 {
-			td.MaxSize = &tmp
+		lst := sadl.GetArray(shape.Traits, "smithy.api#enum")
+		if lst != nil {
+			var values []string
+			for _, v := range lst {
+				m := sadl.AsMap(v)
+				s := sadl.GetString(m, "value")
+				values = append(values, s)
+			}
+			td.Values = values
 		}
 	}
-	lst := sadl.GetArray(shape.Traits, "smithy.api#enum")
-	if lst != nil {
-		var values []string
-		for _, v := range lst {
-			m := sadl.AsMap(v)
-			s := sadl.GetString(m, "value")
-			values = append(values, s)
-		}
-		td.Values = values
-	}
-	//	}
 	schema.Types = append(schema.Types, td)
 }
 

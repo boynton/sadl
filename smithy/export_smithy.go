@@ -82,11 +82,6 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	//	ast.Metadata["imported_from_sadl_version"] = sadl.Version
 	//	ast.Metadata["name"] = model.Name
 
-	refs := AllTypeRefs(model)
-	if _, ok := refs["UUID"]; ok {
-		ast.Shapes[ns+"#UUID"] = uuidShape()
-	}
-
 	for _, td := range model.Types {
 		err := defineShapeFromTypeSpec(model, ns, ast.Shapes, &td.TypeSpec, td.Name, td.Comment, td.Annotations)
 		if err != nil {
@@ -210,16 +205,16 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 		ast.Shapes[prefix+model.Name] = service
 	}
 	if len(model.Examples) > 0 {
-		examplesFromSADL(ast, model)
+		examplesFromSADL(ns, ast, model)
 	}
 	return ast, nil
 }
 
 func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*ExampleTrait {
-	reqType := sadl.Capitalize(hdef.Name) + "Request"
-	resType := sadl.Capitalize(hdef.Name) + "Response"
+	opName := sadl.Capitalize(hdef.Name)
+	reqType := opName + "Request"
+	resType := opName + "Response"
 	namedExamples := make(map[string]*ExampleTrait, 0)
-
 	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range model.Examples {
 		if ex.Target == reqType {
@@ -252,18 +247,17 @@ func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*ExampleTrai
 	return result
 }
 
-func examplesFromSADL(ast *AST, model *sadl.Model) {
+func examplesFromSADL(ns string, ast *AST, model *sadl.Model) {
 	for _, hact := range model.Http {
 		name := capitalize(hact.Name)
-		if model.Namespace != "" {
-			name = model.Namespace + "#" + name
-		}
-		shape := ast.Shapes[name]
-		if shape == nil {
-			fmt.Println("Whoops, cannot find shape", name)
-			continue
+		if ns != "" {
+			name = ns + "#" + name
 		}
 		examples := sadlExamplesForAction(model, hact)
+		shape := ast.Shapes[name]
+		if shape == nil {
+			continue
+		}
 		if len(examples) > 0 {
 			ensureShapeTraits(shape)["smithy.api#examples"] = examples
 		}
@@ -295,7 +289,7 @@ func typeReferenceByName(name string) string {
 	case "Timestamp":
 		return "Timestamp"
 	case "UUID":
-		return "UUID" //depends on the emitted UUID definition, since Smithy does not have UUID types
+		return "String" //Smithy doesn't have UUID
 	case "Bytes":
 		return "Blob"
 	case "String":
@@ -404,6 +398,8 @@ func defineShapeFromTypeSpec(model *sadl.Model, ns string, shapes map[string]*Sh
 		shape = shapeFromUnion(model, ns, shapes, name, ts)
 	case "Map":
 		shape = shapeFromMap(model, ns, shapes, name, ts)
+	case "UUID":
+		shape = *uuidShape()
 	default:
 		fmt.Println("So far:", sadl.Pretty(model))
 		panic("handle this type:" + sadl.Pretty(ts))

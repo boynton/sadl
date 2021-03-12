@@ -124,7 +124,7 @@ func (w *IdlWriter) EmitShape(name string, shape *Shape) {
 	case "service":
 		/* handled up front */
 	default:
-		panic("fix: shape of type " + shape.Type)
+		panic("fix: shape " + name + " of type " + sadl.Pretty(shape))
 	}
 	w.Emit("\n")
 }
