@@ -1089,7 +1089,7 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, interface{}, error) {
 				p.ignore(sadl.COLON)
 				match := tok.Text
 				switch match {
-				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults":
+				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults", "items":
 					val, err := p.ExpectString()
 					if err == nil {
 						args = withTrait(args, match, val)

@@ -114,6 +114,9 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 			if tags, ok := hd.Annotations["x_tags"]; ok {
 				ensureShapeTraits(&shape)["smithy.api#tags"] = strings.Split(tags, ",")
 			}
+			if pagi, ok := hd.Annotations["x_paginated"]; ok {
+				ensureShapeTraits(&shape)["smithy.api#paginated"] = paginatedTrait(pagi)
+			}
 		}
 		switch hd.Method {
 		case "GET":
@@ -607,6 +610,16 @@ func enumTrait(ts *sadl.TypeSpec) []map[string]interface{} {
 		}
 	}
 	return e
+}
+
+func paginatedTrait(sval string) map[string]interface{} {
+	lst := strings.Split(sval, ",")
+	m := make(map[string]interface{}, 0)
+	for _, item := range lst {
+		kv := strings.Split(item, "=")
+		m[kv[0]] = kv[1]
+	}
+	return m
 }
 
 func httpTrait(path, method string, code int) map[string]interface{} {

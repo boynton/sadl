@@ -363,9 +363,22 @@ func (w *IdlWriter) EmitTraits(traits map[string]interface{}, indent string) {
 			w.EmitStringTrait(sadl.AsString(v), stripNamespace(k), indent)
 		case "aws.protocols#restJson1":
 			w.Emit("%s@%s\n", indent, k) //FIXME for the non-default attributes
+		case "smithy.api#paginated":
+			w.EmitPaginatedTrait(v)
 		default:
-			//fixme "smithy.api#paginated"
 			panic("fix me: emit trait " + k)
+		}
+	}
+}
+
+func (w *IdlWriter) EmitPaginatedTrait(d interface{}) {
+	if m, ok := d.(map[string]interface{}); ok {
+		var args []string
+		for k, v := range m {
+			args = append(args, fmt.Sprintf("%s: %q", k, v))
+		}
+		if len(args) > 0 {
+			w.Emit("@paginated(" + strings.Join(args, ", ") + ")\n")
 		}
 	}
 }

@@ -511,6 +511,14 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 			if since != "" {
 				annos = WithAnnotation(annos, "x_deprecated_since", since)
 			}
+		case "smithy.api#paginated":
+			dv := sadl.AsMap(v)
+			inputToken := sadl.AsString(dv["inputToken"])
+			outputToken := sadl.AsString(dv["outputToken"])
+			pageSize := sadl.AsString(dv["pageSize"])
+			items := sadl.AsString(dv["items"])
+			s := fmt.Sprintf("inputToken=%s,outputToken=%s,pageSize=%s,items=%s", inputToken, outputToken, pageSize, items)
+			annos = WithAnnotation(annos, "x_paginated", s)
 		case "aws.protocols#restJson1":
 			//ignore
 		case "smithy.api#examples":
