@@ -186,7 +186,7 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 			}
 			return s + indent + "}"
 		}
-		return fmt.Sprintf("Struct {\n}")
+		return fmt.Sprintf("Struct\n")
 	case "Union":
 		if true {
 			s := fmt.Sprintf("Union {\n")
