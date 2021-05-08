@@ -75,7 +75,7 @@ func noteTypeRefs(refs map[string]bool, model *sadl.Model, ts *sadl.TypeSpec) {
 
 func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	ast := &AST{
-		Version:  SmithyVersion,
+		Smithy:  SmithyVersion,
 		Shapes:   make(map[string]*Shape, 0),
 		Metadata: make(map[string]interface{}, 0),
 	}
@@ -213,28 +213,32 @@ func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	return ast, nil
 }
 
-func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*ExampleTrait {
+func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []map[string]interface{} {
 	opName := sadl.Capitalize(hdef.Name)
 	reqType := opName + "Request"
 	resType := opName + "Response"
-	namedExamples := make(map[string]*ExampleTrait, 0)
+	namedExamples := make(map[string]map[string]interface{}, 0)
 	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range model.Examples {
 		if ex.Target == reqType {
-			tmp := ex.Example.(map[string]interface{})
 			c := ex.Comment
-			namedExamples[ex.Name] = &ExampleTrait{Input: tmp, Documentation: c}
+			e := make(map[string]interface{}, 0)
+			e["input"] = ex.Example.(map[string]interface{})
+			if c != "" {
+				e["documentation"] = c
+			}
+			namedExamples[ex.Name] = e
 		}
 	}
 	for _, ex := range model.Examples {
 		if ex.Target != reqType {
 			if data, ok := namedExamples[ex.Name]; ok {
 				if ex.Target == resType {
-					data.Output = ex.Example.(map[string]interface{})
+					data["output"] = ex.Example.(map[string]interface{})
 				} else {
 					for _, exc := range hdef.Exceptions {
 						if exc.Type == ex.Target {
-							data.Output = ex.Example.(map[string]interface{})
+							data["output"] = ex.Example.(map[string]interface{})
 							break
 						}
 					}
@@ -242,9 +246,9 @@ func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []*ExampleTrai
 			}
 		}
 	}
-	result := make([]*ExampleTrait, 0)
+	result := make([]map[string]interface{}, 0)
 	for k, v := range namedExamples {
-		v.Title = k
+		v["title"] = k
 		result = append(result, v)
 	}
 	return result

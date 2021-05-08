@@ -33,7 +33,7 @@ func loadAST(path string) (*AST, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
 	}
-	if ast.Version == "" {
+	if ast.Smithy == "" {
 		return nil, fmt.Errorf("Cannot parse Smithy AST file: %v\n", err)
 	}
 	return ast, nil
@@ -101,7 +101,7 @@ type Model struct {
 
 //maybe filter by tag top include only parts?
 func (model *Model) Merge(another *Model) error {
-	if model.ast.Version != another.ast.Version {
+	if model.ast.Smithy != another.ast.Smithy {
 		return fmt.Errorf("cannot merge models of different Smithy versions")
 	}
 	if another.ast.Metadata != nil {
@@ -156,6 +156,7 @@ func (model *Model) addShape(absoluteName string, shape *Shape) {
 		model.shapes[kk] = shape
 		if shape.Type == "operation" {
 			if shape.Input != nil {
+				fmt.Println(sadl.Pretty(shape), prefixLen)
 				iok := shape.Input.Target[prefixLen:]
 				model.ioParams[iok] = shape.Input.Target
 			}
@@ -522,10 +523,24 @@ func (model *Model) importTraitsAsAnnotations(annos map[string]string, traits ma
 		case "aws.protocols#restJson1":
 			//ignore
 		case "smithy.api#examples":
-			//ignore
+			//ignore for now
 		default:
-			fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
-			panic("here: " + k)
+			tshape := model.getShape(k)
+			if tshape != nil {
+				tm := sadl.GetMap(tshape.Traits, "smithy.api#trait")
+				if tm != nil {
+					fmt.Println("tshape:", k, tm)
+					//FIX ME
+					//I don't really have a place to put non-string annotations (note how I stuff string annos into "x_name").
+					//So I really need arbitrary annotations values to do this. Note also: need multiple ns support!
+				} else {
+					fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
+					panic("here: " + k)
+				}
+			} else {
+				fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
+				panic("here: " + k)
+			}
 		}
 	}
 	return annos

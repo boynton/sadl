@@ -72,7 +72,7 @@ func (ast *AST) IDL(namespace string) string {
 		if shape.Type == "operation" {
 			if d, ok := shape.Traits["smithy.api#examples"]; ok {
 				switch v := d.(type) {
-				case []*ExampleTrait:
+				case []map[string]interface{}:
 					w.EmitExamplesTrait(nsk, v)
 				}
 			}
@@ -222,10 +222,6 @@ func (w *IdlWriter) EmitHttpTrait(rv interface{}, indent string) {
 	var method, uri string
 	code := 0
 	switch v := rv.(type) {
-	case *HttpTrait:
-		method = v.Method
-		uri = v.Uri
-		code = v.Code
 	case map[string]interface{}:
 		method = sadl.GetString(v, "method")
 		uri = sadl.GetString(v, "uri")
@@ -385,7 +381,7 @@ func (w *IdlWriter) EmitPaginatedTrait(d interface{}) {
 
 func (w *IdlWriter) EmitExamplesTrait(opname string, raw interface{}) {
 	switch data := raw.(type) {
-	case []*ExampleTrait:
+	case []map[string]interface{}:
 		target := stripNamespace(opname)
 		formatted := sadl.Pretty(data)
 		if strings.HasSuffix(formatted, "\n") {

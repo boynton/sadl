@@ -47,7 +47,7 @@ func (p *Parser) Parse() error {
 	var comment string
 	var traits map[string]interface{}
 	p.ast = &AST{
-		Version: "1.0",
+		Smithy: "1.0",
 	}
 	for {
 		var err error
@@ -1089,7 +1089,7 @@ func (p *Parser) parseTraitArgs() (map[string]interface{}, interface{}, error) {
 				p.ignore(sadl.COLON)
 				match := tok.Text
 				switch match {
-				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults", "items":
+				case "method", "uri", "inputToken", "outputToken", "pageSize", "maxResults", "items", "selector":
 					val, err := p.ExpectString()
 					if err == nil {
 						args = withTrait(args, match, val)
@@ -1208,8 +1208,14 @@ func (p *Parser) parseTrait(traits map[string]interface{}) (map[string]interface
 			return traits, p.SyntaxError()
 		}
 		return withTrait(traits, "smithy.api#examples", lit), nil
+	case "trait":
+		args, _, err := p.parseTraitArgs()
+		if err != nil {
+			return traits, err
+		}
+		return withTrait(traits, "smithy.api#trait", args), nil
 	default:
-		if ctrait, ok := p.useTraits[tname]; ok {
+		if ctrait, ok := p.useTraits[tname]; ok { //if the trait is defined in this namespace, shouldn't require 'use'
 			args, lit, err := p.parseTraitArgs()
 			if err != nil {
 				return traits, err
