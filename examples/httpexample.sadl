@@ -5,60 +5,59 @@ name HTTPExample;
 version "v0";
 
 type PersonId UUID
-    
+
 //
 // A Person type. Email
 //
 type Person Struct {
-    id PersonId;
-    name String (required);
-    email String;
+	id PersonId;
+	name String (required);
+	email String;
 }
 
 //
 // An error
 //
 type NotFound Struct {
-    message String
+	message String
 }
 
 //
 // Get a person, given the ID
 //
 http GET "/people/{id}" (action=getPerson) { /* generates a GetPersonRequest type */
-    id PersonId (required);
-
-    //normal response
-    expect 200 { /* generates a GetPersonResponse type */
-        body Person;
-        etag String (header="ETag")
-    }
-
-    //exceptional response
-    except 404 NotFound; /* TODO: currently, this generates nothing. You pass a NotFound object to generated ServiceError type.
+	id PersonId (required);
+	
+	//normal response
+	expect 200 { /* generates a GetPersonResponse type */
+		body Person;
+		etag String (header="ETag")
+	}
+	
+	//exceptional response
+	except 404 NotFound; /* TODO: currently, this generates nothing. You pass a NotFound object to generated ServiceError type.
                             But: I would prefer the consistency of wrapping it, so I could specify headers, and be consistent
                             with "expect". Then, generating mocks and docs with examples is possible for errors, too. */
 }
 
 example GetPersonRequest (name=getPersonExample) { /* the name attribute is used to group request/response pairs */
-    "id": "bf938428-f04c-11e9-a280-8c8590216cf9"
+	"id": "bf938428-f04c-11e9-a280-8c8590216cf9"
 }
 
 example GetPersonResponse (name=getPersonExample) { 
-    "body": {
-        "id": "bf938428-f04c-11e9-a280-8c8590216cf9",
-        "name": "Lee Boynton",
-        "email": "lee@boynton.com"
-    },
-    "etag": "fe4c4350480c2233ca3d6354d3b44b4e"
+	"body": {
+		"id": "bf938428-f04c-11e9-a280-8c8590216cf9",
+		"name": "Lee Boynton",
+		"email": "lee@boynton.com"
+	},
+		"etag": "fe4c4350480c2233ca3d6354d3b44b4e"
 }
 
 
 example GetPersonRequest (name=getPersonNotFoundExample) {
-    "id": "bf938428-f04c-11e9-a280-8c8590216cf8"
+	"id": "bf938428-f04c-11e9-a280-8c8590216cf8"
 }
 
 example NotFound (name=getPersonNotFoundExample) {
 	"message": "Person not found: bf938428-f04c-11e9-a280-8c8590216cf8"
 }
-

@@ -5,7 +5,7 @@
                 "description": "hey this is a typedef comment for Error",
                 "properties": {
                     "code": {
-        "description": "hey this is a field level comment for Error",
+						"description": "hey this is a field level comment for Error",
                         "format": "int32",
                         "type": "integer"
                     },
