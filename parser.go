@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-//
-// import "github.com/boynton/sadl"
-// ...
-// model, err := sadl.ParseFile("/some/path")
-//
 func ParseSadlFile(path string, conf *Data, extensions ...Extension) (*Model, error) {
 	p, err := parseFileNoValidate(path, conf, extensions)
 	if err != nil {
@@ -48,11 +43,6 @@ func IsValidFile(path string) bool {
 	return false
 }
 
-//
-// import "github.com/boynton/sadl"
-// ...
-// model, err := sadl.ParseString("...")
-//
 func ParseSadlString(src string, conf *Data, extensions ...Extension) (*Model, error) {
 	p := &Parser{
 		scanner: NewScanner(strings.NewReader(src)),
