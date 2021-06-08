@@ -45,10 +45,11 @@ func (gen *Generator) CreateServer() {
 		return
 	}
 	gen.CreateServerDataAndFuncMap(src, rez)
-	gen.CreateJavaFileFromTemplate(gen.serverData.MainClass, mainTemplate, gen.serverData, gen.serverData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.serverData.ImplClass, implTemplate, gen.serverData, gen.serverData.Funcs, "")
-	gen.CreateJavaFileFromTemplate(gen.serverData.ResourcesClass, resourcesTemplate, gen.serverData, gen.serverData.Funcs, gen.ServerPackage)
-
+	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, gen.ServerData.Funcs, "")
+	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.ServerPackage)
+	if gen.ServerImpl {
+		gen.CreateJavaFileFromTemplate(gen.ServerData.ImplClass, implTemplate, gen.ServerData, gen.ServerData.Funcs, "")
+	}
 }
 
 func (gen *Generator) ExceptionTypes() map[string]string {
@@ -73,7 +74,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if gen.Err != nil {
 		return
 	}
-	if gen.serverData != nil {
+	if gen.ServerData != nil {
 		return
 	}
 	serviceName := gen.Capitalize(gen.Model.Name)
@@ -81,7 +82,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if rootPath == "" {
 		rootPath = "/"
 	}
-	gen.serverData = &ServerData{
+	gen.ServerData = &ServerData{
 		RootPath:       rootPath,
 		Model:          gen.Model,
 		Name:           serviceName,
@@ -92,8 +93,8 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		ResourcesClass: serviceName + "Resources",
 	}
 
-	gen.serverData.InterfaceClass = serviceName
-	gen.serverData.ImplClass = serviceName + "Controller"
+	gen.ServerData.InterfaceClass = serviceName
+	gen.ServerData.ImplClass = serviceName + "Controller"
 	entityNameType := func(hact *sadl.HttpDef) (string, string) {
 		for _, out := range hact.Expected.Outputs {
 			if out.Header == "" {
@@ -127,14 +128,14 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		"implName":     implName,
 		"implConstructors": func() string {
 			var lst []string
-			for iname, _ := range gen.serverData.Interfaces {
+			for iname, _ := range gen.ServerData.Interfaces {
 				lst = append(lst, "new "+implTypeName(iname)+"()")
 			}
 			return strings.Join(lst, ", ")
 		},
 		"implDecls": func() string {
 			var lst []string
-			for iname, _ := range gen.serverData.Interfaces {
+			for iname, _ := range gen.ServerData.Interfaces {
 				lst = append(lst, implTypeName(iname)+" "+implName(iname))
 			}
 			return strings.Join(lst, ", ")
@@ -142,7 +143,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 		"interfaceName": func(base string) string { return sadl.Uncapitalize(base) },
 		/*		"interfaceHttp": func() []*ScopedxxxHttpDef {
 				var tmp []*ScopedHttpDef
-				for _, hname := range gen.serverData.Interfaces[interfaceName] {
+				for _, hname := range gen.ServerData.Interfaces[interfaceName] {
 					h := gen.Model.FindHttp(hname)
 					h2 := &ScopedHttpDef{
 						HttpDef:       *h,
@@ -157,7 +158,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			return t
 		},
 		"instantProvider": func() string {
-			if !gen.needInstant {
+			if !gen.NeedInstant {
 				return ""
 			}
 			return "config.register(Util.InstantConverterProvider.class);\n        "
@@ -312,12 +313,12 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 			writer.Flush()
 			return b.String()
 		},
-		"extraResources": func() string { return gen.serverData.ExtraResources },
+		"extraResources": func() string { return gen.ServerData.ExtraResources },
 	}
 	if gen.ServerPackage != "" {
-		gen.serverData.PackageLine = "package " + gen.ServerPackage + ";\n"
+		gen.ServerData.PackageLine = "package " + gen.ServerPackage + ";\n"
 	}
-	gen.serverData.Funcs = funcMap
+	gen.ServerData.Funcs = funcMap
 }
 
 const mainTemplate = `
@@ -488,7 +489,7 @@ func (gen *Generator) ResponseType(name string) string {
 func (gen *Generator) jsonWrapper(etype string, val string) string {
 	switch etype {
 	case "String":
-		gen.needUtil = true
+		gen.NeedUtil = true
 		return "Util.toJson(" + val + ")"
 	default:
 		return val //these are already valid JSON objects

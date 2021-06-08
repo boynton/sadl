@@ -75,7 +75,7 @@ func noteTypeRefs(refs map[string]bool, model *sadl.Model, ts *sadl.TypeSpec) {
 
 func FromSADL(model *sadl.Model, ns string) (*AST, error) {
 	ast := &AST{
-		Smithy:  SmithyVersion,
+		Smithy:   SmithyVersion,
 		Shapes:   make(map[string]*Shape, 0),
 		Metadata: make(map[string]interface{}, 0),
 	}

@@ -30,15 +30,16 @@ type Generator struct {
 	UseJsonPretty    bool   //generate a toString() method that pretty prints JSON.
 	UseMaven         bool   //use Maven defaults, and generate a pom.xml file for the project to immedaitely build it.
 	ModelCode        bool   //generate model code
-	ServerCode       bool   //generate server code, including a default (but empty) implementation of the service interface.
+	ServerCode       bool   //generate server code
+	ServerImpl       bool   //generate a default (but empty) implementation of the service interface
 	ClientCode       bool   //generate client code
 	ServiceException bool   //generate a generic ServiceException instead of making POJOs used as action errors throawable
-	needTimestamp    bool
-	needInstant      bool
-	needUtil         bool
+	NeedTimestamp    bool
+	NeedInstant      bool
+	NeedUtil         bool
 	imports          []string
-	serverData       *ServerData
-	clientData       *ClientData
+	ServerData       *ServerData
+	ClientData       *ClientData
 }
 
 func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
@@ -53,7 +54,7 @@ func Export(model *sadl.Model, dir string, conf *sadl.Data) error {
 		gen.CreateClient()
 	}
 	if gen.UseMaven {
-		gen.CreatePom()
+		gen.CreatePom("")
 	}
 	return gen.Err
 }
@@ -132,6 +133,7 @@ func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generato
 	}
 	if gen.GetConfigBool("server", false) {
 		gen.ServerCode = true
+		gen.ServerImpl = gen.GetConfigBool("example-implementation", true)
 		gen.ServerPackage = gen.GetConfigString("server-package", pkg+".server")
 		gen.EnsurePackageDir(gen.ServerPackage)
 	}
@@ -320,7 +322,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 			}
 		}
 		if gen.UseJsonPretty {
-			gen.needUtil = true
+			gen.NeedUtil = true
 			gen.Emit(`    @Override
     public String toString() {
         return Util.pretty(this);
@@ -383,7 +385,7 @@ func (gen *Generator) EmitBuilder(className string, ts *sadl.TypeSpec, indent st
 		tn, _, _ := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
 		if fd.Type == "Timestamp" {
 			if gen.UseInstants {
-				gen.needUtil = true
+				gen.NeedUtil = true
 				gen.Emit(indent + "    @JsonDeserialize(using = Util.InstantDeserializer.class)\n")
 			}
 		}
@@ -541,7 +543,7 @@ func (gen *Generator) CreateUnionPojo(td *sadl.TypeSpec, className string) {
 	}
 	gen.Emit("\n")
 	if gen.UseJsonPretty {
-		gen.needUtil = true
+		gen.NeedUtil = true
 		gen.Emit(`    @Override
     public String toString() {
         return Util.pretty(this);
@@ -701,11 +703,11 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonSerialize")
 			gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 			annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
-			gen.needUtil = true
-			gen.needInstant = true
+			gen.NeedUtil = true
+			gen.NeedInstant = true
 			return "Instant", annotations, nil
 		}
-		gen.needTimestamp = true
+		gen.NeedTimestamp = true
 		return "Timestamp", annotations, nil
 	case "Array":
 		gen.AddImport("java.util.List")
@@ -766,11 +768,11 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 					gen.AddImport("com.fasterxml.jackson.databind.annotation.JsonDeserialize")
 					annotations = append(annotations, fmt.Sprintf("@JsonDeserialize(using = Util.InstantDeserializer.class)"))
 					annotations = append(annotations, fmt.Sprintf("@JsonSerialize(using = Util.InstantSerializer.class)"))
-					gen.needUtil = true
-					gen.needInstant = true
+					gen.NeedUtil = true
+					gen.NeedInstant = true
 					return "Instant", annotations, nil
 				}
-				gen.needTimestamp = true
+				gen.NeedTimestamp = true
 				return "Timestamp", annotations, nil
 			}
 		}

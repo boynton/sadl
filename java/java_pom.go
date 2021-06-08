@@ -6,10 +6,9 @@ import (
 	"text/template"
 )
 
-func (gen *Generator) CreatePom() {
+func (gen *Generator) CreatePom(extraDepends string) {
 	domain := gen.Domain
 	name := gen.Name
-	extraDepends := ""
 	dir := gen.OutDir
 	lombok := gen.UseLombok
 	path := filepath.Join(dir, "pom.xml")

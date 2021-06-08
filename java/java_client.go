@@ -30,7 +30,7 @@ func (gen *Generator) CreateClient() {
 	}
 	gen.CreateClientDataAndFuncMap(src, rez)
 	gen.CreateClientConfig()
-	gen.CreateJavaFileFromTemplate(gen.clientData.Name, clientTemplate, gen.clientData, gen.clientData.Funcs, gen.ClientPackage)
+	gen.CreateJavaFileFromTemplate(gen.ClientData.Name, clientTemplate, gen.ClientData, gen.ClientData.Funcs, gen.ClientPackage)
 }
 
 func (gen *Generator) CreateClientDataAndFuncMap(src, rez string) {
@@ -42,7 +42,7 @@ func (gen *Generator) CreateClientDataAndFuncMap(src, rez string) {
 	if rootPath == "" {
 		rootPath = "/"
 	}
-	gen.clientData = &ClientData{
+	gen.ClientData = &ClientData{
 		RootPath:       rootPath,
 		Model:          gen.Model,
 		ModelPackage:   gen.ModelPackage,
@@ -160,7 +160,7 @@ func (gen *Generator) CreateClientDataAndFuncMap(src, rez string) {
 			return b.String()
 		},
 	}
-	gen.clientData.Funcs = funcMap
+	gen.ClientData.Funcs = funcMap
 }
 
 func (gen *Generator) CreateClientConfig() {
@@ -171,7 +171,7 @@ func (gen *Generator) CreateClientConfig() {
 	gen.Emit(clientConfig)
 	result := gen.End()
 	if gen.Err == nil {
-		gen.WriteJavaFile("ClientConfig", result, gen.clientData.ClientPackage)
+		gen.WriteJavaFile("ClientConfig", result, gen.ClientData.ClientPackage)
 	}
 }
 

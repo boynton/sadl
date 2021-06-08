@@ -9,7 +9,7 @@ const UnspecifiedNamespace = "example"
 const UnspecifiedVersion = "0.0"
 
 type AST struct {
-	Smithy  string                 `json:"smithy"`
+	Smithy   string                 `json:"smithy"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Shapes   map[string]*Shape      `json:"shapes,omitempty"`
 }

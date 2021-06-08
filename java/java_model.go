@@ -16,13 +16,13 @@ func (gen *Generator) CreateModel() {
 		gen.CreatePojoFromDef(td, exceptions)
 	}
 	gen.CreateInterface()
-	if gen.needUtil {
-		gen.CreateUtil()
-	}
-	if gen.needTimestamp {
+	if gen.NeedTimestamp {
 		gen.CreateTimestamp()
-	} else if gen.needInstant {
-		gen.needUtil = true
+	} else if gen.NeedInstant {
+		gen.NeedUtil = true
+	}
+	if gen.NeedUtil {
+		gen.CreateUtil()
 	}
 	if gen.Config.GetBool("service-exception") {
 		funcMap := template.FuncMap{}
@@ -58,7 +58,7 @@ func (gen *Generator) CreateInterface() {
 		gen.CreateResponsePojo(hact)
 		_, etype := gen.entityNameType(hact)
 		if etype == "String" {
-			gen.needUtil = true
+			gen.NeedUtil = true
 		}
 	}
 }
