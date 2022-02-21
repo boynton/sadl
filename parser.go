@@ -454,7 +454,7 @@ func (p *Parser) parseHttpDirective(name, comment string) error {
 	var method string
 	up := strings.ToUpper(sym)
 	switch up {
-	case "POST", "GET", "PUT", "DELETE": //HEAD, OPTIONS
+	case "POST", "GET", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS":
 		method = up
 	default:
 		return p.Error(fmt.Sprintf("HTTP 'method' invalid: %s", sym))
@@ -2149,7 +2149,7 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	if err != nil {
 		return err
 	}
-	needsBody := hact.Method == "POST" || hact.Method == "PUT"
+	needsBody := hact.Method == "POST" || hact.Method == "PUT" || hact.Method == "PATCH"
 	bodyParam := ""
 	for _, in := range hact.Inputs {
 		t := p.model.FindType(in.Type)

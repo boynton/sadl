@@ -19,3 +19,14 @@ example HelloRequest (name=helloExample) {
 example HelloResponse (name=helloExample) {
 	"greeting": "Hello, Lee"
 }
+
+example hello {
+	request: {
+       caller: "Lee"
+	},
+	responses: {
+	  "200": {
+	  	  greeting: "Hello, Lee"
+      }
+	}
+}
