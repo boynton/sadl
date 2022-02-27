@@ -463,7 +463,7 @@ func (p *Parser) parseHttpDirective(name, comment string) error {
 	if err != nil {
 		return err
 	}
-	options, err := p.ParseOptions("http", []string{"action", "resource"})
+	options, err := p.ParseOptions("http", []string{"action", "operation", "resource"})
 	if err != nil {
 		return err
 	}
@@ -1371,7 +1371,7 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 						options.Required = true
 					case "default":
 						options.Default, err = p.parseEqualsLiteral()
-					case "action":
+					case "action", "operation":
 						options.Action, err = p.expectEqualsIdentifier()
 					case "resource":
 						options.Resource, err = p.expectEqualsIdentifier()
