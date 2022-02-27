@@ -2,8 +2,6 @@ module github.com/boynton/sadl
 
 go 1.17
 
-replace github.com/boynton/smithy => /Users/lee/src/smithy
-
 require (
 	github.com/boynton/data v0.0.1
 	github.com/boynton/smithy v0.2.6
