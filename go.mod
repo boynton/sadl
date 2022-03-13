@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/boynton/data v0.0.1
-	github.com/boynton/smithy v0.2.6
+	github.com/boynton/smithy v0.2.9
 	github.com/ghodss/yaml v1.0.0
 	github.com/graphql-go/graphql v0.8.0
 )
