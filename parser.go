@@ -824,7 +824,7 @@ func (p *Parser) parseTypeDirective(comment string) error {
 		err = p.parseUUIDDef(td)
 	case "UnitValue":
 		err = p.parseUnitValueDef(td, params)
-	case "Array":
+	case "Array", "List":
 		err = p.parseArrayDef(td, params)
 	case "Map":
 		err = p.parseMapDef(td, params)
@@ -855,7 +855,7 @@ func (p *Parser) ParseTypeSpec(comment string) (*TypeSpec, *Options, string, err
 	var tsKeys, tsItems string
 	var tsUnit, tsValue string
 	switch tsType {
-	case "Array":
+	case "Array", "List":
 		tsItems, err = p.arrayParams(tsParams)
 	case "Map":
 		tsKeys, tsItems, err = p.mapParams(tsParams)
@@ -896,8 +896,9 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 		var params []string
 		var expectedParams int
 		switch typeName {
-		case "Array":
+		case "Array", "List":
 			expectedParams = 1
+			typeName = "Array"
 		case "Map", "UnitValue":
 			expectedParams = 2
 		case "Union":
