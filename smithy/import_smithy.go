@@ -472,8 +472,10 @@ func (i *Importer) importTraitsAsAnnotations(annos map[string]string, traits *da
 					panic("here: " + k)
 				}
 			} else {
-				fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
-				panic("here: " + k)
+				if strings.HasPrefix(k, "smithy.api#") {
+					fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
+					panic("here: " + k)
+				} //else ignore
 			}
 		}
 	}

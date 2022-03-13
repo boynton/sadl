@@ -16,6 +16,7 @@ var ImportFormats = []string{
 	"sadl",
 	"smithy",
 	"openapi",
+	"swagger",
 	"graphql",
 }
 
@@ -23,7 +24,7 @@ var ImportFileExtensions = map[string][]string{
 	".sadl":    []string{"sadl"},
 	".smithy":  []string{"smithy"},
 	".graphql": []string{"graphql"},
-	".json":    []string{"sadl", "smithy", "openapi"},
+	".json":    []string{"sadl", "smithy", "openapi", "swagger"},
 	".yaml":    []string{"openapi"},
 }
 
@@ -76,6 +77,10 @@ func ValidImportFileType(path string) string {
 				if openapi.IsValidFile(path) {
 					return ftype
 				}
+			case "swagger":
+				if openapi.IsValidSwaggerFile(path) {
+					return ftype
+				}
 			}
 		}
 	} else {
@@ -123,6 +128,8 @@ func importFiles(paths []string, ftype string, conf *sadl.Data, extensions []sad
 		return sadl.ParseSadlFile(paths[0], conf, extensions...)
 	case "smithy":
 		return smithy.Import(paths, conf)
+	case "swagger":
+		return openapi.ImportSwagger(paths, conf)
 	case "openapi":
 		return openapi.Import(paths, conf)
 	case "graphql":

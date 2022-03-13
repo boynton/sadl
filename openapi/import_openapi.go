@@ -278,6 +278,8 @@ func convertOasType(name string, oasSchema *Schema) (sadl.TypeSpec, error) {
 		if ts.Type == "String" {
 			if oasSchema.Format == "uuid" {
 				ts.Type = "UUID"
+			} else if oasSchema.Format == "date-time" {
+				ts.Type = "Timestamp"
 			} else {
 				ts.Pattern = oasSchema.Pattern
 				if oasSchema.MinLength > 0 {
@@ -631,9 +633,7 @@ func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, e
 	if expectedStatus != "" {
 		eparam := op.Responses[expectedStatus]
 		if eparam == nil {
-			fmt.Println("expectedStatus, eparam:", expectedStatus, eparam)
-			fmt.Println(sadl.Pretty(op.Responses))
-			panic("whoops")
+			return nil, fmt.Errorf("no response entity type provided for operation %q", op.OperationId)
 		}
 		var err error
 		code := 200

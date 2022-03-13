@@ -12,6 +12,10 @@ type Data struct {
 	value interface{}
 }
 
+func AsData(v interface{}) *Data {
+	return &Data{value: v}
+}
+
 func NewData() *Data {
 	return &Data{}
 }
@@ -71,6 +75,10 @@ func (data *Data) Put(key string, value interface{}) {
 	}
 }
 
+func (data *Data) IsNil() bool {
+	return data.value == nil
+}
+
 func (data *Data) AsMap() map[string]interface{} {
 	if data != nil && data.value != nil {
 		if m, ok := data.value.(map[string]interface{}); ok {
@@ -127,8 +135,25 @@ func (data *Data) GetInt(keys ...string) int {
 	return AsInt(data.get(keys))
 }
 
+func (data *Data) GetInt64(keys ...string) int64 {
+	return AsInt64(data.get(keys))
+}
+
+func (data *Data) GetFloat64(keys ...string) float64 {
+	return AsFloat64(data.get(keys))
+}
+
 func (data *Data) GetArray(keys ...string) []interface{} {
 	return AsArray(data.get(keys))
+}
+
+func (data *Data) GetStringArray(keys ...string) []string {
+	var sa []string
+	d := data.get(keys)
+	for _, v := range AsArray(d) {
+		sa = append(sa, AsString(v))
+	}
+	return sa
 }
 
 func (data *Data) GetMap(keys ...string) map[string]interface{} {
