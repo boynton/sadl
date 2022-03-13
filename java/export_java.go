@@ -668,9 +668,9 @@ func (gen *Generator) TypeName(ts *sadl.TypeSpec, name string, required bool) (s
 				smax := ""
 				if ts.MaxSize != nil {
 					smax = fmt.Sprintf("max=%d", *ts.MaxSize)
-				}
-				if smax != "" {
-					smax = ", " + smax
+					if smin != "" {
+						smax = ", " + smax
+					}
 				}
 				annotations = append(annotations, fmt.Sprintf("@Size(%s%s)", smin, smax))
 			}
