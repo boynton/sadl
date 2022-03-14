@@ -165,11 +165,18 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 		sopt := ""
 		if len(ts.Fields) > 0 {
 			s := fmt.Sprintf("Struct%s {\n", sopt)
+			blockLine := ""
+			for _, fd := range ts.Fields {
+				if len(fd.Comment) > 60 {
+					blockLine = "\n"
+					break
+				}
+			}
 			for _, fd := range ts.Fields {
 				com := ""
 				bcom := ""
 				if fd.Comment != "" {
-					if len(fd.Comment) > 100 {
+					if blockLine != "" {
 						bcom = g.FormatComment(indent+indentAmount, fd.Comment, 100, false)
 					} else {
 						com = " // " + fd.Comment
@@ -182,7 +189,7 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 				for aname, aval := range fd.Annotations {
 					fopts = append(fopts, fmt.Sprintf("%s=%q", aname, aval))
 				}
-				s += fmt.Sprintf("%s%s%s %s%s\n", bcom, indent+indentAmount, fd.Name, g.sadlTypeSpec(&fd.TypeSpec, fopts, indent+indentAmount), com)
+				s += fmt.Sprintf("%s%s%s%s %s%s\n", blockLine, bcom, indent+indentAmount, fd.Name, g.sadlTypeSpec(&fd.TypeSpec, fopts, indent+indentAmount), com)
 			}
 			return s + indent + "}"
 		}
@@ -298,26 +305,32 @@ func (g *SadlGenerator) sadlParamSpec(ps *HttpParamSpec) string {
 	}
 	com := ""
 	bcom := ""
+	ts := g.sadlTypeSpec(&ps.TypeSpec, nil, indentAmount)
 	if ps.Comment != "" {
-		if len(ps.Comment) > 100 {
+		if (len(ps.Comment) + len(ps.Name) + len(ts) + len(opt)) > 100 {
 			bcom = g.FormatComment("   ", ps.Comment, 100, false)[3:] + "   "
 		} else {
 			com = " // " + ps.Comment
 		}
 	}
-	ts := g.sadlTypeSpec(&ps.TypeSpec, nil, indentAmount)
 	return bcom + ps.Name + " " + ts + opt + com + "\n"
 }
 
 func stringList(lst []string) string {
-	result := "["
+	delim := ""
+	end := ""
+	if len(lst) > 5 {
+		delim = "\n    "
+		end = "\n"
+	}
+	result := "[" + delim
 	for i, s := range lst {
 		if i != 0 {
-			result += ","
+			result += "," + delim
 		}
 		result += fmt.Sprintf("%q", s)
 	}
-	return result + "]"
+	return result + end + "]"
 }
 
 const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Namespace}}namespace {{.Namespace}}
