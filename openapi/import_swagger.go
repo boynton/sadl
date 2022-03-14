@@ -35,14 +35,22 @@ func LoadSwagger(path string) (*Model, error) {
 }
 
 func toV3(v2 *sadl.Data) (*Model, error) {
+	var defConsumes []string
+	var defProduces []string
 	model := &Model{OpenAPI: "3.0.0"}
+	if v2.Has("consumes") {
+		defConsumes = v2.GetStringArray("consumes")
+	}
+	if v2.Has("produces") {
+		defProduces = v2.GetStringArray("produces")
+	}
 	if v2.GetString("swagger") == "2.0" {
 		if v2.Has("externalDocs") {
 			model.ExternalDocs = toV3ExternalDocs(v2.GetData("externalDocs"))
 		}
 		model.Info = toV3Info(v2.GetData("info"))
 		model.Components = toV3Components(v2)
-		model.Paths = toV3Paths(model, v2.GetData("paths"))
+		model.Paths = toV3Paths(model, v2.GetData("paths"), defConsumes, defProduces)
 		model.Servers = toV3Servers(v2)
 		return model, nil
 	}
@@ -56,17 +64,17 @@ func toV3ExternalDocs(v2 *sadl.Data) *ExternalDocumentation {
 	}
 }
 
-func toV3Paths(model *Model, v2 *sadl.Data) map[string]*PathItem {
+func toV3Paths(model *Model, v2 *sadl.Data, defConsumes []string, defProduces []string) map[string]*PathItem {
 	paths := make(map[string]*PathItem, 0)
 	for k, v := range v2.AsMap() {
 		vd := sadl.AsData(v)
 		pi := &PathItem{
-			Get:    toV3Operation(model, vd.GetData("get")),
-			Delete: toV3Operation(model, vd.GetData("delete")),
-			Put:    toV3Operation(model, vd.GetData("put")),
-			Post:   toV3Operation(model, vd.GetData("post")),
-			Patch:  toV3Operation(model, vd.GetData("patch")),
-			Head:   toV3Operation(model, vd.GetData("head")),
+			Get:    toV3Operation(model, vd.GetData("get"), defConsumes, defProduces),
+			Delete: toV3Operation(model, vd.GetData("delete"), defConsumes, defProduces),
+			Put:    toV3Operation(model, vd.GetData("put"), defConsumes, defProduces),
+			Post:   toV3Operation(model, vd.GetData("post"), defConsumes, defProduces),
+			Patch:  toV3Operation(model, vd.GetData("patch"), defConsumes, defProduces),
+			Head:   toV3Operation(model, vd.GetData("head"), defConsumes, defProduces),
 			//etc
 		}
 		paths[k] = pi
@@ -74,7 +82,7 @@ func toV3Paths(model *Model, v2 *sadl.Data) map[string]*PathItem {
 	return paths
 }
 
-func toV3Operation(model *Model, v2 *sadl.Data) *Operation {
+func toV3Operation(model *Model, v2 *sadl.Data, defConsumes []string, defProduces []string) *Operation {
 	if v2.IsNil() {
 		return nil
 	}
@@ -86,6 +94,9 @@ func toV3Operation(model *Model, v2 *sadl.Data) *Operation {
 	}
 	//responses
 	consumes := v2.GetStringArray("consumes")
+	if consumes == nil {
+		consumes = defConsumes
+	}
 	var params []*Parameter
 	for _, param := range v2.GetArray("parameters") {
 		paramd := sadl.AsData(param)
@@ -112,6 +123,9 @@ func toV3Operation(model *Model, v2 *sadl.Data) *Operation {
 	}
 	op.Parameters = params
 	produces := v2.GetStringArray("produces")
+	if produces == nil {
+		produces = defProduces
+	}
 	v2Responses := v2.GetMap("responses")
 
 	if len(v2Responses) > 0 {
