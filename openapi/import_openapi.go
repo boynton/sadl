@@ -13,7 +13,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-var EnumTypes bool = false
+var EnumTypes bool = true
 
 func IsValidFile(path string) bool {
 	_, err := Load(path)
