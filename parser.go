@@ -693,6 +693,9 @@ func (p *Parser) parseHttpExceptionSpec(op *HttpDef, comment string) error {
 		return err
 	}
 	//check for dups.
+	//the only reason I don't accept dups is for Java codegen, which is type-based.
+	//i.e. without a distinct type for each exception, the code cannot raise them
+	//smithy annotates the error itself with an HTTP status code.
 	for _, exc := range op.Exceptions {
 		if exc.Type == etype {
 			return p.Error("Duplicate HTTP action exception type: " + exc.Type)

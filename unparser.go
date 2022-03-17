@@ -148,7 +148,7 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 		if len(opts) > 0 {
 			sopts = " (" + strings.Join(opts, ", ") + ")"
 		}
-		return fmt.Sprintf("Array<%s>%s", ts.Items, sopts)
+		return fmt.Sprintf("List<%s>%s", ts.Items, sopts)
 	case "Map":
 		if ts.MinSize != nil {
 			opts = append(opts, fmt.Sprintf("minsize=%d", *ts.MinSize))

@@ -142,6 +142,10 @@ func (model *Model) ToSadl(name string) (*sadl.Model, error) {
 		Version: model.Info.Version,
 	}
 	for name, oasSchema := range model.Components.Schemas {
+		name = validSadlName(name, oasSchema)
+		if name == "" {
+			continue
+		}
 		var ts sadl.TypeSpec
 		var err error
 		comment := ""
@@ -217,6 +221,17 @@ func (model *Model) ToSadl(name string) (*sadl.Model, error) {
 	schema.Examples = examples
 
 	return sadl.NewModel(schema)
+}
+
+func validSadlName(name string, oasSchema *Schema) string {
+	if name == "Timestamp" {
+		if oasSchema.Type == "string" {
+			return ""
+		}
+	} else if name == "Decimal" {
+		return ""
+	}
+	return name
 }
 
 func oasTypeRef(oasSchema *Schema) string {
