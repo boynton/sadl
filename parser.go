@@ -1031,6 +1031,10 @@ func (p *Parser) parseStringDef(td *TypeDef) error {
 	if err == nil {
 		td.Comment, err = p.EndOfStatement(td.Comment)
 	}
+	if td.Pattern == RegExUUID {
+		td.Type = "UUID"
+		td.Pattern = ""
+	}
 	return err
 }
 
@@ -2110,7 +2114,7 @@ func (p *Parser) validateExampleAgainstHttpResponse(hact *HttpDef, ex *ExampleDe
 	for _, out := range hact.Expected.Outputs {
 		if out.Required {
 			if _, ok := present[out.Name]; !ok {
-				return fmt.Errorf("Required input '%s' missing in example for %s", out.Name, ex.Target)
+				return fmt.Errorf("Required output '%s' missing in example for %s", out.Name, ex.Target)
 			}
 		}
 	}
@@ -2229,34 +2233,6 @@ func (p *Parser) validateStringDef(td *TypeDef) error {
 	if td.Pattern != "" {
 		if td.Values != nil {
 			return fmt.Errorf("Both 'pattern' and 'values' options cannot coexist in String type %s", td.Name)
-		}
-		//expand embedded references
-		for {
-			i := strings.Index(td.Pattern, "{")
-			if i >= 0 {
-				j := strings.Index(td.Pattern[i:], "}")
-				if j > 0 {
-					name := td.Pattern[i+1 : i+j]
-					tpat := p.model.FindType(name)
-					if tpat != nil {
-						if tpat.Type == "String" {
-							if tpat.Pattern != "" {
-								td.Pattern = td.Pattern[:i] + tpat.Pattern + td.Pattern[i+j+1:]
-							} else {
-								return fmt.Errorf("Embedded pattern refers to string type %s, which has no pattern: %q", name, td.Pattern)
-							}
-						} else {
-							return fmt.Errorf("Embedded pattern refers to non-string type %s", name)
-						}
-					} else {
-						return fmt.Errorf("Embedded pattern refers to undefined type %s: %q", name, td.Pattern)
-					}
-				} else {
-					break //unmatched {}, let the leading { just go through
-				}
-			} else {
-				break
-			}
 		}
 	}
 	return p.validateReference(td)

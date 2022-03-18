@@ -9,7 +9,14 @@ import (
 	smithylib "github.com/boynton/smithy"
 )
 
+var inputSuffix = "Input"
+var outputSuffix = "Output"
+
 func Export(model *sadl.Model, out string, conf *sadl.Data, exportAst bool) error {
+	if conf.GetBool("useRequestResponse") {
+		inputSuffix = "Request"
+		outputSuffix = "Response"
+	}
 	ns := model.Namespace
 	ns2 := conf.GetString("namespace")
 	if ns2 != "" {
@@ -129,7 +136,7 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 
 		//if we have any inputs, define this
 		if len(hd.Inputs) > 0 {
-			shape.Input = &smithylib.ShapeRef{Target: prefix + name + "Input"}
+			shape.Input = &smithylib.ShapeRef{Target: prefix + name + inputSuffix}
 			inShape := smithylib.Shape{
 				Type:    "structure",
 				Members: smithylib.NewMembers(),
@@ -156,7 +163,7 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 
 		if len(hd.Expected.Outputs) > 0 {
 			//if we have any outputs, define this
-			shape.Output = &smithylib.ShapeRef{Target: prefix + name + "Output"}
+			shape.Output = &smithylib.ShapeRef{Target: prefix + name + outputSuffix}
 			outShape := smithylib.Shape{
 				Type:    "structure",
 				Members: smithylib.NewMembers(),
@@ -217,8 +224,8 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 
 func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []map[string]interface{} {
 	opName := sadl.Capitalize(hdef.Name)
-	reqType := opName + "Request"
-	resType := opName + "Response"
+	reqType := opName + inputSuffix
+	resType := opName + outputSuffix
 	namedExamples := make(map[string]map[string]interface{}, 0)
 	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range model.Examples {
@@ -240,7 +247,10 @@ func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []map[string]i
 				} else {
 					for _, exc := range hdef.Exceptions {
 						if exc.Type == ex.Target {
-							data["output"] = ex.Example.(map[string]interface{})
+							tmp := make(map[string]interface{}, 0)
+							tmp["error"] = ex.Example.(map[string]interface{})
+							tmp["shapeId"] = ex.Target
+							data["error"] = tmp
 							break
 						}
 					}

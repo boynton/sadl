@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const RegExUUID = "([a-f0-9]{8}(-[a-f0-9]{4}){4}[a-f0-9]{8})"
+
 type Model struct {
 	Schema
 	Extensions map[string]interface{} `json:"extensions,omitempty"`

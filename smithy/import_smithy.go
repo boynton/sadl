@@ -684,8 +684,8 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 		outShapeName = shape.Output.Target
 		outType = i.shapeRefToTypeRef(outShapeName)
 	}
-	reqType := sadl.Capitalize(shapeName) + "Request"
-	resType := sadl.Capitalize(shapeName) + "Response"
+	reqType := sadl.Capitalize(shapeName) + inputSuffix
+	resType := sadl.Capitalize(shapeName) + outputSuffix
 	if opexes := shape.Traits.GetArray("smithy.api#examples"); opexes != nil {
 		for _, opexr := range opexes {
 			if opex, ok := opexr.(map[string]interface{}); ok {
