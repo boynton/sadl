@@ -9,13 +9,13 @@ import (
 	smithylib "github.com/boynton/smithy"
 )
 
-var inputSuffix = "Input"
-var outputSuffix = "Output"
+var inputSuffix = "Request"
+var outputSuffix = "Response"
 
 func Export(model *sadl.Model, out string, conf *sadl.Data, exportAst bool) error {
-	if conf.GetBool("useRequestResponse") {
-		inputSuffix = "Request"
-		outputSuffix = "Response"
+	if conf.GetBool("useInputOutput") {
+		inputSuffix = "Input"
+		outputSuffix = "Output"
 	}
 	ns := model.Namespace
 	ns2 := conf.GetString("namespace")
@@ -224,8 +224,8 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 
 func sadlExamplesForAction(model *sadl.Model, hdef *sadl.HttpDef) []map[string]interface{} {
 	opName := sadl.Capitalize(hdef.Name)
-	reqType := opName + inputSuffix
-	resType := opName + outputSuffix
+	reqType := opName + "Request"
+	resType := opName + "Response"
 	namedExamples := make(map[string]map[string]interface{}, 0)
 	//each named example should be a pair of req/res, or req/exc
 	for _, ex := range model.Examples {
