@@ -146,7 +146,7 @@ func (gen *Generator) paramAccessor(in *sadl.HttpParamSpec, v string) string {
 	}
 	bt := gen.baseType(in.Type)
 	switch bt {
-	case "String":
+	case "String", "UUID":
 		vv := fmt.Sprintf("stringParam(%s, %q)", v, stringDefault(in.Default))
 		if coerceTo != bt {
 			vv = fmt.Sprintf("%s(%s)", coerceTo, vv)

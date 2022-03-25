@@ -113,6 +113,8 @@ func (gen *Generator) EmitType(td *sadl.TypeDef, errors map[string]bool) {
 		gen.EmitEnumType(td)
 	case "String":
 		gen.Emit("type " + td.Name + " string\n")
+	case "UUID":
+		gen.Emit("type " + td.Name + " string //UUID\n")
 	case "Decimal":
 		gen.Emit("type " + td.Name + " Decimal\n")
 		gen.createDecimal = true
