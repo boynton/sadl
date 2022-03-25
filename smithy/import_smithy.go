@@ -427,7 +427,7 @@ func (i *Importer) importTraitsAsAnnotations(annos map[string]string, traits *da
 			/* ignore, implicit in SADL */
 		case "smithy.api#tags":
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), strings.Join(sadl.AsStringArray(v), ","))
-		case "smithy.api#readonly", "smithy.api#idempotent":
+		case "smithy.api#readonly", "smithy.api#idempotent", "smithy.api#sensitive", "smithy.api#box":
 			//			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
@@ -739,7 +739,6 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 					hasQuery = true
 				}
 			}
-			fmt.Println("--------", sadlName, hasLabel, hasQuery, payloadMember)
 			if hasLabel || hasQuery || payloadMember != "" {
 				//the input might *have* a body
 				for _, fname := range inStruct.Members.Keys() {
@@ -772,7 +771,7 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 		}
 	} else {
 		fmt.Println("no input:", data.Pretty(shape))
-		panic("HERE")
+//		panic("HERE")
 	}
 
 	expected := &sadl.HttpExpectedSpec{
