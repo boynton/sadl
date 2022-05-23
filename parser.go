@@ -2178,7 +2178,9 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	}
 	needsBody = false
 	if hact.Expected == nil {
-		return nil
+		hact.Expected = &HttpExpectedSpec{
+			Status: 200,
+		}
 	}
 	needsBody = hact.Expected.Status != 204 && hact.Expected.Status != 304
 	bodyParam = ""

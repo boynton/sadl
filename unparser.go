@@ -256,11 +256,6 @@ func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 		s += indentAmount + g.sadlParamSpec(in)
 	}
 	bcom := ""
-	if hact.Expected == nil {
-		hact.Expected = &HttpExpectedSpec{
-			Status: 200,
-		}
-	}
 	if hact.Expected.Comment != "" {
 		bcom = g.FormatComment(indentAmount, hact.Expected.Comment, 100, false)
 	}
