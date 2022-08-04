@@ -24,7 +24,7 @@ type Item Struct {
 //
 type ItemListing Struct {
 	items Array<Item> (required) // The array is always returned, even if empty.
-	next ItemId                  // The token to skip to the next batch is returned only if there are more.
+	next String                  // The token to skip to the next batch is returned only if there are more.
 }
 
 //
@@ -32,15 +32,21 @@ type ItemListing Struct {
 // throw the exception. i.e. in Java: throw new ServiceException(new NotModified())
 //
 type NotModified Struct {
+}
+
+//common representation for all errors
+type Error Struct {
 	message String
 }
 
-type BadRequest Struct {
-	message String
+//the exception wrapper for Bad Requests. The payload of the response is the Error itself, this type is only used
+//for code generation
+type BadRequestException Struct {
+	error Error //the payload
 }
 
-type NotFound Struct {
-	message String
+type NotFoundException Struct {
+	error Error
 }
 
 
@@ -57,7 +63,7 @@ action CreateItem POST "/items" {
 	
 	// The response if the item or the id is malformed in any way. Each except type can only occur
 	// once, but multiple types can have that code.
-	except 400 BadRequest
+	except 400 BadRequestException
 }
 
 //
@@ -78,7 +84,7 @@ action GetItem GET "/items/{id}" {
 	except 304 NotModified
 	
 	//not found
-	except 404 NotFound
+	except 404 NotFoundException
 }
 
 //
@@ -94,7 +100,7 @@ action PutItem PUT "/items/{id}" {
 	}
 	
 	// The response if the item or the id is malformed in any way
-	except 400 BadRequest
+	except 400 BadRequestException
 }
 
 //
@@ -108,17 +114,17 @@ action DeleteItem DELETE "/items/{id}" {
 	}
 	
 	// The response if the id is not found in the store
-	except 404 NotFound
+	except 404 NotFoundException
 }
 
 //
 // List the items. By default only 10 items are returned, but that can be overridden with a query
 // parameter. If more items are available than the limit, then a "next" token is returned, which can
-// be provided with a subsequent call as the "skip" query parameter.
+// be provided with a subsequent call as the "after" query parameter.
 //
-action ListItems GET "/items?limit={limit}&skip={skip}" {
+action ListItems GET "/items?limit={limit}&after={after}" {
 	limit Int32 (default=10)
-	skip ItemId
+	after String
 	
 	//return a list
 	expect 200 {
