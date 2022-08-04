@@ -186,11 +186,34 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 		//if we have any exceptions, define them
 		if len(hd.Exceptions) > 0 {
 			for _, e := range hd.Exceptions {
+				//so, these are *wrappers* for error resources in smithy
+				//i.e. I need to generate *another* type with a field marked with @httpPayload attribute
+				//So, this is the "NotFoundErrorContent" type that smithy->openapi produces. If I specify it,
+				//then smithy reference tooling does not generate anything else.
+				//typical pattern to use:
+				// type Error Struct { message String }
+				// type NotFoundError { error Error } //this is the wrapper for the operation
+				//this produces (assuming NotFoundError is referenced in an 'except' response):
+				// structure Error { message: String }
+				// @error("client")
+				// @httpError(404)
+				// structure NotFoundError {
+				//   @httpPayload
+				//   error: Error
+				// }
+				//to do: modify the sadl model to support headers in exception responses
 				em := &smithylib.ShapeRef{Target: ns + "#" + e.Type}
 				shape.Errors = append(shape.Errors, em)
 				if tmp := ast.Shapes.Get(em.Target); tmp != nil {
 					ensureShapeTraits(tmp).Put("smithy.api#httpError", e.Status)
 					ensureShapeTraits(tmp).Put("smithy.api#error", httpErrorCategory(e.Status))
+					//check that the shape has a single member that is a struct. If so, mark it as payload
+					if tmp.Members != nil && tmp.Members.Length() == 1 {
+						for _, k := range tmp.Members.Keys() {
+							m := tmp.Members.Get(k)
+							ensureMemberTraits(m).Put("smithy.api#httpPayload", true)
+						}
+					}
 				} else {
 					return nil, fmt.Errorf("Cannot find shape for error declaration type %q", e.Type)
 				}
