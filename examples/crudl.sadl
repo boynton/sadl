@@ -53,7 +53,7 @@ type NotFoundException Struct {
 //
 // Create the item. The item with the updated modified time is returned.
 //
-action CreateItem POST "/items" {
+http POST "/items" (operation=CreateItem) {
 	item Item // The new item
 	
 	// The expected response upon creation of the item in the store
@@ -70,7 +70,7 @@ action CreateItem POST "/items" {
 // Get the item with the specified id. Conditional response is provided to avoid sending the item
 // over the wire if it has not changed.
 //
-action GetItem GET "/items/{id}" {
+http GET "/items/{id}" (operation=GetItem) {
 	id ItemId
 	ifNewer Timestamp (header="If-Modified-Since")
 	
@@ -90,7 +90,7 @@ action GetItem GET "/items/{id}" {
 //
 // Update the item. The item with the updated modified time is returned.
 //
-action PutItem PUT "/items/{id}" {
+http PUT "/items/{id}" (operation=PutItem) {
 	id ItemId
 	item Item // The new item
 	
@@ -106,7 +106,7 @@ action PutItem PUT "/items/{id}" {
 //
 // Delete the item from the store.
 //
-action DeleteItem DELETE "/items/{id}" {
+http DELETE "/items/{id}" (operation=DeleteItem) {
 	id ItemId // The id of the item
 	
 	// The expected response has no content
@@ -122,7 +122,7 @@ action DeleteItem DELETE "/items/{id}" {
 // parameter. If more items are available than the limit, then a "next" token is returned, which can
 // be provided with a subsequent call as the "after" query parameter.
 //
-action ListItems GET "/items?limit={limit}&after={after}" {
+http GET "/items?limit={limit}&after={after}" (operation=ListItems) {
 	limit Int32 (default=10)
 	after String
 	

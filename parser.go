@@ -192,8 +192,8 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 				err = p.parseExampleDirective(comment)
 			case "base":
 				err = p.parseBaseDirective(comment)
-			case "rpc", "action", "operation":
-				err = p.parseActionDirective(comment)
+			case "operation":
+				err = p.parseOperationDirective(comment)
 			case "http":
 				err = p.parseHttpDirective("", comment)
 			case "include":
@@ -344,13 +344,181 @@ func (p *Parser) parseIncludeDirective(comment string) error {
 				op.Annotations = p.addAnnotation(op.Annotations, "x_include", fname)
 				p.schema.Http = append(p.schema.Http, op)
 			}
-			for _, action := range inc.Actions {
-				action.Annotations = p.addAnnotation(action.Annotations, "x_include", fname)
-				p.schema.Actions = append(p.schema.Actions, action)
+			for _, op := range inc.Operations {
+				op.Annotations = p.addAnnotation(op.Annotations, "x_include", fname)
+				p.schema.Operations = append(p.schema.Operations, op)
 			}
 		}
 	}
 	return err
+}
+
+func (p *Parser) parseOperationDirective(comment string) error {
+	name, err := p.ExpectIdentifier()
+	if err != nil {
+		return err
+	}
+
+	//parse operation options here
+	options, err := p.ParseOptions("operation", []string{"http"})
+
+	err = p.expect(OPEN_BRACE)
+	if err != nil {
+		return err
+	}
+	var inputs []*OperationInput
+	var outputs []*OperationOutput
+	var exceptions []string
+
+	for {
+		tok := p.GetToken()
+		if tok == nil {
+			return p.EndOfFileError()
+		}
+		if tok.Type == CLOSE_BRACE {
+			break
+		} else if tok.Type == SYMBOL {
+			if tok.Text == "inputs" {
+				inputs, err = p.parseOperationInputs()
+			} else if tok.Text == "outputs" {
+				outputs, err = p.parseOperationOutputs()
+			} else if tok.Text == "exceptions" {
+				exceptions, err = p.parseOperationExceptions()
+			} else {
+				err = p.Error("Expected 'inputs', 'outputs', or 'exceptions', but found symbol '" + tok.Text + "'")
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
+	//comment, err = p.EndOfStatement(comment)
+	op := &OperationDef{
+		Name:        name,
+		Inputs:      inputs,
+		Outputs:     outputs,
+		Exceptions:  exceptions,
+		Comment:     comment,
+		Annotations: options.Annotations,
+	}
+	p.schema.Operations = append(p.schema.Operations, op)
+	return nil
+}
+
+func (p *Parser) parseOperationInputs() ([]*OperationInput, error) {
+	var inputs []*OperationInput
+	tok := p.GetToken()
+	if tok.Type != OPEN_BRACE {
+		return nil, p.SyntaxError()
+	}
+	tok = p.GetToken()
+	for tok != nil {
+		if tok.Type == CLOSE_BRACE {
+			return inputs, nil
+		} else if tok.Type == NEWLINE {
+			tok = p.GetToken()
+			if tok == nil {
+				return nil, p.EndOfFileError()
+			}
+			continue
+		} else {
+			in := &OperationInput{}
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			in.Name = tok.Text
+			tok = p.GetToken()
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			in.Type = tok.Text
+			tok = p.GetToken()
+			if tok.Type != OPEN_PAREN {
+				p.UngetToken()
+			} else {
+				for {
+					tok = p.GetToken()
+					if tok.Type == CLOSE_PAREN {
+						break
+					} else if tok.Type == SYMBOL {
+						switch tok.Text {
+						case "required":
+							in.Required = true
+						default:
+							return nil, p.SyntaxError()
+						}
+					}
+				}
+			}
+			inputs = append(inputs, in)
+		}
+		tok = p.GetToken()
+	}
+	return nil, nil
+}
+
+func (p *Parser) parseOperationOutputs() ([]*OperationOutput, error) {
+	var outputs []*OperationOutput
+	tok := p.GetToken()
+	if tok.Type != OPEN_BRACE {
+		return nil, p.SyntaxError()
+	}
+	tok = p.GetToken()
+	for tok != nil {
+		if tok.Type == CLOSE_BRACE {
+			return outputs, nil
+		} else if tok.Type == NEWLINE {
+			tok = p.GetToken()
+			if tok == nil {
+				return nil, p.EndOfFileError()
+			}
+			continue
+		} else {
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			outName := tok.Text
+			tok = p.GetToken()
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			outType := tok.Text
+			//options? comment?
+			out := &OperationOutput{}
+			out.Name = outName
+			out.Type = outType
+			outputs = append(outputs, out)
+		}
+		tok = p.GetToken()
+	}
+	return nil, nil
+}
+
+func (p *Parser) parseOperationExceptions() ([]string, error) {
+	var exceptions []string
+	tok := p.GetToken()
+	if tok.Type != OPEN_BRACE {
+		return nil, p.SyntaxError()
+	}
+	tok = p.GetToken()
+	for tok != nil {
+		if tok.Type == CLOSE_BRACE {
+			return exceptions, nil
+		} else if tok.Type == NEWLINE {
+			tok = p.GetToken()
+			if tok == nil {
+				return nil, p.EndOfFileError()
+			}
+			continue
+		} else {
+			if tok.Type != SYMBOL {
+				return nil, p.SyntaxError()
+			}
+			exceptions = append(exceptions, tok.Text)
+		}
+		tok = p.GetToken()
+	}
+	return nil, nil
 }
 
 func (p *Parser) parseActionDirective(comment string) error {
@@ -359,75 +527,6 @@ func (p *Parser) parseActionDirective(comment string) error {
 		return err
 	}
 	return p.parseHttpDirective(name, comment)
-	/*
-		err = p.expect(OPEN_PAREN)
-		if err != nil {
-			return err
-		}
-		tok := p.GetToken()
-		if tok == nil {
-			return p.EndOfFileError()
-		}
-		input := ""
-		if tok.Type == SYMBOL {
-			input = tok.Text
-			tok = p.GetToken()
-			if tok == nil {
-				return p.EndOfFileError()
-			}
-		}
-		if tok.Type != CLOSE_PAREN {
-			return p.SyntaxError()
-		}
-		output := ""
-		var options *Options
-		var etypes []string
-		tok = p.GetToken()
-		if tok != nil {
-			if tok.Type == SYMBOL {
-				if tok.Text != "except" {
-					output = tok.Text
-					tok = p.GetToken()
-				}
-				if tok != nil && tok.Type == SYMBOL && tok.Text == "except" {
-					for {
-						etype := p.getIdentifier()
-						if etype == "" {
-							if len(etypes) == 0 {
-								return p.SyntaxError()
-							}
-							break
-						}
-						etypes = append(etypes, etype)
-					}
-				} else {
-					if tok != nil {
-						if tok.Type == SYMBOL {
-							return p.SyntaxError()
-						}
-						p.UngetToken()
-					}
-				}
-			} else {
-				p.UngetToken()
-			}
-		}
-		options, err = p.ParseOptions("action", []string{})
-		if err != nil {
-			return err
-		}
-		comment, err = p.EndOfStatement(comment)
-		action := &ActionDef{
-			Name:        name,
-			Input:       input,
-			Output:      output,
-			Exceptions:  etypes,
-			Comment:     comment,
-			Annotations: options.Annotations,
-		}
-		p.schema.Actions = append(p.schema.Actions, action)
-		return nil
-	*/
 }
 
 func (p *Parser) getIdentifier() string {
@@ -1983,8 +2082,18 @@ func (p *Parser) Validate() (*Model, error) {
 			return nil, err
 		}
 	}
-	for _, action := range p.model.Actions {
-		err = p.validateAction(action)
+	/*
+		for _, action := range p.model.Actions {
+			//err = p.validateAction(action)
+			err = p.validateAction(action)
+			if err != nil {
+				return nil, err
+			}
+		}
+	*/
+	for _, op := range p.model.Operations {
+		//err = p.validateAction(action)
+		err = p.validateOperation(op)
 		if err != nil {
 			return nil, err
 		}
@@ -2178,9 +2287,7 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	}
 	needsBody = false
 	if hact.Expected == nil {
-		hact.Expected = &HttpExpectedSpec{
-			Status: 200,
-		}
+		return nil
 	}
 	needsBody = hact.Expected.Status != 204 && hact.Expected.Status != 304
 	bodyParam = ""
@@ -2209,7 +2316,8 @@ func (p *Parser) validateHttp(hact *HttpDef) error {
 	return nil
 }
 
-func (p *Parser) validateAction(action *ActionDef) error {
+/*
+   func (p *Parser) validateAction(action *ActionDef) error {
 	if action.Input != "" {
 		t := p.model.FindType(action.Input)
 		if t == nil {
@@ -2228,6 +2336,12 @@ func (p *Parser) validateAction(action *ActionDef) error {
 			return fmt.Errorf("Action '%s' exception type '%s' is not defined", action.Name, etype)
 		}
 	}
+	return nil
+}
+*/
+
+func (p *Parser) validateOperation(action *OperationDef) error {
+	//fix me
 	return nil
 }
 

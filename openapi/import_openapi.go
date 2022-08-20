@@ -174,7 +174,6 @@ func (model *Model) ToSadl(name string) (*sadl.Model, error) {
 	}
 
 	httpBindings := true
-	actions := false
 	for tmpl, path := range model.Paths {
 		path2 := *path
 		for _, method := range methods {
@@ -183,15 +182,7 @@ func (model *Model) ToSadl(name string) (*sadl.Model, error) {
 				if strings.HasPrefix(tmpl, "x-") {
 					continue
 				}
-				if actions {
-					act, err := convertOasPathToAction(schema, op, method)
-					if err != nil {
-						return nil, err
-					}
-					schema.Actions = append(schema.Actions, act)
-				}
 				if httpBindings {
-					//					fmt.Println("xxxxxxxxxxxxxxxx === ", method)
 					hact, err := convertOasPath(tmpl, op, method)
 					if err != nil {
 						return nil, err
@@ -397,128 +388,6 @@ func uncapitalize(s string) string {
 func makeIdentifier(text string) string {
 	reg, _ := regexp.Compile("[^a-zA-Z_][^a-zA-Z_0-9]*")
 	return reg.ReplaceAllString(text, "")
-}
-
-func convertOasPathToAction(schema *sadl.Schema, op *Operation, method string) (*sadl.ActionDef, error) {
-	name := op.OperationId
-	synthesizedName := guessOperationName(op, method)
-	if name == "" {
-		if synthesizedName == "" {
-			synthesizedName = method + "Something" //!
-		}
-		name = synthesizedName
-	}
-	act := &sadl.ActionDef{
-		Name:    name,
-		Comment: op.Summary,
-	}
-	//need a single input. Generate the op.OperationId
-	reqTypeName := capitalize(name) + "Request"
-
-	td := &sadl.TypeDef{
-		Name: reqTypeName,
-		TypeSpec: sadl.TypeSpec{
-			Type: "Struct",
-		},
-	}
-	for _, param := range op.Parameters {
-		name := makeIdentifier(param.Name)
-		fd := &sadl.StructFieldDef{
-			Name:     name,
-			Comment:  param.Description,
-			Required: param.Required,
-		}
-		if param.Schema != nil {
-			fd.Type = oasTypeRef(param.Schema)
-			if fd.Type == "" {
-				fd.Type = sadlPrimitiveType(param.Schema.Type)
-				if fd.Type == "Array" {
-					if param.Schema.Items == nil {
-						fd.Items = "Any"
-					} else {
-						schref := param.Schema.Items
-						switch schref.Type {
-						case "string":
-							fd.Items = "String"
-						default:
-							fd.Items = "Any"
-						}
-					}
-				}
-				if param.Schema.Enum != nil {
-					for _, val := range param.Schema.Enum {
-						if s, ok := val.(string); ok {
-							fd.Values = append(fd.Values, s)
-						} else {
-							return nil, fmt.Errorf("String enum values are not strings: %v", param.Schema.Enum)
-						}
-					}
-				}
-			}
-		}
-		if fd.Type == "Struct" {
-			panic("whoops, that isn't right")
-		} else {
-			if fd.Type == "Array" {
-				if fd.Items == "" {
-					panic("nope")
-				}
-			}
-		}
-		td.Fields = append(td.Fields, fd)
-	}
-
-	td2 := findTypeDef(schema, reqTypeName)
-	if td2 == nil {
-		schema.Types = append(schema.Types, td)
-	} else {
-		fmt.Println(reqTypeName, "already defined as", sadl.Pretty(td2), "Would have replaced with ", sadl.Pretty(td))
-	}
-	act.Input = reqTypeName
-
-	//need the output and exceptions now
-	expectedStatus := guessDefaultResponseCode(op)
-	expectedType := ""
-	if expectedStatus != "" {
-		resp := op.Responses[expectedStatus]
-		if resp == nil {
-			resp = op.Responses["default"]
-		}
-		expectedType = responseTypeName(resp)
-		act.Output = expectedType
-	}
-	resTypeName := capitalize(name) + "Response"
-	if findTypeDef(schema, resTypeName) == nil { //ugh
-		td = &sadl.TypeDef{
-			Name: resTypeName,
-			TypeSpec: sadl.TypeSpec{
-				Type: "Struct",
-			},
-		}
-		fd := &sadl.StructFieldDef{
-			Name: uncapitalize(resTypeName),
-		}
-		fd.Type = act.Output
-		td.Fields = append(td.Fields, fd)
-		//header responses?
-		schema.Types = append(schema.Types, td)
-	}
-	act.Output = resTypeName
-	excepts := make(map[string][]int32, 0)
-	for status, param := range op.Responses {
-		if status != expectedStatus {
-			respType := responseTypeName(param)
-			if respType != expectedType {
-				code, _ := strconv.Atoi(status)
-				lst, _ := excepts[respType]
-				excepts[respType] = append(lst, int32(code))
-			}
-		}
-	}
-	for etype, _ := range excepts {
-		act.Exceptions = append(act.Exceptions, etype)
-	}
-	return act, nil
 }
 
 func convertOasPath(path string, op *Operation, method string) (*sadl.HttpDef, error) {

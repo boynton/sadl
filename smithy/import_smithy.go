@@ -201,6 +201,8 @@ func (i *Importer) importShape(shapeName string, shapeDef *smithylib.Shape) {
 		i.importUnionShape(shapeName, shapeDef)
 	case "blob":
 		i.importBlobShape(shapeName, shapeDef)
+	case "enum":
+		i.importEnumShape(shapeName, shapeDef)
 	case "service":
 		//FIX schema.Name = shapeName
 	case "operation":
@@ -334,8 +336,8 @@ func (i *Importer) importEnum(shapeName string, shape *smithylib.Shape) bool {
 		return false
 	}
 	var elements []*sadl.EnumElementDef
-	isEnum := true
-	couldBeEnum := true
+	isEnum := false
+	couldBeEnum := false
 	for _, v := range lst {
 		m := sadl.AsMap(v)
 		sym := sadl.GetString(m, "name")
@@ -431,7 +433,7 @@ func (i *Importer) importTraitsAsAnnotations(annos map[string]string, traits *da
 			//			annos = WithAnnotation(annos, "x_"+stripNamespace(k), "true")
 		case "smithy.api#http":
 			/* ignore, handled elsewhere */
-		case "smithy.api#timestampFormat":
+		case "smithy.api#timestampFormat", "smithy.api#enumValue":
 			annos = WithAnnotation(annos, "x_"+stripNamespace(k), sadl.AsString(v))
 		case "smithy.api#deprecated":
 			//message
@@ -480,6 +482,30 @@ func (i *Importer) importTraitsAsAnnotations(annos map[string]string, traits *da
 		}
 	}
 	return annos
+}
+
+func (i *Importer) importEnumShape(shapeName string, shape *smithylib.Shape) {
+	sadlName := stripNamespace(shapeName)
+	td := &sadl.TypeDef{
+		Name:        sadlName,
+		Comment:     escapeComment(shape.Traits.GetString("smithy.api#documentation")),
+		Annotations: i.importTraitsAsAnnotations(nil, shape.Traits),
+	}
+	td.Type = "Enum"
+	//	prefix := model.namespace + "#"
+	var elements []*sadl.EnumElementDef
+	for _, memberName := range shape.Members.Keys() {
+		member := shape.Members.Get(memberName)
+		ee := &sadl.EnumElementDef{
+			Symbol:      memberName,
+			Comment:     escapeComment(member.Traits.GetString("smithy.api#documentation")),
+			Annotations: i.importTraitsAsAnnotations(nil, member.Traits),
+		}
+		elements = append(elements, ee)
+	}
+	td.Type = "Enum"
+	td.Elements = elements
+	i.schema.Types = append(i.schema.Types, td)
 }
 
 func (i *Importer) importUnionShape(shapeName string, shape *smithylib.Shape) {
@@ -669,9 +695,6 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 		uri = ht.GetString("uri")
 		code = ht.GetInt("code")
 	}
-	if method == "" {
-		panic("non-http actions NYI")
-	}
 	var inType string
 	var inShapeName string
 	if shape.Input != nil {
@@ -712,6 +735,47 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 	}
 
 	sadlName := stripNamespace(shapeName)
+	if method == "" {
+		odef := &sadl.OperationDef{
+			Name:        sadl.Uncapitalize(sadlName),
+			Comment:     escapeComment(shape.Traits.GetString("smithy.api#documentation")),
+			Annotations: i.importTraitsAsAnnotations(nil, shape.Traits),
+		}
+		if shape.Input != nil {
+			inStruct := i.ast.GetShape(inShapeName)
+			var inputs []*sadl.OperationInput
+			for _, fname := range inStruct.Members.Keys() {
+				fval := inStruct.Members.Get(fname)
+				in := &sadl.OperationInput{}
+				in.Name = fname
+				in.Type = i.shapeRefToTypeRef(fval.Target)
+				in.Required = fval.Traits.GetBool("smithy.api#required")
+				inputs = append(inputs, in)
+			}
+			odef.Inputs = inputs
+		}
+		if shape.Output != nil {
+			outStruct := i.ast.GetShape(outShapeName)
+			var outputs []*sadl.OperationOutput
+			for _, fname := range outStruct.Members.Keys() {
+				out := &sadl.OperationOutput{}
+				fval := outStruct.Members.Get(fname)
+				out.Name = fname
+				out.Type = i.shapeRefToTypeRef(fval.Target)
+				outputs = append(outputs, out)
+			}
+			odef.Outputs = outputs
+		}
+		if shape.Errors != nil {
+			//fix me
+			for _, err := range shape.Errors {
+				odef.Exceptions = append(odef.Exceptions, i.shapeRefToTypeRef(err.Target))
+			}
+		}
+		i.schema.Operations = append(i.schema.Operations, odef)
+		//the req/resp types are getting dropped
+		return
+	}
 	hdef := &sadl.HttpDef{
 		Method:      method,
 		Path:        uri,
@@ -771,7 +835,6 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 		}
 	} else {
 		fmt.Println("no input:", data.Pretty(shape))
-//		panic("HERE")
 	}
 
 	expected := &sadl.HttpExpectedSpec{
@@ -858,7 +921,7 @@ func AssembleModel(paths []string, tags []string) (*smithylib.AST, error) {
 		return nil, err
 	}
 	assembly := &smithylib.AST{
-		Smithy: "1.0",
+		Smithy: "2",
 	}
 	for _, path := range flatPathList {
 		var ast *smithylib.AST

@@ -55,19 +55,8 @@ func (g *SadlGenerator) Generate() string {
 		"typedef": func(td *TypeDef) string {
 			return fmt.Sprintf("type %s %s\n", td.Name, g.sadlTypeSpec(&td.TypeSpec, nil, ""))
 		},
-		"action": func(act *ActionDef) string {
-			out := ""
-			exc := ""
-			if act.Output != "" {
-				out = " " + act.Output
-			}
-			if len(act.Exceptions) > 0 {
-				exc = " " + strings.Join(act.Exceptions, ", ")
-			}
-			if exc != "" {
-				exc = " except" + exc
-			}
-			return fmt.Sprintf("action %s(%s)%s%s\n", act.Name, act.Input, out, exc)
+		"operation": func(op *OperationDef) string {
+			return g.sadlOperationSpec(op)
 		},
 		"http": func(hact *HttpDef) string {
 			return g.sadlHttpSpec(hact)
@@ -233,6 +222,73 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 	}
 }
 
+func (g *SadlGenerator) sadlOperationSpec(op *OperationDef) string {
+	var opts []string
+	if len(op.Annotations) > 0 {
+		for k, v := range op.Annotations {
+			opts = append(opts, fmt.Sprintf("%s=%q", k, v))
+		}
+	}
+	opt := ""
+	if len(opts) > 0 {
+		opt = " (" + strings.Join(opts, ", ") + ")"
+	}
+	var s string
+	s = fmt.Sprintf("operation %s %s {\n", op.Name, opt)
+	//s = fmt.Sprintf("action %s %s %q%s {\n", hact.Name, hact.Method, hact.Path, opt)
+	if len(op.Inputs) > 0 {
+		s += indentAmount + "inputs {\n"
+		for _, in := range op.Inputs {
+			opts = nil
+			opt = ""
+			com := ""
+			bcom := ""
+			ts := g.sadlTypeSpec(&in.TypeSpec, nil, indentAmount)
+			if in.Required {
+				opts = append(opts, "required")
+			}
+			if in.Comment != "" {
+				if (len(in.Comment) + len(in.Name) + len(ts) + len(opt)) > 100 {
+					bcom = g.FormatComment("   ", in.Comment, 100, false)[3:] + "   "
+				} else {
+					com = " // " + in.Comment
+				}
+			}
+			if len(opts) > 0 {
+				opt = " (" + strings.Join(opts, ", ") + ")"
+			}
+			s += indentAmount + indentAmount + bcom + in.Name + " " + in.Type + opt + com + "\n"
+		}
+		s += indentAmount + "}\n"
+	}
+	if len(op.Outputs) > 0 {
+		s += indentAmount + "outputs {\n"
+		for _, out := range op.Outputs {
+			com := ""
+			bcom := ""
+			ts := g.sadlTypeSpec(&out.TypeSpec, nil, indentAmount)
+			if out.Comment != "" {
+				if (len(out.Comment) + len(out.Name) + len(ts) + len(opt)) > 100 {
+					bcom = g.FormatComment("   ", out.Comment, 100, false)[3:] + "   "
+				} else {
+					com = " // " + out.Comment
+				}
+			}
+			s += indentAmount + indentAmount + bcom + out.Name + " " + out.Type + opt + com + "\n"
+		}
+		s += indentAmount + "}\n"
+	}
+	if len(op.Exceptions) > 0 {
+		s += indentAmount + "exceptions {\n"
+		for _, exc := range op.Exceptions {
+			s += fmt.Sprintf("%s%s\n", indentAmount+indentAmount, exc)
+		}
+		s += indentAmount + "}\n"
+	}
+	s += "}\n"
+	return s
+}
+
 func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 	var opts []string
 	if hact.Name != "" {
@@ -256,6 +312,11 @@ func (g *SadlGenerator) sadlHttpSpec(hact *HttpDef) string {
 		s += indentAmount + g.sadlParamSpec(in)
 	}
 	bcom := ""
+	if hact.Expected == nil {
+		hact.Expected = &HttpExpectedSpec{
+			Status: 200,
+		}
+	}
 	if hact.Expected.Comment != "" {
 		bcom = g.FormatComment(indentAmount, hact.Expected.Comment, 100, false)
 	}
@@ -332,7 +393,7 @@ const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Names
 {{end}}{{if .Name}}name {{.Name}}
 {{end}}{{if .Version}}version "{{.Version}}"
 {{end}}{{annotations .Annotations}}{{if .Types}}{{range .Types}}
-{{blockComment .Comment}}{{typedef .}}{{end}}{{end}}{{if .Actions}}{{range .Actions}}
-{{blockComment .Comment}}{{action .}}{{end}}{{end}}{{if .Http}}{{range .Http}}
+{{blockComment .Comment}}{{typedef .}}{{end}}{{end}}{{if .Operations}}{{range .Operations}}
+{{blockComment .Comment}}{{operation .}}{{end}}{{end}}{{if .Http}}{{range .Http}}
 {{blockComment .Comment}}{{http .}}{{end}}{{end}}{{if .Examples}}{{range .Examples}}
 {{blockComment .Comment}}{{example .}}{{end}}{{end}}`

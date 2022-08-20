@@ -1,7 +1,7 @@
 github.com/boynton/data v0.0.1 h1:XFVz1S37dOPtksLvAHTKCQQT72BdcPRsSTLUAP9IcHA=
 github.com/boynton/data v0.0.1/go.mod h1:cpfhBNpi+8m4mQhnA6DFFYy8WiLUJZEGuZjt/1t2DBo=
-github.com/boynton/smithy v0.2.9 h1:t7FQASGRCtVI+F0vvzc64Wo43Q9qr1eSBAYSfzR0CGY=
-github.com/boynton/smithy v0.2.9/go.mod h1:1a90I+tgaX3XKw9aUH2QGKv7BuZLu0G3DtumxoFPG4o=
+github.com/boynton/smithy v0.4.3 h1:YIOjeYJH5tDbSTt5gNU2lPt3UMHBGi+bueTjsghVrR0=
+github.com/boynton/smithy v0.4.3/go.mod h1:1a90I+tgaX3XKw9aUH2QGKv7BuZLu0G3DtumxoFPG4o=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/graphql-go/graphql v0.8.0 h1:JHRQMeQjofwqVvGwYnr8JnPTY0AxgVy1HpHSGPLdH0I=
