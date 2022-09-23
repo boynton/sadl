@@ -6,7 +6,7 @@ import (
 	"math/big"
 )
 
-//we establish this "reasonable" max precision
+// we establish this "reasonable" max precision
 const DecimalPrecision = uint(250)
 
 type Decimal struct {

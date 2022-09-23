@@ -44,6 +44,9 @@ func (gen *Generator) CreateInterface() {
 	if gen.Err != nil {
 		return
 	}
+	if gen.Name == "" {
+		return
+	}
 	funcMap := template.FuncMap{
 		"handlerSig": func(hact *sadl.HttpDef) string {
 			name := gen.ActionName(hact)

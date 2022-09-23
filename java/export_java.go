@@ -417,7 +417,12 @@ func (gen *Generator) CreateEnumPojo(ts *sadl.TypeSpec, className string) {
 		if el.Comment != "" {
 			comment = gen.FormatComment(" ", el.Comment, 0, false)
 		}
-		gen.Emit("    " + strings.ToUpper(el.Symbol) + "(\"" + el.Symbol + "\")" + delim + comment)
+		sym := el.Symbol //strings.ToUpper(el.Symbol) ???
+		val := sadl.GetAnnotation(el.Annotations, "x_enumValue")
+		if val == "" {
+			val = sym
+		}
+		gen.Emit("    " + sym + "(\"" + val + "\")" + delim + comment)
 	}
 	gen.Emit("\n")
 	gen.Emit("    private String repr;\n\n")

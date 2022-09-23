@@ -200,6 +200,13 @@ func (gen *Generator) EmitEnumType(td *sadl.TypeDef) {
 	}
 	funcMap := template.FuncMap{
 		"openBrace": func() string { return "{" },
+		"enumValue": func(el sadl.EnumElementDef) string {
+			val := sadl.GetAnnotation(el.Annotations, "x_enumValue")
+			if val == "" {
+				return el.Symbol
+			}
+			return val
+		},
 	}
 	gen.EmitTemplate("enumType", enumTemplate, td, funcMap)
 }
@@ -212,7 +219,7 @@ const (
 )
 
 var names{{.Name}} = []string{{openBrace}}{{range .Elements}}
-    {{.Symbol}}: "{{.Symbol}}",{{end}}
+    {{.Symbol}}: "{{enumValue .}}",{{end}}
 }
 
 func (e {{.Name}}) String() string {

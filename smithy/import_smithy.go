@@ -14,7 +14,7 @@ import (
 const UnspecifiedNamespace = "example"
 const UnspecifiedVersion = "0.0"
 
-//set to true to prevent enum traits that have only values from ever becoming actul enum objects.
+// set to true to prevent enum traits that have only values from ever becoming actul enum objects.
 var StringValuesNeverEnum bool = false
 
 func IsValidFile(path string) bool {
@@ -881,7 +881,7 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 			eStruct := i.ast.GetShape(eShapeName)
 			eType := i.shapeRefToTypeRef(eShapeName)
 			if eStruct == nil {
-				panic("error type not found")
+				panic("error type not found: " + eShapeName)
 			}
 			exc := &sadl.HttpExceptionSpec{}
 			exc.Type = eType

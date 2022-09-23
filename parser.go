@@ -1509,7 +1509,7 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 	}
 }
 
-//parse the next string. And also a line comment, and the end of line, if present. Anything else is an error
+// parse the next string. And also a line comment, and the end of line, if present. Anything else is an error
 func (p *Parser) parseStringToEndOfLine() (string, string, error) {
 	val := ""
 	comment := ""

@@ -93,7 +93,8 @@ func (g *SadlGenerator) sadlTypeSpec(ts *TypeSpec, opts []string, indent string)
 			if el.Comment != "" {
 				com = " // " + el.Comment
 			}
-			s = s + indent + indentAmount + el.Symbol + com + "\n"
+			annos := AnnotationsAsString(el.Annotations)
+			s = s + indent + indentAmount + el.Symbol + annos + com + "\n"
 		}
 		return s + indent + "}"
 	case "String":

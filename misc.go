@@ -162,3 +162,28 @@ func FormatComment(indent, prefix, comment string, maxcol int, extraPad bool) st
 	}
 	return pad + buf.String() + pad
 }
+
+func GetAnnotation(annos map[string]string, key string) string {
+	if annos != nil {
+		if s, ok := annos[key]; ok {
+			if s == "" {
+				s = "true"
+			}
+			return s
+		}
+	}
+	return ""
+}
+
+func AnnotationsAsString(annos map[string]string) string {
+	var opts []string
+	if len(annos) > 0 {
+		for k, v := range annos {
+			opts = append(opts, fmt.Sprintf("%s=%q", k, v))
+		}
+	}
+	if len(opts) > 0 {
+		return " (" + strings.Join(opts, ", ") + ")"
+	}
+	return ""
+}

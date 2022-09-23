@@ -592,9 +592,9 @@ func (model *Model) FindExampleType(ex *ExampleDef) (*TypeSpec, error) {
 	return ts, nil
 }
 
-//for every typedef and action parameter that has an inline enum def, create a toplevel enum def and refer to it instead.
-//This reduces duplicate definitions.
-//This produces an error if name conflicts cannot be resolved.
+// for every typedef and action parameter that has an inline enum def, create a toplevel enum def and refer to it instead.
+// This reduces duplicate definitions.
+// This produces an error if name conflicts cannot be resolved.
 func (model *Model) ConvertInlineEnums() error {
 	//	refs := make(map[string]*TypeSpec, 0)
 	var tds []*TypeDef
