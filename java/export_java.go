@@ -224,6 +224,14 @@ func (gen *Generator) CreatePojo(ts *sadl.TypeSpec, className, comment string, e
 	}
 }
 
+func reservedKeyword(name string) bool {
+	switch name {
+	case "package":
+		return true
+	}
+	return false
+}
+
 func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, indent string, exceptions map[string]string) {
 	lombok := false
 	if _, ok := exceptions[className]; !ok {
@@ -283,6 +291,10 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 	}
 	nested := make(map[string]*sadl.TypeSpec, 0)
 	for _, fd := range ts.Fields {
+		fname := fd.Name
+		if reservedKeyword(fname) {
+			panic("bad field name, clashes with a keyword: " + fname)
+		}
 		if fd.Comment != "" {
 			gen.Emit(gen.FormatComment(indent+"    ", fd.Comment, 100, false))
 		}
@@ -291,7 +303,7 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 		}
 		tn, tanno, anonymous := gen.TypeName(&fd.TypeSpec, fd.Type, fd.Required)
 		if anonymous != nil {
-			tn = gen.Capitalize(fd.Name)
+			tn = gen.Capitalize(fname)
 			if tn == className {
 				gen.Err = fmt.Errorf("Cannot have identically named inner class with same name as containing class: %q", tn)
 				return
@@ -304,9 +316,9 @@ func (gen *Generator) CreateStructPojo(ts *sadl.TypeSpec, className string, inde
 			}
 		}
 		if gen.UseImmutable {
-			gen.Emit(indent + "    private final " + tn + " " + fd.Name + ";\n\n")
+			gen.Emit(indent + "    private final " + tn + " " + fname + ";\n\n")
 		} else {
-			gen.Emit(indent + "    public " + tn + " " + fd.Name + ";\n\n")
+			gen.Emit(indent + "    public " + tn + " " + fname + ";\n\n")
 		}
 	}
 	if !lombok {

@@ -90,6 +90,9 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 	}
 	//	ast.Metadata["imported_from_sadl_version"] = sadl.Version
 	//	ast.Metadata["name"] = model.Name
+	if model.Base != "" {
+		ast.Metadata.Put("base", model.Base)
+	}
 
 	for _, td := range model.Types {
 		err := defineShapeFromTypeSpec(model, ns, ast.Shapes, &td.TypeSpec, td.Name, td.Comment, td.Annotations)
@@ -105,6 +108,9 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 			expectedCode = int(hd.Expected.Status)
 		}
 		path := hd.Path
+		if model.Base != "" {
+			path = model.Base + path
+		}
 		n := strings.Index(path, "?")
 		if n >= 0 {
 			path = path[:n]

@@ -77,6 +77,9 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	if gen.ServerData != nil {
 		return
 	}
+	if gen.Model.Name == "" {
+		panic("no model name!")
+	}
 	serviceName := gen.Capitalize(gen.Model.Name)
 	rootPath := gen.Model.Base
 	if rootPath == "" {

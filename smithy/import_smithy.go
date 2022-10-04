@@ -124,7 +124,12 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 	if ast.Metadata != nil {
 		for _, k := range ast.Metadata.Keys() {
 			if k != "name" {
-				annos["x_"+k] = sadl.ToString(ast.Metadata.Get(k)) //ideally not a string
+				s := sadl.AsString(ast.Metadata.Get(k))
+				if k == "base" {
+					annos[k] = s
+				} else {
+					annos["x_"+k] = s
+				}
 			}
 		}
 	}
@@ -834,7 +839,7 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 			hdef.Path = hdef.Path + qs
 		}
 	} else {
-		fmt.Println("no input:", data.Pretty(shape))
+		//		fmt.Println("no input:", data.Pretty(shape))
 	}
 
 	expected := &sadl.HttpExpectedSpec{

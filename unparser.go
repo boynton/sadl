@@ -38,6 +38,9 @@ func (g *SadlGenerator) Generate() string {
 			}
 			return g.FormatComment("", s, 100, true)
 		},
+		"literal": func(s string) string {
+			return fmt.Sprintf("%q", s)
+		},
 		"annotations": func(annos map[string]string) string {
 			s := ""
 			if len(annos) > 0 {
@@ -392,6 +395,7 @@ func stringList(lst []string) string {
 
 const sadlTemplate = `{{if .Comment}}{{blockComment .Comment}}{{end}}{{if .Namespace}}namespace {{.Namespace}}
 {{end}}{{if .Name}}name {{.Name}}
+{{end}}{{if .Base}}base {{literal .Base}}
 {{end}}{{if .Version}}version "{{.Version}}"
 {{end}}{{annotations .Annotations}}{{if .Types}}{{range .Types}}
 {{blockComment .Comment}}{{typedef .}}{{end}}{{end}}{{if .Operations}}{{range .Operations}}
