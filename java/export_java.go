@@ -121,7 +121,7 @@ func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generato
 	gen.UseGetters = gen.GetConfigBool("getters", false)
 	gen.UseImmutable = gen.GetConfigBool("immutable", true)
 	gen.UseInstants = gen.GetConfigBool("instants", true)
-	gen.UseMaven = gen.GetConfigBool("maven", true)
+	gen.UseMaven = gen.GetConfigBool("maven", false)
 	gen.UseJsonPretty = gen.GetConfigBool("json", false)
 	gen.Model = model
 	gen.OutDir = outdir
@@ -133,7 +133,7 @@ func NewGenerator(model *sadl.Model, outdir string, config *sadl.Data) *Generato
 	}
 	if gen.GetConfigBool("server", false) {
 		gen.ServerCode = true
-		gen.ServerImpl = gen.GetConfigBool("example-implementation", true)
+		gen.ServerImpl = gen.GetConfigBool("example-implementation", false)
 		gen.ServerPackage = gen.GetConfigString("server-package", pkg+".server")
 		gen.EnsurePackageDir(gen.ServerPackage)
 	}

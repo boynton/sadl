@@ -49,16 +49,16 @@ Supported generators and options used from config if present
    graphql: Prints the GraphQL representation to stdout. Options:
       custom-scalars: a map of any of ["Int64", "Decimal", "Timestamp", "UUID"] to a custom scalar name.
    java: Generate Java code for the model, server, client plumbing. Options:
+      server: include server plumbing code, using Jersey for JAX-RS implementation.
+      client: include client plumbing code, using Jersey for the implementation.
+      maven: generates a Maven pom.xml file to build the project, default is false
+      example-implementation: generates an example implementation controller and Main class based on Jetty, default to false.
       header: a string to include at the top of every generated java file
       lombok: use Lombok for generated model POJOs to reduce boilerplate, default is false
       getters: create model POJOs with traditional getter/setter style, default is true
       immutable: Create POJOs as immutable with a builder static inner class, default is true
       source: specify the default source directory, default to "src/main/java"
-      resource: specify the default resouece directory, default to "src/main/resource"
-      server: include server plumbing code, using Jersey for JAX-RS implementation.
-      client: include client plumbing code, using Jersey for the implementation.
-      project: "maven" generates a pom.xml file to build the project, others (i.e. gradle) will be added
-      domain: The domain name for the project, for use in things like the maven pom.xml file.
+      resource: specify the default resource directory, default to "src/main/resource"
       instants: use java.time.Instant for Timestamp impl, else generate a Timestamp class.
    java-server: a shorthand for specifying the "server" option to the "java" generator. Same options.
    java-client: a shorthand for specifying the "client" option to the "java" generator. Same options.
@@ -77,6 +77,7 @@ Supported generators and options used from config if present
 	pName := flag.String("n", "", "The name of the model, overrides any name present in the source")
 	pNamespace := flag.String("ns", "", "The namespace of the model, overrides any namespace present in the source")
 	pService := flag.String("s", "", "The single service to consider in the model. Default is to use the only one present.")
+	pBase := flag.String("b", "", "The base path for service operations")
 	pGen := flag.String("g", "sadl", "The generator for output")
 	pConf := flag.String("c", "", "The JSON config file for default settings. Default is $HOME/.sadl-config.yaml")
 	pForce := flag.Bool("f", false, "Force overwrite of existing files")
@@ -105,6 +106,7 @@ Supported generators and options used from config if present
 	force := *pForce
 	formatType := *pType
 	service := *pService
+	base := *pBase
 
 	if len(args) == 0 {
 		flag.Usage()
@@ -122,6 +124,9 @@ Supported generators and options used from config if present
 	}
 	if formatType != "" {
 		importConf.Put("type", formatType)
+	}
+	if base != "" {
+		importConf.Put("base", base)
 	}
 	model, err := ImportFiles(args, importConf)
 	if err != nil {

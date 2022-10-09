@@ -45,9 +45,9 @@ func (gen *Generator) CreateServer() {
 		return
 	}
 	gen.CreateServerDataAndFuncMap(src, rez)
-	gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, gen.ServerData.Funcs, "")
 	gen.CreateJavaFileFromTemplate(gen.ServerData.ResourcesClass, resourcesTemplate, gen.ServerData, gen.ServerData.Funcs, gen.ServerPackage)
 	if gen.ServerImpl {
+		gen.CreateJavaFileFromTemplate(gen.ServerData.MainClass, mainTemplate, gen.ServerData, gen.ServerData.Funcs, "")
 		gen.CreateJavaFileFromTemplate(gen.ServerData.ImplClass, implTemplate, gen.ServerData, gen.ServerData.Funcs, "")
 	}
 }
@@ -97,7 +97,7 @@ func (gen *Generator) CreateServerDataAndFuncMap(src, rez string) {
 	}
 
 	gen.ServerData.InterfaceClass = serviceName
-	gen.ServerData.ImplClass = serviceName + "Controller"
+	gen.ServerData.ImplClass = serviceName + "Controller" //add version here?
 	entityNameType := func(hact *sadl.HttpDef) (string, string) {
 		for _, out := range hact.Expected.Outputs {
 			if out.Header == "" {

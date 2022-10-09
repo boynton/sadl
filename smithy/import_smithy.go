@@ -115,6 +115,7 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 	}
 	service := conf.GetString("service")
 	namespace := conf.GetString("namespace")
+	base := conf.GetString("base")
 
 	if namespace != UnspecifiedNamespace {
 		i.namespace = namespace
@@ -135,11 +136,13 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 	}
 	//	annos["x_smithy_version"] = model.ast.Version
 	schema := &sadl.Schema{
-		Name:      name,
-		Namespace: namespace,
-		//		Version:     ast.Smithy,
+		Name:        name,
+		Namespace:   namespace,
+		Sadl:        sadl.Version,
 		Annotations: annos,
+		Base:        base,
 	}
+	//capture?     ast.Smithy
 	if schema.Namespace == UnspecifiedNamespace {
 		schema.Namespace = ""
 	}
@@ -148,7 +151,8 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 	}
 	i.schema = schema
 
-	haveService := ""
+	serviceName := ""
+	serviceVersion := ""
 	for _, shapeName := range ast.Shapes.Keys() {
 		shapeDef := ast.Shapes.Get(shapeName)
 		if shapeDef.Type == "service" {
@@ -157,11 +161,12 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 					continue
 				}
 			} else {
-				if haveService != "" {
-					return nil, fmt.Errorf("SADL only supports one service per model (%s, %s)", haveService, shapeName)
+				if serviceName != "" {
+					return nil, fmt.Errorf("SADL only supports one service per model (%s, %s)", serviceName, shapeName)
 				}
 			}
-			haveService = shapeName
+			serviceName = shapeName
+			serviceVersion = shapeDef.Version
 		} else if shapeDef.Type == "operation" {
 			if shapeDef.Input != nil {
 				i.ioParams[shapeDef.Input.Target] = i.ast.GetShape(shapeDef.Input.Target)
@@ -171,10 +176,18 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 			}
 		}
 	}
-
+	if schema.Name == "" {
+		schema.Name = stripNamespace(serviceName)
+	}
+	if schema.Version == "" {
+		schema.Version = serviceVersion
+	}
+	if schema.Base == "" && schema.Version != "" {
+		schema.Base = "/" + schema.Version
+	}
 	for _, k := range ast.Shapes.Keys() {
 		v := ast.Shapes.Get(k)
-		if v.Type != "service" || k == haveService {
+		if v.Type != "service" || k == serviceName {
 			i.importShape(k, v)
 		}
 	}
