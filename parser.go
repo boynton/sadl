@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/boynton/scanner"
 )
 
 func ParseSadlFile(path string, conf *Data, extensions ...Extension) (*Model, error) {
@@ -45,7 +47,7 @@ func IsValidFile(path string) bool {
 
 func ParseSadlString(src string, conf *Data, extensions ...Extension) (*Model, error) {
 	p := &Parser{
-		scanner: NewScanner(strings.NewReader(src)),
+		scanner: scanner.NewScanner(strings.NewReader(src)),
 		source:  src,
 		conf:    conf,
 	}
@@ -58,12 +60,12 @@ type Parser struct {
 	path           string
 	source         string
 	conf           *Data
-	scanner        *Scanner
+	scanner        *scanner.Scanner
 	model          *Model
 	schema         *Schema
-	lastToken      *Token
-	prevLastToken  *Token
-	ungottenToken  *Token
+	lastToken      *scanner.Token
+	prevLastToken  *scanner.Token
+	ungottenToken  *scanner.Token
 	currentComment string
 	extensions     map[string]Extension
 }
@@ -82,7 +84,7 @@ func parseFileNoValidate(path string, conf *Data, extensions []Extension) (*Pars
 	}
 	src := string(b)
 	p := &Parser{
-		scanner: NewScanner(strings.NewReader(src)),
+		scanner: scanner.NewScanner(strings.NewReader(src)),
 		path:    path,
 		source:  src,
 		conf:    conf,
@@ -108,7 +110,7 @@ func (p *Parser) UngetToken() {
 	p.lastToken = p.prevLastToken
 }
 
-func (p *Parser) GetToken() *Token {
+func (p *Parser) GetToken() *scanner.Token {
 	if p.ungottenToken != nil {
 		p.lastToken = p.ungottenToken
 		p.ungottenToken = nil
@@ -118,9 +120,9 @@ func (p *Parser) GetToken() *Token {
 	p.prevLastToken = p.lastToken
 	tok := p.scanner.Scan()
 	for {
-		if tok.Type == EOF {
+		if tok.Type == scanner.EOF {
 			return nil //fixme
-		} else if tok.Type != BLOCK_COMMENT {
+		} else if tok.Type != scanner.BLOCK_COMMENT {
 			break
 		}
 		tok = p.scanner.Scan()
@@ -178,7 +180,7 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 			break
 		}
 		switch tok.Type {
-		case SYMBOL:
+		case scanner.SYMBOL:
 			switch tok.Text {
 			case "name":
 				err = p.parseNameDirective(comment)
@@ -213,11 +215,11 @@ func (p *Parser) ParseNoValidate(extensions []Extension) error {
 				}
 			}
 			comment = ""
-		case LINE_COMMENT:
+		case scanner.LINE_COMMENT:
 			comment = p.MergeComment(comment, tok.Text)
-		case SEMICOLON:
+		case scanner.SEMICOLON:
 			/* ignore */
-		case NEWLINE:
+		case scanner.NEWLINE:
 			/* ignore */
 		default:
 			return p.expectedDirectiveError()
@@ -254,7 +256,7 @@ func (p *Parser) parseNamespaceDirective(comment string) error {
 		if tok == nil {
 			break
 		}
-		if tok.Type != DOT {
+		if tok.Type != scanner.DOT {
 			p.UngetToken()
 			break
 		}
@@ -285,7 +287,7 @@ func (p *Parser) parseVersionDirective(comment string) error {
 		return p.EndOfFileError()
 	}
 	switch tok.Type {
-	case NUMBER, SYMBOL, STRING:
+	case scanner.NUMBER, scanner.SYMBOL, scanner.STRING:
 		p.schema.Version = tok.Text
 		return nil
 	default:
@@ -362,7 +364,7 @@ func (p *Parser) parseOperationDirective(comment string) error {
 	//parse operation options here
 	options, err := p.ParseOptions("operation", []string{"http"})
 
-	err = p.expect(OPEN_BRACE)
+	err = p.expect(scanner.OPEN_BRACE)
 	if err != nil {
 		return err
 	}
@@ -375,9 +377,9 @@ func (p *Parser) parseOperationDirective(comment string) error {
 		if tok == nil {
 			return p.EndOfFileError()
 		}
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			break
-		} else if tok.Type == SYMBOL {
+		} else if tok.Type == scanner.SYMBOL {
 			if tok.Text == "inputs" {
 				inputs, err = p.parseOperationInputs()
 			} else if tok.Text == "outputs" {
@@ -408,14 +410,14 @@ func (p *Parser) parseOperationDirective(comment string) error {
 func (p *Parser) parseOperationInputs() ([]*OperationInput, error) {
 	var inputs []*OperationInput
 	tok := p.GetToken()
-	if tok.Type != OPEN_BRACE {
+	if tok.Type != scanner.OPEN_BRACE {
 		return nil, p.SyntaxError()
 	}
 	tok = p.GetToken()
 	for tok != nil {
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return inputs, nil
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
@@ -423,24 +425,24 @@ func (p *Parser) parseOperationInputs() ([]*OperationInput, error) {
 			continue
 		} else {
 			in := &OperationInput{}
-			if tok.Type != SYMBOL {
+			if tok.Type != scanner.SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			in.Name = tok.Text
 			tok = p.GetToken()
-			if tok.Type != SYMBOL {
+			if tok.Type != scanner.SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			in.Type = tok.Text
 			tok = p.GetToken()
-			if tok.Type != OPEN_PAREN {
+			if tok.Type != scanner.OPEN_PAREN {
 				p.UngetToken()
 			} else {
 				for {
 					tok = p.GetToken()
-					if tok.Type == CLOSE_PAREN {
+					if tok.Type == scanner.CLOSE_PAREN {
 						break
-					} else if tok.Type == SYMBOL {
+					} else if tok.Type == scanner.SYMBOL {
 						switch tok.Text {
 						case "required":
 							in.Required = true
@@ -460,26 +462,26 @@ func (p *Parser) parseOperationInputs() ([]*OperationInput, error) {
 func (p *Parser) parseOperationOutputs() ([]*OperationOutput, error) {
 	var outputs []*OperationOutput
 	tok := p.GetToken()
-	if tok.Type != OPEN_BRACE {
+	if tok.Type != scanner.OPEN_BRACE {
 		return nil, p.SyntaxError()
 	}
 	tok = p.GetToken()
 	for tok != nil {
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return outputs, nil
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
 			continue
 		} else {
-			if tok.Type != SYMBOL {
+			if tok.Type != scanner.SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			outName := tok.Text
 			tok = p.GetToken()
-			if tok.Type != SYMBOL {
+			if tok.Type != scanner.SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			outType := tok.Text
@@ -497,21 +499,21 @@ func (p *Parser) parseOperationOutputs() ([]*OperationOutput, error) {
 func (p *Parser) parseOperationExceptions() ([]string, error) {
 	var exceptions []string
 	tok := p.GetToken()
-	if tok.Type != OPEN_BRACE {
+	if tok.Type != scanner.OPEN_BRACE {
 		return nil, p.SyntaxError()
 	}
 	tok = p.GetToken()
 	for tok != nil {
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return exceptions, nil
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
 			continue
 		} else {
-			if tok.Type != SYMBOL {
+			if tok.Type != scanner.SYMBOL {
 				return nil, p.SyntaxError()
 			}
 			exceptions = append(exceptions, tok.Text)
@@ -534,11 +536,11 @@ func (p *Parser) getIdentifier() string {
 	if tok == nil {
 		return ""
 	}
-	if tok.Type == COMMA {
+	if tok.Type == scanner.COMMA {
 		//ignore the comma, try again
 		return p.getIdentifier()
 	}
-	if tok.Type == SYMBOL {
+	if tok.Type == scanner.SYMBOL {
 		return tok.Text
 	}
 	p.UngetToken()
@@ -580,7 +582,7 @@ func (p *Parser) parseHttpDirective(name, comment string) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type == OPEN_BRACE {
+	if tok.Type == scanner.OPEN_BRACE {
 		var done bool
 		op.Comment = p.ParseTrailingComment(comment)
 		comment = ""
@@ -740,7 +742,7 @@ func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 	if tok == nil {
 		return p.EndOfFileError()
 	}
-	if tok.Type == OPEN_BRACE {
+	if tok.Type == scanner.OPEN_BRACE {
 		op.Expected.Comment = p.ParseTrailingComment(comment)
 		comment = ""
 		for {
@@ -754,7 +756,7 @@ func (p *Parser) parseHttpExpectedSpec(op *HttpDef, comment string) error {
 				return err
 			}
 		}
-	} else if tok.Type == SYMBOL {
+	} else if tok.Type == scanner.SYMBOL {
 		output := &HttpParamSpec{
 			StructFieldDef: StructFieldDef{
 				Name: "entity",
@@ -848,15 +850,15 @@ func (p *Parser) IsBlockDone(comment string) (bool, string, error) {
 		return false, comment, p.EndOfFileError()
 	}
 	for {
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return true, comment, nil
-		} else if tok.Type == LINE_COMMENT {
+		} else if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 			tok = p.GetToken()
 			if tok == nil {
 				return false, comment, p.EndOfFileError()
 			}
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return false, comment, p.EndOfFileError()
@@ -994,7 +996,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 	if tok == nil {
 		return typeName, nil, nil, nil, options, "", nil
 	}
-	if tok.Type == OPEN_ANGLE {
+	if tok.Type == scanner.OPEN_ANGLE {
 		var params []string
 		var expectedParams int
 		switch typeName {
@@ -1013,21 +1015,21 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 			if tok == nil {
 				return typeName, nil, nil, nil, options, "", p.EndOfFileError()
 			}
-			if tok.Type != COMMA {
-				if tok.Type == CLOSE_ANGLE {
+			if tok.Type != scanner.COMMA {
+				if tok.Type == scanner.CLOSE_ANGLE {
 					if expectedParams >= 0 && expectedParams != len(params) {
 						return typeName, nil, nil, nil, options, "", p.SyntaxError()
 					}
 					return typeName, params, nil, nil, options, "", nil
 				}
-				if tok.Type != SYMBOL {
+				if tok.Type != scanner.SYMBOL {
 					return typeName, params, nil, nil, options, "", p.SyntaxError()
 				}
 				params = append(params, tok.Text)
 			}
 		}
 	} else if typeName == "Struct" || typeName == "Enum" || typeName == "Union" {
-		if tok.Type != OPEN_BRACE {
+		if tok.Type != scanner.OPEN_BRACE {
 			p.UngetToken()
 			options, err = p.ParseOptions(typeName, []string{})
 			if err != nil {
@@ -1038,7 +1040,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 				return typeName, nil, nil, nil, options, "", p.EndOfFileError()
 			}
 		}
-		if tok.Type == OPEN_BRACE {
+		if tok.Type == scanner.OPEN_BRACE {
 			comment := p.ParseTrailingComment("")
 			switch typeName {
 			case "Struct", "Union":
@@ -1047,7 +1049,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 				if tok == nil {
 					return typeName, nil, fields, nil, options, comment, p.SyntaxError()
 				}
-				if tok.Type != NEWLINE {
+				if tok.Type != scanner.NEWLINE {
 					p.UngetToken()
 				}
 				for {
@@ -1069,7 +1071,7 @@ func (p *Parser) ParseTypeSpecElements() (string, []string, []*StructFieldDef, [
 				if tok == nil {
 					return typeName, nil, nil, nil, options, comment, p.SyntaxError()
 				}
-				if tok.Type != NEWLINE {
+				if tok.Type != scanner.NEWLINE {
 					p.UngetToken()
 				}
 				for {
@@ -1228,7 +1230,7 @@ func (p *Parser) parseUnionDef(td *TypeDef, params []string, fields []*StructFie
 
 func (p *Parser) Error(msg string) error {
 	Debug("*** error, last token:", p.lastToken)
-	return fmt.Errorf("*** %s\n", FormattedAnnotation(p.path, p.Source(), "", msg, p.lastToken, RED, 5))
+	return fmt.Errorf("*** %s\n", scanner.FormattedAnnotation(p.path, p.Source(), "", msg, p.lastToken, scanner.RED, 5))
 }
 
 func (p *Parser) SyntaxError() error {
@@ -1239,11 +1241,11 @@ func (p *Parser) EndOfFileError() error {
 	return p.Error("Unexpected end of file")
 }
 
-func (p *Parser) assertIdentifier(tok *Token) (string, error) {
+func (p *Parser) assertIdentifier(tok *scanner.Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == SYMBOL {
+	if tok.Type == scanner.SYMBOL {
 		return tok.Text, nil
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected symbol, found %v", tok.Type))
@@ -1264,7 +1266,7 @@ func (p *Parser) ExpectCompoundIdentifier() (string, error) {
 	if tok == nil {
 		return s, nil
 	}
-	if tok.Type != DOT {
+	if tok.Type != scanner.DOT {
 		p.UngetToken()
 		return s, nil
 	}
@@ -1276,18 +1278,18 @@ func (p *Parser) ExpectCompoundIdentifier() (string, error) {
 }
 
 func (p *Parser) expectEqualsIdentifier() (string, error) {
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return "", err
 	}
 	return p.ExpectIdentifier()
 }
 
-func (p *Parser) assertString(tok *Token) (string, error) {
+func (p *Parser) assertString(tok *scanner.Token) (string, error) {
 	if tok == nil {
 		return "", p.EndOfFileError()
 	}
-	if tok.Type == STRING {
+	if tok.Type == scanner.STRING {
 		return tok.Text, nil
 	}
 	return tok.Text, p.Error(fmt.Sprintf("Expected string, found %v", tok.Type))
@@ -1299,7 +1301,7 @@ func (p *Parser) ExpectString() (string, error) {
 }
 
 func (p *Parser) expectEqualsString() (string, error) {
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return "", err
 	}
@@ -1331,7 +1333,7 @@ func (p *Parser) expectInt32() (int32, error) {
 
 func (p *Parser) expectEqualsInt32() (*int32, error) {
 	var val int32
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return nil, err
 	}
@@ -1356,7 +1358,7 @@ func (p *Parser) expectInt64() (int64, error) {
 
 func (p *Parser) expectEqualsInt64() (*int64, error) {
 	var val int64
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return nil, err
 	}
@@ -1379,14 +1381,14 @@ func (p *Parser) expectNumber() (*Decimal, error) {
 }
 
 func (p *Parser) expectEqualsNumber() (*Decimal, error) {
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return nil, err
 	}
 	return p.expectNumber()
 }
 
-func (p *Parser) expect(toktype TokenType) error {
+func (p *Parser) expect(toktype scanner.TokenType) error {
 	tok := p.GetToken()
 	if tok == nil {
 		return p.EndOfFileError()
@@ -1447,16 +1449,16 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 	if tok == nil {
 		return options, nil
 	}
-	if tok.Type == OPEN_PAREN {
+	if tok.Type == scanner.OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return nil, p.SyntaxError()
 			}
-			if tok.Type == CLOSE_PAREN {
+			if tok.Type == scanner.CLOSE_PAREN {
 				return options, nil
 			}
-			if tok.Type == SYMBOL {
+			if tok.Type == scanner.SYMBOL {
 				match := strings.ToLower(tok.Text)
 				if strings.HasPrefix(match, "x_") {
 					options.Annotations, err = p.parseExtendedOption(options.Annotations, tok.Text)
@@ -1497,7 +1499,7 @@ func (p *Parser) ParseOptions(typeName string, acceptable []string) (*Options, e
 				if err != nil {
 					return nil, err
 				}
-			} else if tok.Type == COMMA {
+			} else if tok.Type == scanner.COMMA {
 				//ignore
 			} else {
 				return nil, p.SyntaxError()
@@ -1517,28 +1519,28 @@ func (p *Parser) parseStringToEndOfLine() (string, string, error) {
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type == EQUALS {
+	if tok.Type == scanner.EQUALS {
 		//ignore it except error if at end of file
 		tok = p.GetToken()
 		if tok == nil {
 			return "", "", p.EndOfFileError()
 		}
 	}
-	if tok.Type == STRING {
+	if tok.Type == scanner.STRING {
 		val = tok.Text
 		tok = p.GetToken()
 	}
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type == LINE_COMMENT {
+	if tok.Type == scanner.LINE_COMMENT {
 		comment = tok.Text
 		tok = p.GetToken()
 	}
 	if tok == nil {
 		return val, comment, nil
 	}
-	if tok.Type != NEWLINE {
+	if tok.Type != scanner.NEWLINE {
 		return "", "", p.SyntaxError()
 	}
 	return val, comment, nil
@@ -1558,7 +1560,7 @@ func (p *Parser) parseExtendedOption(annos map[string]string, anno string) (map[
 	var val string
 	tok := p.GetToken()
 	if tok != nil {
-		if tok.Type == EQUALS {
+		if tok.Type == scanner.EQUALS {
 			val, err = p.ExpectString()
 		} else {
 			p.UngetToken()
@@ -1582,27 +1584,27 @@ func (p *Parser) parseBytesOptions(typedef *TypeDef) error {
 		return p.SyntaxError()
 	}
 	expected := ""
-	if tok.Type == OPEN_PAREN {
+	if tok.Type == scanner.OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return p.SyntaxError()
 			}
-			if tok.Type == CLOSE_PAREN {
+			if tok.Type == scanner.CLOSE_PAREN {
 				return nil
 			}
-			if tok.Type == SYMBOL {
+			if tok.Type == scanner.SYMBOL {
 				switch tok.Text {
 				case "minsize", "maxsize":
 					expected = tok.Text
 				default:
 					return p.Error("invalid bytes option: " + tok.Text)
 				}
-			} else if tok.Type == EQUALS {
+			} else if tok.Type == scanner.EQUALS {
 				if expected == "" {
 					return p.SyntaxError()
 				}
-			} else if tok.Type == NUMBER {
+			} else if tok.Type == scanner.NUMBER {
 				if expected == "" {
 					return p.SyntaxError()
 				}
@@ -1634,7 +1636,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != EQUALS {
+	if tok.Type != scanner.EQUALS {
 		return nil, p.SyntaxError()
 	}
 
@@ -1642,7 +1644,7 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 	if tok == nil {
 		return nil, p.EndOfFileError()
 	}
-	if tok.Type != OPEN_BRACKET {
+	if tok.Type != scanner.OPEN_BRACKET {
 		return nil, p.SyntaxError()
 	}
 	for {
@@ -1650,12 +1652,12 @@ func (p *Parser) expectEqualsStringArray() ([]string, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == CLOSE_BRACKET {
+		if tok.Type == scanner.CLOSE_BRACKET {
 			break
 		}
-		if tok.Type == STRING {
+		if tok.Type == scanner.STRING {
 			values = append(values, tok.Text)
-		} else if tok.Type == COMMA || tok.Type == NEWLINE {
+		} else if tok.Type == scanner.COMMA || tok.Type == scanner.NEWLINE {
 			//ignore
 		} else {
 			return nil, p.SyntaxError()
@@ -1673,11 +1675,11 @@ func (p *Parser) parseEnumElementDef() (*EnumElementDef, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return nil, nil
-		} else if tok.Type == LINE_COMMENT {
+		} else if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
-		} else if tok.Type == SEMICOLON || tok.Type == NEWLINE || tok.Type == COMMA {
+		} else if tok.Type == scanner.SEMICOLON || tok.Type == scanner.NEWLINE || tok.Type == scanner.COMMA {
 			//ignore
 		} else {
 			sym, err = p.assertIdentifier(tok)
@@ -1704,7 +1706,7 @@ func (p *Parser) expectNewline() error {
 	if tok == nil {
 		return p.SyntaxError()
 	}
-	if tok.Type != NEWLINE {
+	if tok.Type != scanner.NEWLINE {
 		p.UngetToken()
 		return p.SyntaxError()
 	}
@@ -1718,15 +1720,15 @@ func (p *Parser) parseStructFieldDef() (*StructFieldDef, error) {
 		return nil, p.EndOfFileError()
 	}
 	for {
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return nil, nil
-		} else if tok.Type == LINE_COMMENT {
+		} else if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment("", tok.Text)
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
 			}
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			tok = p.GetToken()
 			if tok == nil {
 				return nil, p.EndOfFileError()
@@ -1799,7 +1801,7 @@ func (p *Parser) parseStructFieldOptions(field *StructFieldDef) error {
 }
 
 func (p *Parser) parseEqualsLiteral() (interface{}, error) {
-	err := p.expect(EQUALS)
+	err := p.expect(scanner.EQUALS)
 	if err != nil {
 		return 0, err
 	}
@@ -1814,24 +1816,24 @@ func (p *Parser) parseLiteralValue() (interface{}, error) {
 	return p.parseLiteral(tok)
 }
 
-func (p *Parser) parseLiteral(tok *Token) (interface{}, error) {
+func (p *Parser) parseLiteral(tok *scanner.Token) (interface{}, error) {
 	switch tok.Type {
-	case SYMBOL:
+	case scanner.SYMBOL:
 		return p.parseLiteralSymbol(tok)
-	case STRING:
+	case scanner.STRING:
 		return p.parseLiteralString(tok)
-	case NUMBER:
+	case scanner.NUMBER:
 		return p.parseLiteralNumber(tok)
-	case OPEN_BRACKET:
+	case scanner.OPEN_BRACKET:
 		return p.parseLiteralArray()
-	case OPEN_BRACE:
+	case scanner.OPEN_BRACE:
 		return p.parseLiteralObject()
 	default:
 		return nil, p.SyntaxError()
 	}
 }
 
-func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
+func (p *Parser) parseLiteralSymbol(tok *scanner.Token) (interface{}, error) {
 	switch tok.Text {
 	case "true":
 		return true, nil
@@ -1843,7 +1845,7 @@ func (p *Parser) parseLiteralSymbol(tok *Token) (interface{}, error) {
 		return nil, fmt.Errorf("Not a valid symbol: %s", tok.Text)
 	}
 }
-func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
+func (p *Parser) parseLiteralString(tok *scanner.Token) (*string, error) {
 	s := "\"" + tok.Text + "\""
 	q, err := strconv.Unquote(s)
 	if err != nil {
@@ -1852,7 +1854,7 @@ func (p *Parser) parseLiteralString(tok *Token) (*string, error) {
 	return &q, nil
 }
 
-func (p *Parser) parseLiteralNumber(tok *Token) (interface{}, error) {
+func (p *Parser) parseLiteralNumber(tok *scanner.Token) (interface{}, error) {
 	num, err := ParseDecimal(tok.Text)
 	if err != nil {
 		return nil, p.Error(fmt.Sprintf("Not a valid number: %s", tok.Text))
@@ -1867,11 +1869,11 @@ func (p *Parser) parseLiteralArray() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type != NEWLINE {
-			if tok.Type == CLOSE_BRACKET {
+		if tok.Type != scanner.NEWLINE {
+			if tok.Type == scanner.CLOSE_BRACKET {
 				return ary, nil
 			}
-			if tok.Type != COMMA {
+			if tok.Type != scanner.COMMA {
 				obj, err := p.parseLiteral(tok)
 				if err != nil {
 					return nil, err
@@ -1890,15 +1892,15 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 		if tok == nil {
 			return nil, p.EndOfFileError()
 		}
-		if tok.Type == CLOSE_BRACE {
+		if tok.Type == scanner.CLOSE_BRACE {
 			return obj, nil
 		}
-		if tok.Type == STRING {
+		if tok.Type == scanner.STRING {
 			pkey, err := p.parseLiteralString(tok)
 			if err != nil {
 				return nil, err
 			}
-			err = p.expect(COLON)
+			err = p.expect(scanner.COLON)
 			if err != nil {
 				return nil, err
 			}
@@ -1907,7 +1909,7 @@ func (p *Parser) parseLiteralObject() (interface{}, error) {
 				return nil, err
 			}
 			obj[*pkey] = val
-		} else if tok.Type == SYMBOL {
+		} else if tok.Type == scanner.SYMBOL {
 			return nil, p.Error("Expected String key for JSON object, found symbol '" + tok.Text + "'")
 		} else {
 			//fmt.Println("ignoring this token:", tok)
@@ -1933,16 +1935,16 @@ func (p *Parser) parseCollectionOptions(typedef *TypeDef) error {
 	if tok == nil {
 		return p.SyntaxError()
 	}
-	if tok.Type == OPEN_PAREN {
+	if tok.Type == scanner.OPEN_PAREN {
 		for {
 			tok := p.GetToken()
 			if tok == nil {
 				return p.SyntaxError()
 			}
-			if tok.Type == CLOSE_PAREN {
+			if tok.Type == scanner.CLOSE_PAREN {
 				return nil
 			}
-			if tok.Type == SYMBOL {
+			if tok.Type == scanner.SYMBOL {
 				switch tok.Text {
 				case "minsize":
 					num, err := p.expectEqualsInt64()
@@ -2006,11 +2008,11 @@ func (p *Parser) EndOfStatement(comment string) (string, error) {
 		if tok == nil {
 			return comment, nil
 		}
-		if tok.Type == SEMICOLON {
+		if tok.Type == scanner.SEMICOLON {
 			//ignore it
-		} else if tok.Type == LINE_COMMENT {
+		} else if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
-		} else if tok.Type == NEWLINE {
+		} else if tok.Type == scanner.NEWLINE {
 			return comment, nil
 		} else {
 			return comment, p.SyntaxError()
@@ -2024,7 +2026,7 @@ func (p *Parser) parseLeadingComment(comment string) string {
 		if tok == nil {
 			return comment
 		}
-		if tok.Type == LINE_COMMENT {
+		if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 		} else {
 			p.UngetToken()
@@ -2036,7 +2038,7 @@ func (p *Parser) parseLeadingComment(comment string) string {
 func (p *Parser) ParseTrailingComment(comment string) string {
 	tok := p.GetToken()
 	if tok != nil {
-		if tok.Type == LINE_COMMENT {
+		if tok.Type == scanner.LINE_COMMENT {
 			comment = p.MergeComment(comment, tok.Text)
 		} else {
 			p.UngetToken()
