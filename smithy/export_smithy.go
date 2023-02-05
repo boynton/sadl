@@ -293,7 +293,8 @@ func FromSADL(model *sadl.Model, ns string) (*smithylib.AST, error) {
 		if model.Comment != "" {
 			ensureShapeTraits(service).Put("smithy.api#documentation", model.Comment)
 		}
-		ast.Shapes.Put(prefix+model.Name, service)
+		serviceName := sadl.Capitalize(model.Name)
+		ast.Shapes.Put(prefix+serviceName, service)
 	}
 	if len(model.Examples) > 0 {
 		examplesFromSADL(ns, ast, model)
