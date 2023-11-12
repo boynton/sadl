@@ -413,6 +413,13 @@ func (gen *Generator) exportTypeDef(td *sadl.TypeDef) (*Schema, error) {
 		return tmp, nil
 	case "Union":
 		return gen.exportUnionTypeDef(td)
+	case "Timestamp":
+		tmp, err := gen.exportStringTypeDef(td)
+		if err != nil {
+			return nil, err
+		}
+		tmp.Format = "date-time"
+		return tmp, nil
 	}
 	//etc
 	return nil, fmt.Errorf("Implement export of this type: %q", td.Type)

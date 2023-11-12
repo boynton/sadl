@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -28,6 +29,8 @@ func serveSwaggerUi(model *sadl.Model, conf *sadl.Data) error {
 	modTime := time.Now()
 	apiName := model.Name + ".json"
 	fmt.Println("show swagger-ui for:", apiName, "at http://localhost:8080/")
+
+	_ = exec.Command("open", "http://localhost:8080/").Run()
 
 	endpoint := ":8080"
 	path, err := cacheSwaggerDist()

@@ -182,9 +182,6 @@ func ToSadl(ast *smithylib.AST, conf *sadl.Data) (*sadl.Model, error) {
 	if schema.Version == "" {
 		schema.Version = serviceVersion
 	}
-	if schema.Base == "" && schema.Version != "" {
-		schema.Base = "/" + schema.Version
-	}
 	for _, k := range ast.Shapes.Keys() {
 		v := ast.Shapes.Get(k)
 		if v.Type != "service" || k == serviceName {
@@ -493,8 +490,12 @@ func (i *Importer) importTraitsAsAnnotations(annos map[string]string, traits *da
 				}
 			} else {
 				if strings.HasPrefix(k, "smithy.api#") {
-					fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
-					panic("here: " + k)
+					if k == "smithy.api#internal" {
+						//ignore
+					} else {
+						fmt.Println("Unhandled trait:", k, " =", sadl.Pretty(v))
+						//panic("here: " + k)
+					}
 				} //else ignore
 			}
 		}
@@ -804,7 +805,7 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 	if code == 0 {
 		code = 200
 	}
-	if shape.Input != nil {
+	if shape.Input != nil && inShapeName != "smithy.api#Unit" {
 		inStruct := i.ast.GetShape(inShapeName)
 		qs := ""
 		payloadMember := ""
@@ -858,7 +859,7 @@ func (i *Importer) importOperationShape(shapeName string, shape *smithylib.Shape
 	expected := &sadl.HttpExpectedSpec{
 		Status: int32(code),
 	}
-	if shape.Output != nil {
+	if shape.Output != nil && outShapeName != "smithy.api#Unit" {
 		outStruct := i.ast.GetShape(outShapeName)
 		//SADL: each output is a header or a (singular) payload.
 		//Smithy: the output struct is the result payload, unless a field is marked as payload, which allows other fields
