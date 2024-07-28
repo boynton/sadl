@@ -71,6 +71,8 @@ func AsBool(v interface{}) bool {
 	if v != nil {
 		if b, isBool := v.(bool); isBool {
 			return b
+		} else if s, isString := v.(string); isString {
+			return s != "false"
 		}
 		return true
 	}
